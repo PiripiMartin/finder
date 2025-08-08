@@ -21,6 +21,7 @@ export default function Index() {
 
   const handleMarkerPress = (pointId: string, event: any) => {
     const videoUrl = videoUrls[pointId];
+    console.log('Marker pressed:', pointId, 'Video URL:', videoUrl);
     if (videoUrl) {
       setSelectedVideo(videoUrl);
       setIsVideoVisible(true);
@@ -113,7 +114,7 @@ export default function Index() {
               <Text style={[styles.closeButtonText, { color: theme.colors.text }]}>✕</Text>
             </TouchableOpacity>
             <WebView
-              key={selectedVideo}
+              key={`${selectedVideo}-${Date.now()}`}
               source={{ 
                 html: `
                   <!DOCTYPE html>
