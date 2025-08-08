@@ -125,82 +125,24 @@ export default function Index() {
                         margin: 0; 
                         padding: 0; 
                         background: #000; 
-                        overflow: hidden;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
                       }
                       iframe { 
-                        width: 100%; 
-                        height: 100vh; 
                         border: none; 
                         display: block;
                       }
                     </style>
-                    <script>
-                      // Function to setup auto loop and hide controls
-                      function setupTikTokPlayer() {
-                        const iframe = document.querySelector('iframe');
-                        if (iframe) {
-                          // Add parameters to hide controls and enable loop
-                          const baseUrl = '${selectedVideo}';
-                          const params = new URLSearchParams({
-                            'music_info': '0',
-                            'description': '0',
-                            'autoplay': '1',
-                            'loop': '1',
-                            'muted': '1'
-                          });
-                          
-                          iframe.src = baseUrl + '?' + params.toString();
-                          
-                          // Setup messaging for player control
-                          window.addEventListener('message', function(event) {
-                            if (event.origin.includes('tiktok.com')) {
-                              // Handle TikTok player messages
-                              console.log('TikTok message:', event.data);
-                            }
-                          });
-                          
-                          // Send play command after iframe loads
-                          iframe.onload = function() {
-                            setTimeout(function() {
-                              try {
-                                iframe.contentWindow.postMessage({
-                                  method: 'play',
-                                  value: true
-                                }, '*');
-                              } catch(e) {
-                                console.log('Could not send play command');
-                              }
-                            }, 1000);
-                          };
-                          
-                          // Auto restart video when it ends
-                          setInterval(function() {
-                            try {
-                              iframe.contentWindow.postMessage({
-                                method: 'seekTo',
-                                value: 0
-                              }, '*');
-                              iframe.contentWindow.postMessage({
-                                method: 'play',
-                                value: true
-                              }, '*');
-                            } catch(e) {
-                              console.log('Could not restart video');
-                            }
-                          }, 30000); // Check every 30 seconds
-                        }
-                      }
-                      
-                      // Setup when page loads
-                      window.onload = setupTikTokPlayer;
-                      document.addEventListener('DOMContentLoaded', setupTikTokPlayer);
-                    </script>
                   </head>
                   <body>
                     <iframe 
-                      sandbox="allow-popups allow-popups-to-escape-sandbox allow-scripts allow-top-navigation allow-same-origin allow-forms"
-                      allowfullscreen
-                      allow="autoplay; encrypted-media">
+                      height="300" 
+                      width="400" 
+                      src="${selectedVideo}" 
+                      allow="fullscreen" 
+                      title="TikTok Video">
                     </iframe>
                   </body>
                   </html>
@@ -263,8 +205,8 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   videoContainer: {
-    width: 250,
-    height: 400, // Larger size to better fit TikTok embeds
+    width: 165,
+    height: 298, // Match the iframe dimensions
     borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
