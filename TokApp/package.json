@@ -1,5 +1,5 @@
 {
-  "name": "finder",
+  "name": "tokapp",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -37,15 +37,17 @@
     "react-native-screens": "~4.11.1",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
-    "react-native-maps": "1.20.1"
+    "react-native-maps": "1.20.1",
+    "expo-location": "~18.1.6",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "expo-av": "~15.1.7"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-    "@types/node": "^24.2.0",
     "@types/react": "~19.0.10",
+    "typescript": "~5.8.3",
     "eslint": "^9.25.0",
-    "eslint-config-expo": "~9.2.0",
-    "typescript": "~5.8.3"
+    "eslint-config-expo": "~9.2.0"
   },
   "private": true
 }
