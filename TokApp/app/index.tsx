@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import { useRouter } from "expo-router";
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
@@ -12,11 +12,13 @@ const { width } = Dimensions.get('window');
 
 export default function Index() {
   const router = useRouter();
+  const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation] = useState<Region | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [isVideoVisible, setIsVideoVisible] = useState(false);
   const [selectedMarkerPosition, setSelectedMarkerPosition] = useState({ x: 0, y: 0 });
+  const [videoPosition, setVideoPosition] = useState({ x: 0, y: 0 });
   const { theme } = useTheme();
 
   const handleMarkerPress = (pointId: string, event: any) => {
@@ -28,10 +30,24 @@ export default function Index() {
       
       // Get marker position for video placement
       if (event.nativeEvent) {
+        const coordinate = event.nativeEvent.coordinate;
         setSelectedMarkerPosition({
-          x: event.nativeEvent.coordinate.x,
-          y: event.nativeEvent.coordinate.y,
+          x: coordinate.longitude,
+          y: coordinate.latitude,
         });
+        
+        // Calculate video position based on marker screen position
+        const screenWidth = Dimensions.get('window').width;
+        const screenHeight = Dimensions.get('window').height;
+        const videoWidth = 165; // Width of video container
+        const videoHeight = 298; // Height of video container
+        const margin = 20;
+        
+        // Place video in bottom left
+        const x = margin;
+        const y = screenHeight - videoHeight - 80; // Moved up by reducing bottom margin
+        
+        setVideoPosition({ x, y });
       }
     }
   };
@@ -72,6 +88,7 @@ export default function Index() {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Full-screen map */}
       <MapView
+        ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}
         initialRegion={userLocation || {
@@ -108,7 +125,7 @@ export default function Index() {
 
       {/* Picture-in-Picture Video */}
       {isVideoVisible && selectedVideo && (
-        <View style={styles.videoOverlay}>
+        <View style={[styles.videoOverlay, { left: videoPosition.x, top: videoPosition.y }]}>
           <View style={[styles.videoContainer, { backgroundColor: theme.colors.surface }]}>
             <TouchableOpacity style={styles.closeButton} onPress={closeVideo}>
               <Text style={[styles.closeButtonText, { color: theme.colors.text }]}>✕</Text>
@@ -201,8 +218,6 @@ const styles = StyleSheet.create({
   },
   videoOverlay: {
     position: 'absolute',
-    top: 50,
-    right: 20,
     zIndex: 1000,
   },
   videoContainer: {
