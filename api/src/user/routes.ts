@@ -1,4 +1,5 @@
-import { db } from "../database";
+import { db, toCamelCase } from "../database";
+import type { User } from "./types";
 
 
 
@@ -6,6 +7,7 @@ interface LoginRequest {
     username: string,
     password: string,
 };
+
 
 
 export async function login(req: Request): Promise<Response> {
@@ -21,24 +23,23 @@ export async function login(req: Request): Promise<Response> {
     const loginRequest = data as LoginRequest;
 
     // Fetch the corresponding account
-    const [results, _] = await db.execute(
-        "SELECT id, username, password_hash FROM users WHERE username = ?", 
+    const [rows, _] = await db.execute(
+        "SELECT * FROM users WHERE username = ?", 
         [loginRequest.username]
-    ) as [any, any];
+    ) as [any[], any];
+
+    const results: User[] = toCamelCase(rows);
 
 
-    console.log("Fetch results:");
-    console.log(results);
-    
     // Compare hashes
-    const validCredentials = Bun.password.verify(loginRequest.password, results.password_hash, "argon2id");
-    
-    console.log("Hash comparison results:");
-    console.log(validCredentials);
+    const validCredentials = await Bun.password.verify(loginRequest.password, results[0]?.passwordHash || "", "argon2id");
 
 
-    return new Response();
+
+    // TODO: Generate this to initiate session
+    const sessionToken = "";
+
+    return new Response(sessionToken, {status: validCredentials ? 200 : 401});
 }
-
 
 

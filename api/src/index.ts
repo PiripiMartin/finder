@@ -7,7 +7,7 @@ Bun.serve({
     routes: {
         "/api/login": {
             POST: login
-        }
+        },
     }
 });
 
