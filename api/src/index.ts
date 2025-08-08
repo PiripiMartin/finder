@@ -1,19 +1,9 @@
-
-
-function testRoute(req: Request): Response {
-
-
-    console.log(req);
-
-    return new Response("Hello!");
-}
-
+import { db } from "./database";
 
 
 Bun.serve({
     port: 8000,
     routes: {
-        "/": testRoute
     }
 });
 
