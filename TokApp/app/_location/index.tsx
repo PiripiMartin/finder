@@ -3,8 +3,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { useTheme } from './context/ThemeContext';
-import { tiktokEmbedUrls } from './videoData';
+import { useTheme } from '../context/ThemeContext';
+import { tiktokEmbedUrls } from '../videoData';
 
 const { width } = Dimensions.get('window');
 const tileWidth = (width - 30) / 2; // 2 columns with padding

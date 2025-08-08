@@ -4,20 +4,16 @@ import { useEffect, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
-import { useTheme } from './context/ThemeContext';
-import { MapPoint, mapPoints } from './mapData';
-import { videoUrls } from './videoData';
-
-const { width } = Dimensions.get('window');
+import { useTheme } from '../context/ThemeContext';
+import { MapPoint, mapPoints } from '../mapData';
+import { videoUrls } from '../videoData';
 
 export default function Index() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation] = useState<Region | null>(null);
-  const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [isVideoVisible, setIsVideoVisible] = useState(false);
-  const [selectedMarkerPosition, setSelectedMarkerPosition] = useState({ x: 0, y: 0 });
   const [videoPosition, setVideoPosition] = useState({ x: 0, y: 0 });
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
@@ -30,22 +26,13 @@ export default function Index() {
       setIsVideoVisible(true);
       setSelectedMarkerId(pointId);
       
-      // Get marker position for video placement
+      // Calculate video position based on screen dimensions
       if (event.nativeEvent) {
-        const coordinate = event.nativeEvent.coordinate;
-        setSelectedMarkerPosition({
-          x: coordinate.longitude,
-          y: coordinate.latitude,
-        });
-        
-        // Calculate video position based on marker screen position
-        const screenWidth = Dimensions.get('window').width;
         const screenHeight = Dimensions.get('window').height;
-        const videoWidth = 165; // Width of video container
         const videoHeight = 298; // Height of video container
         const margin = 20;
         
-        // Place video in bottom left
+        // Place video in bottom left, moved up
         const x = margin;
         const y = screenHeight - videoHeight - 130; // Moved up by reducing bottom margin
         
@@ -67,8 +54,6 @@ export default function Index() {
         console.log('Location permission denied');
         return;
       }
-      
-      setLocationPermission(true);
       
       // Get current location
       let location = await Location.getCurrentPositionAsync({
@@ -118,9 +103,7 @@ export default function Index() {
             tracksViewChanges={false}
             onPress={(event) => handleMarkerPress(point.id, event)}
           >
-            <View style={[styles.customMarker, { backgroundColor: theme.colors.surface, borderColor: theme.colors.primary, shadowColor: theme.colors.shadow }]}>
-              <Text style={styles.markerEmoji}>{point.emoji}</Text>
-            </View>
+            <Text style={styles.markerEmoji}>{point.emoji}</Text>
           </Marker>
         ))}
       </MapView>
@@ -131,11 +114,11 @@ export default function Index() {
           {/* Shop Button with Arrow */}
           <TouchableOpacity 
             style={[styles.shopButton, { backgroundColor: '#ffffff' }]}
-            onPress={() => {
-              // Navigate to location page
-              console.log('Navigating to location with ID:', selectedMarkerId);
-              router.push(`/location?id=${selectedMarkerId}`);
-            }}
+                               onPress={() => {
+                     // Navigate to location page
+                     console.log('Navigating to location with ID:', selectedMarkerId);
+                     router.push(`/_location?id=${selectedMarkerId}`);
+                   }}
           >
             <Text style={styles.shopButtonText}>→ Check it out</Text>
           </TouchableOpacity>
@@ -227,9 +210,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
-  markerEmoji: {
-    fontSize: 18,
-  },
+           markerEmoji: {
+           fontSize: 32,
+         },
   videoOverlay: {
     position: 'absolute',
     zIndex: 1000,

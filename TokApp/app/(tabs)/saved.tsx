@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useTheme } from './context/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const videoWidth = (width - 30) / 2; // 2 columns with padding
