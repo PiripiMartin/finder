@@ -7,6 +7,7 @@ function TabLayout() {
   
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
@@ -22,20 +23,20 @@ function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="saved"
-        options={{
-          title: "",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="bookmark" size={20} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="index"
         options={{
           title: "",
           tabBarIcon: ({ color }) => (
             <Ionicons name="map" size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="saved"
+        options={{
+          title: "",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="bookmark" size={20} color={color} />
           ),
         }}
       />

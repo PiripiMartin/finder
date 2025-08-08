@@ -19,6 +19,7 @@ export default function Index() {
   const [isVideoVisible, setIsVideoVisible] = useState(false);
   const [selectedMarkerPosition, setSelectedMarkerPosition] = useState({ x: 0, y: 0 });
   const [videoPosition, setVideoPosition] = useState({ x: 0, y: 0 });
+  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
 
   const handleMarkerPress = (pointId: string, event: any) => {
@@ -27,6 +28,7 @@ export default function Index() {
     if (videoUrl) {
       setSelectedVideo(videoUrl);
       setIsVideoVisible(true);
+      setSelectedMarkerId(pointId);
       
       // Get marker position for video placement
       if (event.nativeEvent) {
@@ -45,7 +47,7 @@ export default function Index() {
         
         // Place video in bottom left
         const x = margin;
-        const y = screenHeight - videoHeight - 80; // Moved up by reducing bottom margin
+        const y = screenHeight - videoHeight - 130; // Moved up by reducing bottom margin
         
         setVideoPosition({ x, y });
       }
@@ -126,6 +128,18 @@ export default function Index() {
       {/* Picture-in-Picture Video */}
       {isVideoVisible && selectedVideo && (
         <View style={[styles.videoOverlay, { left: videoPosition.x, top: videoPosition.y }]}>
+          {/* Shop Button with Arrow */}
+          <TouchableOpacity 
+            style={[styles.shopButton, { backgroundColor: '#ffffff' }]}
+            onPress={() => {
+              // Navigate to location page
+              console.log('Navigating to location with ID:', selectedMarkerId);
+              router.push(`/location?id=${selectedMarkerId}`);
+            }}
+          >
+            <Text style={styles.shopButtonText}>→ Check it out</Text>
+          </TouchableOpacity>
+          
           <View style={[styles.videoContainer, { backgroundColor: theme.colors.surface }]}>
             <TouchableOpacity style={styles.closeButton} onPress={closeVideo}>
               <Text style={[styles.closeButtonText, { color: theme.colors.text }]}>✕</Text>
@@ -256,6 +270,27 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     fontSize: 12,
+    fontWeight: 'bold',
+  },
+  shopButton: {
+    width: 165,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  shopButtonText: {
+    color: '#000000',
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });
