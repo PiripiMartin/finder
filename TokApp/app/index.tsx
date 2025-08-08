@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import { useRouter } from "expo-router";
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
@@ -12,25 +12,42 @@ const { width } = Dimensions.get('window');
 
 export default function Index() {
   const router = useRouter();
+  const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation] = useState<Region | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [isVideoVisible, setIsVideoVisible] = useState(false);
   const [selectedMarkerPosition, setSelectedMarkerPosition] = useState({ x: 0, y: 0 });
+  const [videoPosition, setVideoPosition] = useState({ x: 0, y: 0 });
   const { theme } = useTheme();
 
   const handleMarkerPress = (pointId: string, event: any) => {
     const videoUrl = videoUrls[pointId];
+    console.log('Marker pressed:', pointId, 'Video URL:', videoUrl);
     if (videoUrl) {
       setSelectedVideo(videoUrl);
       setIsVideoVisible(true);
       
       // Get marker position for video placement
       if (event.nativeEvent) {
+        const coordinate = event.nativeEvent.coordinate;
         setSelectedMarkerPosition({
-          x: event.nativeEvent.coordinate.x,
-          y: event.nativeEvent.coordinate.y,
+          x: coordinate.longitude,
+          y: coordinate.latitude,
         });
+        
+        // Calculate video position based on marker screen position
+        const screenWidth = Dimensions.get('window').width;
+        const screenHeight = Dimensions.get('window').height;
+        const videoWidth = 165; // Width of video container
+        const videoHeight = 298; // Height of video container
+        const margin = 20;
+        
+        // Place video in bottom left
+        const x = margin;
+        const y = screenHeight - videoHeight - 80; // Moved up by reducing bottom margin
+        
+        setVideoPosition({ x, y });
       }
     }
   };
@@ -71,6 +88,7 @@ export default function Index() {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Full-screen map */}
       <MapView
+        ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}
         initialRegion={userLocation || {
@@ -107,24 +125,55 @@ export default function Index() {
 
       {/* Picture-in-Picture Video */}
       {isVideoVisible && selectedVideo && (
-        <View style={styles.videoOverlay}>
+        <View style={[styles.videoOverlay, { left: videoPosition.x, top: videoPosition.y }]}>
           <View style={[styles.videoContainer, { backgroundColor: theme.colors.surface }]}>
             <TouchableOpacity style={styles.closeButton} onPress={closeVideo}>
               <Text style={[styles.closeButtonText, { color: theme.colors.text }]}>✕</Text>
             </TouchableOpacity>
             <WebView
+              key={`${selectedVideo}-${Date.now()}`}
               source={{ 
-                uri: selectedVideo,
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
-                }
+                html: `
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                      body { 
+                        margin: 0; 
+                        padding: 0; 
+                        background: #000; 
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                      }
+                      iframe { 
+                        border: none; 
+                        display: block;
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <iframe 
+                      height="300" 
+                      width="400" 
+                      src="${selectedVideo}" 
+                      allow="fullscreen" 
+                      title="TikTok Video">
+                    </iframe>
+                  </body>
+                  </html>
+                `
               }}
               style={styles.video}
               allowsInlineMediaPlayback={true}
               mediaPlaybackRequiresUserAction={false}
               javaScriptEnabled={true}
               domStorageEnabled={true}
-              userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
+              scalesPageToFit={true}
+              bounces={false}
+              scrollEnabled={false}
               onError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
                 console.warn('WebView error: ', nativeEvent);
@@ -169,13 +218,11 @@ const styles = StyleSheet.create({
   },
   videoOverlay: {
     position: 'absolute',
-    top: 50,
-    right: 20,
     zIndex: 1000,
   },
   videoContainer: {
-    width: 200,
-    height: 300, // Better size for TikTok embeds
+    width: 165,
+    height: 298, // Match the iframe dimensions
     borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
@@ -193,6 +240,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: '#000',
+    borderRadius: 8,
   },
   closeButton: {
     position: 'absolute',
