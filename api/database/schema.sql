@@ -10,12 +10,15 @@ CREATE TABLE IF NOT EXISTS users (
 
 
 CREATE TABLE IF NOT EXISTS user_sessions(
-  session_token CHAR(36) PRIMARY KEY,
-  expires_at DATETIME NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  --ip_address VARCHAR(45), NOTE: not needed right now, can be added in if needed
-  --user_agent TEXT,              ^ same here.
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    session_token CHAR(36) PRIMARY KEY,
+    user_id INT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    /*
+    ip_address VARCHAR(45), NOTE: not needed right now, can be added in if needed
+    user_agent TEXT,              ^ same here.
+    */
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 
@@ -24,9 +27,8 @@ CREATE TABLE IF NOT EXISTS map_points (
     title VARCHAR(100) NOT NULL,
     description TEXT,
     emoji VARCHAR(16) NOT NULL,
-    latitude DECIMAL(9,6) NOT NULL,
-    longitude DECIMAL(9,6) NOT NULL,
-    SPATIAL INDEX idx_location (latitude, longitude),
+    location POINT NOT NULL,
+    SPATIAL INDEX idx_location (location),
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -35,7 +37,8 @@ CREATE TABLE IF NOT EXISTS map_points (
 CREATE TABLE IF NOT EXISTS posts (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     url VARCHAR(2048) NOT NULL,
-    FOREIGN KEY (posted_by) INT REFERENCES users (id),
+    posted_by INT,
+    FOREIGN KEY (posted_by) REFERENCES users(id),
 
     posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
