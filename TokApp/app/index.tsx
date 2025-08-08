@@ -113,18 +113,107 @@ export default function Index() {
               <Text style={[styles.closeButtonText, { color: theme.colors.text }]}>✕</Text>
             </TouchableOpacity>
             <WebView
+              key={selectedVideo}
               source={{ 
-                uri: selectedVideo,
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
-                }
+                html: `
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                      body { 
+                        margin: 0; 
+                        padding: 0; 
+                        background: #000; 
+                        overflow: hidden;
+                      }
+                      iframe { 
+                        width: 100%; 
+                        height: 100vh; 
+                        border: none; 
+                        display: block;
+                      }
+                    </style>
+                    <script>
+                      // Function to setup auto loop and hide controls
+                      function setupTikTokPlayer() {
+                        const iframe = document.querySelector('iframe');
+                        if (iframe) {
+                          // Add parameters to hide controls and enable loop
+                          const baseUrl = '${selectedVideo}';
+                          const params = new URLSearchParams({
+                            'music_info': '0',
+                            'description': '0',
+                            'autoplay': '1',
+                            'loop': '1',
+                            'muted': '1'
+                          });
+                          
+                          iframe.src = baseUrl + '?' + params.toString();
+                          
+                          // Setup messaging for player control
+                          window.addEventListener('message', function(event) {
+                            if (event.origin.includes('tiktok.com')) {
+                              // Handle TikTok player messages
+                              console.log('TikTok message:', event.data);
+                            }
+                          });
+                          
+                          // Send play command after iframe loads
+                          iframe.onload = function() {
+                            setTimeout(function() {
+                              try {
+                                iframe.contentWindow.postMessage({
+                                  method: 'play',
+                                  value: true
+                                }, '*');
+                              } catch(e) {
+                                console.log('Could not send play command');
+                              }
+                            }, 1000);
+                          };
+                          
+                          // Auto restart video when it ends
+                          setInterval(function() {
+                            try {
+                              iframe.contentWindow.postMessage({
+                                method: 'seekTo',
+                                value: 0
+                              }, '*');
+                              iframe.contentWindow.postMessage({
+                                method: 'play',
+                                value: true
+                              }, '*');
+                            } catch(e) {
+                              console.log('Could not restart video');
+                            }
+                          }, 30000); // Check every 30 seconds
+                        }
+                      }
+                      
+                      // Setup when page loads
+                      window.onload = setupTikTokPlayer;
+                      document.addEventListener('DOMContentLoaded', setupTikTokPlayer);
+                    </script>
+                  </head>
+                  <body>
+                    <iframe 
+                      sandbox="allow-popups allow-popups-to-escape-sandbox allow-scripts allow-top-navigation allow-same-origin allow-forms"
+                      allowfullscreen
+                      allow="autoplay; encrypted-media">
+                    </iframe>
+                  </body>
+                  </html>
+                `
               }}
               style={styles.video}
               allowsInlineMediaPlayback={true}
               mediaPlaybackRequiresUserAction={false}
               javaScriptEnabled={true}
               domStorageEnabled={true}
-              userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
+              scalesPageToFit={true}
+              bounces={false}
+              scrollEnabled={false}
               onError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
                 console.warn('WebView error: ', nativeEvent);
@@ -174,8 +263,8 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   videoContainer: {
-    width: 200,
-    height: 300, // Better size for TikTok embeds
+    width: 250,
+    height: 400, // Larger size to better fit TikTok embeds
     borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
@@ -193,6 +282,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: '#000',
+    borderRadius: 8,
   },
   closeButton: {
     position: 'absolute',
