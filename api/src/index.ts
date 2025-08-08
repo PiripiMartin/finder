@@ -1,3 +1,4 @@
+import { db } from "./database";
 
 
 Bun.serve({
