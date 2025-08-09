@@ -1,12 +1,52 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '../context/ThemeContext';
 import { MapPoint, mapPoints } from '../mapData';
 import { videoUrls } from '../videoData';
+
+// Function to calculate distance between two coordinates in meters
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) *
+    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+};
+
+// Function to calculate emoji scale based on distance
+const getEmojiScale = (distance: number): number => {
+  // Base scale is 1.0
+  // Closer emojis get slightly bigger (up to 1.3x)
+  // Farther emojis get slightly smaller (down to 0.8x)
+  const maxDistance = 3000; // 3km - beyond this, emojis are at minimum size
+  const minDistance = 200; // 200m - closer than this, emojis are at maximum size
+  
+  if (distance <= minDistance) return 1.3;
+  if (distance >= maxDistance) return 0.8;
+  
+  // Use exponential decay for more natural drop-off
+  const scaleRange = 1.3 - 0.8;
+  const distanceRange = maxDistance - minDistance;
+  const normalizedDistance = (distance - minDistance) / distanceRange;
+  
+  // Exponential curve for more aggressive drop-off in the middle range
+  const exponentialFactor = Math.pow(normalizedDistance, 1.5);
+  
+  return 1.3 - (exponentialFactor * scaleRange);
+};
 
 export default function Index() {
   const router = useRouter();
@@ -19,6 +59,27 @@ export default function Index() {
   const [videoPosition, setVideoPosition] = useState({ x: 0, y: 0 });
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  
+  // Filter state
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  
+  // Get unique marker types from emojis
+  const markerTypes = [
+    { emoji: '☕', label: 'Coffee' },
+    { emoji: '🧋', label: 'Bubble Tea' },
+    { emoji: '𫖖', label: 'Tea' },
+    { emoji: '🍰', label: 'Dessert' },
+    { emoji: '🍕', label: 'Pizza' },
+    { emoji: '🍜', label: 'Noodles' },
+    { emoji: '🍣', label: 'Sushi' },
+    { emoji: '🍔', label: 'Burgers' },
+  ];
+  
+  // Filtered map points based on active filter
+  const filteredMapPoints = activeFilter 
+    ? mapPoints.filter(point => point.emoji === activeFilter)
+    : mapPoints;
   
   const handleMarkerPress = (pointId: string, event: any) => {
     const videoUrl = videoUrls[pointId];
@@ -85,11 +146,11 @@ export default function Index() {
         const videoHeight = 298; // Height of video container
         const margin = 20;
         
-        // Place video in bottom left, moved up
+        // Place video in bottom left, above the filters
         const x = margin;
-        const y = screenHeight - videoHeight - 130; // Moved up by reducing bottom margin
+        // Remove y calculation since we're using bottom positioning now
         
-        setVideoPosition({ x, y });
+        setVideoPosition({ x, y: 0 }); // y is no longer used
       }
     }
   };
@@ -148,12 +209,29 @@ export default function Index() {
         }}
         region={userLocation || undefined} // This will center the map on user location when available
         showsUserLocation={true}
-        showsMyLocationButton={true}
+        showsMyLocationButton={false}
         followsUserLocation={true}
         moveOnMarkerPress={false}
       >
         {/* Render all map points as markers */}
-        {mapPoints.map((point: MapPoint) => {
+        {filteredMapPoints.map((point: MapPoint) => {
+          // Calculate distance from user to this marker
+          let distanceScale = 1.0;
+          if (userLocation) {
+            const distance = calculateDistance(
+              userLocation.latitude,
+              userLocation.longitude,
+              point.latitude,
+              point.longitude
+            );
+            distanceScale = getEmojiScale(distance);
+          }
+          
+          // Combine distance scale with selection scale
+          const finalScale = point.id === selectedMarkerId ? 
+            distanceScale * 1.2 : // Selected markers get 20% bigger than their distance scale
+            distanceScale;
+          
           return (
             <Marker
               key={point.id}
@@ -176,7 +254,7 @@ export default function Index() {
                   justifyContent: 'center',
                   transform: [
                     {
-                      scale: point.id === selectedMarkerId ? 1.1 : 1.0,
+                      scale: finalScale,
                     },
                   ],
                 }}
@@ -190,6 +268,74 @@ export default function Index() {
         })}
       </MapView>
 
+      {/* Custom Location Button - Top Left */}
+      <TouchableOpacity 
+        style={[
+          styles.locationButton,
+          {
+            top: insets.top + 20,
+            left: insets.left + 20,
+          }
+        ]}
+        onPress={() => {
+          if (userLocation && mapRef.current) {
+            mapRef.current.animateToRegion(userLocation, 1000);
+          }
+        }}
+      >
+        <Ionicons name="navigate" size={24} color="#007AFF" />
+      </TouchableOpacity>
+
+      {/* Filter Buttons - Bottom */}
+      <View style={[
+        styles.filterContainer,
+        {
+          bottom: insets.bottom - 28,
+        }
+      ]}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScrollContent}
+        >
+          {/* All Filter Button */}
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              {
+                backgroundColor: activeFilter === null ? theme.colors.primary : theme.colors.surface,
+                borderColor: activeFilter === null ? theme.colors.primary : theme.colors.border,
+              }
+            ]}
+            onPress={() => setActiveFilter(null)}
+          >
+            <Text style={[
+              styles.filterButtonText,
+              { color: activeFilter === null ? '#ffffff' : theme.colors.text }
+            ]}>
+              All
+            </Text>
+          </TouchableOpacity>
+
+          {/* Type-specific Filter Buttons */}
+          {markerTypes.map((type) => (
+            <TouchableOpacity
+              key={type.emoji}
+              style={[
+                styles.filterButton,
+                {
+                  backgroundColor: activeFilter === type.emoji ? theme.colors.primary : theme.colors.surface,
+                  borderColor: activeFilter === type.emoji ? theme.colors.primary : theme.colors.border,
+                }
+              ]}
+              onPress={() => setActiveFilter(activeFilter === type.emoji ? null : type.emoji)}
+            >
+              <Text style={styles.filterEmoji}>{type.emoji}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* Picture-in-Picture Video */}
       {isVideoVisible && selectedVideo && (
         <Animated.View 
@@ -197,7 +343,7 @@ export default function Index() {
             styles.videoOverlay, 
             { 
               left: videoPosition.x, 
-              top: videoPosition.y,
+              bottom: insets.bottom + 20, // Position above the filters
               opacity: fadeAnim,
             }
           ]}
@@ -284,6 +430,8 @@ export default function Index() {
           </View>
         </Animated.View>
       )}
+
+      
     </View>
   );
 }
@@ -378,6 +526,63 @@ const styles = StyleSheet.create({
   shopButtonText: {
     color: '#000000',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  debugInfo: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 10,
+    borderRadius: 5,
+    zIndex: 100,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#ffffff',
+  },
+  locationButton: {
+    position: 'absolute',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  filterContainer: {
+    position: 'absolute',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  filterScrollContent: {
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  filterEmoji: {
+    fontSize: 18,
+    marginRight: 5,
+  },
+  filterButtonText: {
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });
