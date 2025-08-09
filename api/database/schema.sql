@@ -38,9 +38,13 @@ CREATE TABLE IF NOT EXISTS posts (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     url VARCHAR(2048) NOT NULL,
     posted_by INT,
+    map_point_id INT NOT NULL,
     FOREIGN KEY (posted_by) REFERENCES users(id),
+    FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE,
 
     posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
 
 
