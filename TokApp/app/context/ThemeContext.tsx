@@ -89,7 +89,4 @@ export const useTheme = () => {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
-};
-
-// Default export to satisfy Expo Router
-export default { ThemeProvider, useTheme }; 
+}; 

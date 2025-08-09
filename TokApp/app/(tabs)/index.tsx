@@ -23,29 +23,17 @@ export default function Index() {
   const markerAnimations = useRef<{ [key: string]: Animated.Value }>({}).current;
   const [animatingMarkers, setAnimatingMarkers] = useState<Set<string>>(new Set());
 
-  // Log when selectedMarkerId changes
-  useEffect(() => {
-    if (selectedMarkerId) {
-      console.log('🎯 Selected marker changed to:', selectedMarkerId);
-      console.log('📊 Current animation values:', Object.keys(markerAnimations).map(id => `${id}: ${markerAnimations[id] ? 'exists' : 'missing'}`));
-    }
-  }, [selectedMarkerId]);
-
   const handleMarkerPress = (pointId: string, event: any) => {
     const videoUrl = videoUrls[pointId];
-    console.log('Marker pressed:', pointId, 'Video URL:', videoUrl);
     
     // If tapping the same marker, shrink it back to normal size
     if (selectedMarkerId === pointId) {
-      console.log('🔄 Tapping same marker, shrinking back to normal size:', pointId);
       setAnimatingMarkers(prev => new Set([...prev, pointId]));
-      Animated.spring(markerAnimations[pointId], {
+      Animated.timing(markerAnimations[pointId], {
         toValue: 1,
+        duration: 900,
         useNativeDriver: true,
-        tension: 100,
-        friction: 8,
       }).start(() => {
-        console.log('✅ Shrink animation completed for marker:', pointId);
         setAnimatingMarkers(prev => {
           const newSet = new Set(prev);
           newSet.delete(pointId);
@@ -58,13 +46,11 @@ export default function Index() {
     
     // Reset the previously selected marker first
     if (selectedMarkerId && selectedMarkerId !== pointId && markerAnimations[selectedMarkerId]) {
-      console.log('🔄 Resetting previously selected marker:', selectedMarkerId, 'to scale 1.0');
       setAnimatingMarkers(prev => new Set([...prev, selectedMarkerId]));
-      Animated.spring(markerAnimations[selectedMarkerId], {
+      Animated.timing(markerAnimations[selectedMarkerId], {
         toValue: 1,
+        duration: 900,
         useNativeDriver: true,
-        tension: 100,
-        friction: 8,
       }).start(() => {
         setAnimatingMarkers(prev => {
           const newSet = new Set(prev);
@@ -76,23 +62,18 @@ export default function Index() {
     
     // Animate the selected marker
     if (markerAnimations[pointId]) {
-      console.log('🎯 Animating marker:', pointId, 'to scale 1.3');
       setAnimatingMarkers(prev => new Set([...prev, pointId]));
-      Animated.spring(markerAnimations[pointId], {
-        toValue: 1.3,
+      Animated.timing(markerAnimations[pointId], {
+        toValue: 1.1,
+        duration: 900,
         useNativeDriver: true,
-        tension: 100,
-        friction: 8,
       }).start(() => {
-        console.log('✅ Animation completed for marker:', pointId);
         setAnimatingMarkers(prev => {
           const newSet = new Set(prev);
           newSet.delete(pointId);
           return newSet;
         });
       });
-    } else {
-      console.log('⚠️ No animation value found for marker:', pointId);
     }
     
     // Always set the selected marker ID for visual feedback
@@ -126,7 +107,6 @@ export default function Index() {
   };
 
   const closeVideo = () => {
-    console.log('🎬 Closing video, resetting all marker animations');
     // Start fade-out animation
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -143,12 +123,10 @@ export default function Index() {
         setAnimatingMarkers(new Set(markersToReset));
         markersToReset.forEach((id) => {
           if (markerAnimations[id]) {
-            console.log('🔄 Resetting marker:', id, 'to scale 1.0 (from closeVideo)');
-            Animated.spring(markerAnimations[id], {
+            Animated.timing(markerAnimations[id], {
               toValue: 1,
+              duration: 900,
               useNativeDriver: true,
-              tension: 100,
-              friction: 8,
             }).start(() => {
               setAnimatingMarkers(prev => {
                 const newSet = new Set(prev);
@@ -167,7 +145,6 @@ export default function Index() {
       // Request location permissions
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        console.log('Location permission denied');
         return;
       }
       
@@ -208,24 +185,22 @@ export default function Index() {
       >
         {/* Render all map points as markers */}
         {mapPoints.map((point: MapPoint) => {
-          // Ensure animated value exists for this marker
+          // Ensure animated value exists for this marker (only create once)
           if (!markerAnimations[point.id]) {
-            console.log('🆕 Creating new animated value for marker:', point.id);
             markerAnimations[point.id] = new Animated.Value(1);
           }
           
           return (
             <Marker
-              key={point.id}
+              key={`marker-${point.id}`}
               coordinate={{
                 latitude: point.latitude,
                 longitude: point.longitude,
               }}
               title={point.title}
               description={point.description}
-              tracksViewChanges={point.id === selectedMarkerId || animatingMarkers.has(point.id)}
+              tracksViewChanges={animatingMarkers.has(point.id)}
               onPress={(event) => {
-                console.log('👆 Marker pressed:', point.id);
                 handleMarkerPress(point.id, event);
               }}
             >
@@ -233,13 +208,13 @@ export default function Index() {
                 style={[
                   styles.markerEmoji,
                   {
-                    fontSize: point.id === selectedMarkerId ? 48 : 32,
                     transform: [
                       {
                         scale: markerAnimations[point.id],
                       },
                     ],
-                  }
+                    textAlign: 'center',
+                  },
                 ]}
               >
                 {point.emoji}
@@ -266,7 +241,6 @@ export default function Index() {
             style={[styles.shopButton, { backgroundColor: '#ffffff' }]}
             onPress={() => {
               // Navigate to location page
-              console.log('Navigating to location with ID:', selectedMarkerId);
               router.push(`/_location?id=${selectedMarkerId}`);
             }}
           >
@@ -323,11 +297,9 @@ export default function Index() {
               scrollEnabled={false}
               onError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
-                console.warn('WebView error: ', nativeEvent);
               }}
               onHttpError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
-                console.warn('WebView HTTP error: ', nativeEvent);
               }}
             />
           </View>
