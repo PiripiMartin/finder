@@ -28,14 +28,6 @@ interface LoginResponse {
 }
 
 
-
-export interface TokenValidation {
-    userId: string,
-    sessionToken: string
-};
-
-
-
 export async function login(req: BunRequest): Promise<Response> {
 
     if (!req.body) {
@@ -100,19 +92,17 @@ export async function login(req: BunRequest): Promise<Response> {
 
 
 export async function validateSessionToken(req: BunRequest): Promise<Response> {
-    
-    if (!req.body) {
-        return new Response("Missing request body", {status: 400});
-    }
-    const data = await req.body.json();
 
-    if (!("sessionToken" in data) || !("userId" in data)) {
-        return new Response("Malformed body", {status: 400});
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+
+    if (!sessionToken) {
+        return new Response("Missing session token", {status: 401});
     }
 
-    const isValidSession = await verifySessionToken(data as TokenValidation);
+    const maybeUserId = await verifySessionToken(sessionToken);
 
-    return new Response(null, {status: isValidSession ? 200 : 401});
+    // Return user id if valid, null otherwise
+    return new Response(maybeUserId?.toString() || null, {status: maybeUserId != null ? 200 : 401});
 }
 
 
