@@ -1,13 +1,18 @@
 import type { BunRequest } from "bun";
 import { db, toCamelCase } from "../database";
 import type { User } from "./types";
-import { generateSessionToken } from "./session";
+import { generateSessionToken, verifySessionToken } from "./session";
 
 
 
 interface LoginRequest {
     username: string,
     password: string,
+};
+
+export interface TokenValidation {
+    userId: string,
+    sessionToken: string
 };
 
 
@@ -46,10 +51,26 @@ export async function login(req: BunRequest): Promise<Response> {
         return new Response("Invalid credentials", {status: 401});
     }
 
-
     // Generate session token and send back to user
     const sessionToken = await generateSessionToken(account.id);
     return new Response(sessionToken, {status: validCredentials ? 200 : 401});
+}
+
+
+export async function validateSessionToken(req: BunRequest): Promise<Response> {
+    
+    if (!req.body) {
+        return new Response("Missing request body", {status: 400});
+    }
+    const data = await req.body.json();
+
+    if (!("sessionToken" in data) || !("userId" in data)) {
+        return new Response("Malformed body", {status: 400});
+    }
+
+    const isValidSession = await verifySessionToken(data as TokenValidation);
+
+    return new Response(null, {status: isValidSession ? 200 : 401});
 }
 
 

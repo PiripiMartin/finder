@@ -1,5 +1,5 @@
 import { db } from "./database";
-import { login } from "./user/routes";
+import { login, validateSessionToken } from "./user/routes";
 
 
 Bun.serve({
@@ -8,6 +8,9 @@ Bun.serve({
         "/api/login": {
             POST: login
         },
+        "/api/validate-token": {
+            POST: validateSessionToken
+        }
     }
 });
 
