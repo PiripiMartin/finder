@@ -19,10 +19,6 @@ export default function Index() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
   
-  // Create animated values for each marker
-  const markerAnimations = useRef<{ [key: string]: Animated.Value }>({}).current;
-  const [animatingMarkers, setAnimatingMarkers] = useState<Set<string>>(new Set());
-
   const handleMarkerPress = (pointId: string, event: any) => {
     const videoUrl = videoUrls[pointId];
     
@@ -45,57 +41,13 @@ export default function Index() {
       }, 1000);
     }
     
-    // If tapping the same marker, shrink it back to normal size
+    // If tapping the same marker, deselect it
     if (selectedMarkerId === pointId) {
-      setAnimatingMarkers(prev => new Set([...prev, pointId]));
-      Animated.timing(markerAnimations[pointId], {
-        toValue: 1,
-        duration: 900,
-        useNativeDriver: true,
-      }).start(() => {
-        setAnimatingMarkers(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(pointId);
-          return newSet;
-        });
-      });
       setSelectedMarkerId(null);
       return;
     }
     
-    // Reset the previously selected marker first
-    if (selectedMarkerId && selectedMarkerId !== pointId && markerAnimations[selectedMarkerId]) {
-      setAnimatingMarkers(prev => new Set([...prev, selectedMarkerId]));
-      Animated.timing(markerAnimations[selectedMarkerId], {
-        toValue: 1,
-        duration: 900,
-        useNativeDriver: true,
-      }).start(() => {
-        setAnimatingMarkers(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(selectedMarkerId);
-          return newSet;
-        });
-      });
-    }
-    
-    // Animate the selected marker
-    if (markerAnimations[pointId]) {
-      setAnimatingMarkers(prev => new Set([...prev, pointId]));
-      Animated.timing(markerAnimations[pointId], {
-        toValue: 1.1,
-        duration: 900,
-        useNativeDriver: true,
-      }).start(() => {
-        setAnimatingMarkers(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(pointId);
-          return newSet;
-        });
-      });
-    }
-    
-    // Always set the selected marker ID for visual feedback
+    // Set the selected marker ID for visual feedback
     setSelectedMarkerId(pointId);
     
     if (videoUrl) {
@@ -135,27 +87,6 @@ export default function Index() {
       setIsVideoVisible(false);
       setSelectedVideo(null);
       setSelectedMarkerId(null);
-      
-      // Reset all marker animations
-      const markersToReset = Object.keys(markerAnimations);
-      if (markersToReset.length > 0) {
-        setAnimatingMarkers(new Set(markersToReset));
-        markersToReset.forEach((id) => {
-          if (markerAnimations[id]) {
-            Animated.timing(markerAnimations[id], {
-              toValue: 1,
-              duration: 900,
-              useNativeDriver: true,
-            }).start(() => {
-              setAnimatingMarkers(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(id);
-                return newSet;
-              });
-            });
-          }
-        });
-      }
     });
   };
 
@@ -204,11 +135,6 @@ export default function Index() {
       >
         {/* Render all map points as markers */}
         {mapPoints.map((point: MapPoint) => {
-          // Ensure animated value exists for this marker
-          if (!markerAnimations[point.id]) {
-            markerAnimations[point.id] = new Animated.Value(1);
-          }
-          
           return (
             <Marker
               key={point.id}
@@ -231,7 +157,7 @@ export default function Index() {
                   justifyContent: 'center',
                   transform: [
                     {
-                      scale: markerAnimations[point.id],
+                      scale: point.id === selectedMarkerId ? 1.1 : 1.0,
                     },
                   ],
                 }}
