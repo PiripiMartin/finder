@@ -60,10 +60,13 @@ export default function Index() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  
+
   // Filter state
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  
+
+  // Shake animation refs for each marker
+  const shakeAnims = useRef<{ [key: string]: Animated.Value }>({}).current;
+
   // Get unique marker types from emojis
   const markerTypes = [
     { emoji: '☕', label: 'Coffee' },
@@ -75,13 +78,66 @@ export default function Index() {
     { emoji: '🍣', label: 'Sushi' },
     { emoji: '🍔', label: 'Burgers' },
   ];
-  
+
   // Filtered map points based on active filter
-  const filteredMapPoints = activeFilter 
+  const filteredMapPoints = activeFilter
     ? mapPoints.filter(point => point.emoji === activeFilter)
     : mapPoints;
+
+  // Clear selection if selected marker is no longer visible after filtering
+  useEffect(() => {
+    if (selectedMarkerId && !filteredMapPoints.find(point => point.id === selectedMarkerId)) {
+      setSelectedMarkerId(null);
+      setIsVideoVisible(false);
+    }
+  }, [filteredMapPoints, selectedMarkerId]);
+
+  // Function to trigger shake animation for a marker
+  const triggerShake = (pointId: string) => {
+    if (!shakeAnims[pointId]) {
+      shakeAnims[pointId] = new Animated.Value(0);
+    }
+    
+    Animated.sequence([
+      Animated.timing(shakeAnims[pointId], {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnims[pointId], {
+        toValue: -1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnims[pointId], {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnims[pointId], {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // Randomly trigger shake animations
+  useEffect(() => {
+    const shakeInterval = setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * filteredMapPoints.length);
+      if (filteredMapPoints[randomIndex]) {
+        triggerShake(filteredMapPoints[randomIndex].id);
+      }
+    }, 3000); // Shake every 3 seconds
+
+    return () => clearInterval(shakeInterval);
+  }, [filteredMapPoints]);
   
   const handleMarkerPress = (pointId: string, event: any) => {
+    console.log('Marker pressed:', pointId);
+    console.log('Current selectedMarkerId:', selectedMarkerId);
+    
     const videoUrl = videoUrls[pointId];
     
     // Pan camera to the clicked marker - position it in the top middle of the screen
@@ -105,10 +161,12 @@ export default function Index() {
     
     // If tapping the same marker, do nothing (keep it selected)
     if (selectedMarkerId === pointId) {
+      console.log('Same marker tapped, keeping selected');
       return;
     }
     
     // Set the selected marker ID for visual feedback
+    console.log('Setting selectedMarkerId to:', pointId);
     setSelectedMarkerId(pointId);
     
     if (videoUrl) {
@@ -232,6 +290,10 @@ export default function Index() {
             distanceScale * 1.2 : // Selected markers get 20% bigger than their distance scale
             distanceScale;
           
+          if (point.id === selectedMarkerId) {
+            console.log(`Marker ${point.id} selected, distanceScale: ${distanceScale}, finalScale: ${finalScale}`);
+          }
+          
           return (
             <Marker
               key={point.id}
@@ -259,9 +321,23 @@ export default function Index() {
                   ],
                 }}
               >
-                <Text style={styles.markerEmoji}>
+                <Animated.Text 
+                  style={[
+                    styles.markerEmoji,
+                    {
+                      transform: [
+                        {
+                          translateX: shakeAnims[point.id] ? shakeAnims[point.id].interpolate({
+                            inputRange: [-1, 0, 1],
+                            outputRange: [-3, 0, 3],
+                          }) : 0,
+                        },
+                      ],
+                    }
+                  ]}
+                >
                   {point.emoji}
-                </Text>
+                </Animated.Text>
               </Animated.View>
             </Marker>
           );
@@ -281,6 +357,8 @@ export default function Index() {
           if (userLocation && mapRef.current) {
             mapRef.current.animateToRegion(userLocation, 1000);
           }
+          // Unselect the emoji and hide marker labels
+          setSelectedMarkerId(null);
         }}
       >
         <Ionicons name="navigate" size={24} color="#007AFF" />
