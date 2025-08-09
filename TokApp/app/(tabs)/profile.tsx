@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-import { useTheme } from './context/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Profile() {
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
@@ -83,12 +83,12 @@ export default function Profile() {
           <View style={styles.activityList}>
             <View style={styles.activityItem}>
               <Ionicons name="heart" size={16} color="#ff4757" />
-              <Text style={[styles.activityText, { color: theme.colors.text }]}>Liked "Amazing Coffee Art"</Text>
+              <Text style={[styles.activityText, { color: theme.colors.text }]}>Liked &ldquo;Amazing Coffee Art&rdquo;</Text>
               <Text style={[styles.activityTime, { color: theme.colors.textSecondary }]}>2h ago</Text>
             </View>
             <View style={styles.activityItem}>
               <Ionicons name="bookmark" size={16} color={theme.colors.primary} />
-              <Text style={[styles.activityText, { color: theme.colors.text }]}>Saved "Bubble Tea Recipe"</Text>
+              <Text style={[styles.activityText, { color: theme.colors.text }]}>Saved &ldquo;Bubble Tea Recipe&rdquo;</Text>
               <Text style={[styles.activityTime, { color: theme.colors.textSecondary }]}>5h ago</Text>
             </View>
             <View style={styles.activityItem}>

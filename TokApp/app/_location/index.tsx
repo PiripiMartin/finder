@@ -1,0 +1,410 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { WebView } from 'react-native-webview';
+import { useTheme } from '../context/ThemeContext';
+import { tiktokEmbedUrls } from '../videoData';
+
+const { width } = Dimensions.get('window');
+const tileWidth = (width - 30) / 2; // 2 columns with padding
+
+interface LocationData {
+  id: string;
+  name: string;
+  description: string;
+  address: string;
+  category: string;
+  rating: number;
+  hours: string;
+  phone: string;
+  website: string;
+  tiktokVideos: string[];
+}
+
+// Mock location data - you can replace with real data
+const mockLocationData: { [key: string]: LocationData } = {
+  '1': {
+    id: '1',
+    name: 'Coffee Haven',
+    description: 'A cozy coffee shop known for its artisanal brews and creative latte art. Perfect spot for coffee enthusiasts and remote workers.',
+    address: '123 Main Street, Downtown, City',
+    category: 'Coffee Shop',
+    rating: 4.8,
+    hours: 'Mon-Fri: 7AM-7PM, Sat-Sun: 8AM-6PM',
+    phone: '(555) 123-4567',
+    website: 'coffeehaven.com',
+    tiktokVideos: ['1', '2', '3', '4', '5', '6']
+  },
+  '2': {
+    id: '2',
+    name: 'Bubble Tea Paradise',
+    description: 'The ultimate destination for bubble tea lovers with over 50 unique flavors and customizable toppings.',
+    address: '456 Oak Avenue, Midtown, City',
+    category: 'Bubble Tea',
+    rating: 4.6,
+    hours: 'Daily: 10AM-10PM',
+    phone: '(555) 234-5678',
+    website: 'bubbleteaparadise.com',
+    tiktokVideos: ['7', '8', '9', '10', '11', '12']
+  },
+  '3': {
+    id: '3',
+    name: 'Tea Garden',
+    description: 'Traditional tea house offering authentic tea ceremonies and premium loose-leaf teas from around the world.',
+    address: '789 Pine Street, Uptown, City',
+    category: 'Tea House',
+    rating: 4.9,
+    hours: 'Tue-Sun: 11AM-8PM, Closed Monday',
+    phone: '(555) 345-6789',
+    website: 'teagarden.com',
+    tiktokVideos: ['13', '14', '15', '16', '17', '18']
+  }
+};
+
+export default function Location() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams();
+  const { theme } = useTheme();
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log('Location page received ID:', id);
+    if (id) {
+      const data = mockLocationData[id as string];
+      console.log('Found location data:', data);
+      if (data) {
+        setLocationData(data);
+      } else {
+        // If no data found, use a default location
+        console.log('No data found for ID, using default');
+        setLocationData(mockLocationData['1']);
+      }
+    } else {
+      // If no ID provided, use default location
+      console.log('No ID provided, using default');
+      setLocationData(mockLocationData['1']);
+    }
+  }, [id]);
+
+  const handleVideoPress = (videoId: string) => {
+    const videoUrl = tiktokEmbedUrls[videoId];
+    if (videoUrl) {
+      setSelectedVideo(videoUrl);
+    }
+  };
+
+  const closeVideo = () => {
+    setSelectedVideo(null);
+  };
+
+  if (!locationData) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading...</Text>
+        <TouchableOpacity 
+          style={[styles.loadingButton, { backgroundColor: theme.colors.primary }]}
+          onPress={() => setLocationData(mockLocationData['1'])}
+        >
+          <Text style={[styles.loadingButtonText, { color: '#ffffff' }]}>Load Demo Location</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{locationData.name}</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Hero Section */}
+        <View style={[styles.heroSection, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.heroContent}>
+            <Text style={[styles.locationName, { color: theme.colors.text }]}>{locationData.name}</Text>
+            <Text style={[styles.category, { color: theme.colors.primary }]}>{locationData.category}</Text>
+            <View style={styles.ratingContainer}>
+              <Ionicons name="star" size={16} color="#FFD700" />
+              <Text style={[styles.rating, { color: theme.colors.text }]}>{locationData.rating}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Description Section */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>About</Text>
+          <Text style={[styles.description, { color: theme.colors.textSecondary }]}>{locationData.description}</Text>
+        </View>
+
+        {/* Contact Info Section */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Contact & Hours</Text>
+          
+          <View style={styles.contactItem}>
+            <Ionicons name="location" size={20} color={theme.colors.primary} />
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.address}</Text>
+          </View>
+          
+          <View style={styles.contactItem}>
+            <Ionicons name="time" size={20} color={theme.colors.primary} />
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.hours}</Text>
+          </View>
+          
+          <View style={styles.contactItem}>
+            <Ionicons name="call" size={20} color={theme.colors.primary} />
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.phone}</Text>
+          </View>
+          
+          <View style={styles.contactItem}>
+            <Ionicons name="globe" size={20} color={theme.colors.primary} />
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.website}</Text>
+          </View>
+        </View>
+
+        {/* TikTok Videos Section */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>TikTok Videos</Text>
+          <View style={styles.videoGrid}>
+            {locationData.tiktokVideos.map((videoId, index) => (
+              <TouchableOpacity 
+                key={videoId} 
+                style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
+                onPress={() => handleVideoPress(videoId)}
+              >
+                <View style={styles.videoThumbnail}>
+                  <Text style={styles.videoNumber}>#{index + 1}</Text>
+                </View>
+                <Text style={[styles.videoTitle, { color: theme.colors.text }]}>Video {index + 1}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Full Screen Video Modal */}
+      {selectedVideo && (
+        <View style={styles.videoModal}>
+          <View style={[styles.videoModalContent, { backgroundColor: theme.colors.surface }]}>
+            <TouchableOpacity style={styles.closeVideoButton} onPress={closeVideo}>
+              <Ionicons name="close" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+            <WebView
+              key={selectedVideo}
+              source={{ 
+                html: `
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                      body { 
+                        margin: 0; 
+                        padding: 0; 
+                        background: #000; 
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                      }
+                      iframe { 
+                        border: none; 
+                        display: block;
+                        width: 100%;
+                        height: 100%;
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <iframe 
+                      src="${selectedVideo}" 
+                      allow="fullscreen" 
+                      title="TikTok Video">
+                    </iframe>
+                  </body>
+                  </html>
+                `
+              }}
+              style={styles.fullScreenVideo}
+              allowsInlineMediaPlayback={true}
+              mediaPlaybackRequiresUserAction={false}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+            />
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  heroSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  heroContent: {
+    alignItems: 'center',
+  },
+  locationName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  category: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rating: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  section: {
+    padding: 20,
+    marginTop: 10,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  contactText: {
+    fontSize: 16,
+    marginLeft: 12,
+    flex: 1,
+  },
+  videoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  videoTile: {
+    width: tileWidth,
+    marginBottom: 15,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: tileWidth * 1.5,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  videoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    padding: 12,
+  },
+  videoModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  videoModalContent: {
+    width: '90%',
+    height: '80%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  closeVideoButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  fullScreenVideo: {
+    flex: 1,
+  },
+  loadingText: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 100,
+  },
+  loadingButton: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignSelf: 'center',
+  },
+  loadingButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});

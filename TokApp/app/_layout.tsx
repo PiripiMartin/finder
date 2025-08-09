@@ -1,61 +1,23 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from "expo-router";
-import { ThemeProvider, useTheme } from './context/ThemeContext';
-
-function TabLayout() {
-  const { theme } = useTheme();
-  
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopWidth: 1,
-          borderTopColor: theme.colors.border,
-          paddingBottom: 15,
-          paddingTop: 5,
-          height: 70,
-        },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textSecondary,
-      }}
-    >
-      <Tabs.Screen
-        name="saved"
-        options={{
-          title: "",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="bookmark" size={20} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="map" size={20} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="person" size={20} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
-  );
-}
+import { Stack } from "expo-router";
+import { ThemeProvider } from './context/ThemeContext';
 
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <TabLayout />
+      <Stack 
+        screenOptions={{ 
+          headerShown: false,
+          animation: 'slide_from_left',
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen 
+          name="_location" 
+          options={{
+            animation: 'slide_from_left',
+          }}
+        />
+      </Stack>
     </ThemeProvider>
   );
 }

@@ -1,5 +1,6 @@
+import { useRouter } from "expo-router";
 import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useTheme } from './context/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const videoWidth = (width - 30) / 2; // 2 columns with padding
@@ -93,6 +94,7 @@ const mockVideos = [
 ];
 
 export default function Saved() {
+  const router = useRouter();
   const { theme } = useTheme();
 
   return (
@@ -101,7 +103,11 @@ export default function Saved() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.videoGrid}>
           {mockVideos.map((video) => (
-            <TouchableOpacity key={video.id} style={[styles.videoCard, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}>
+            <TouchableOpacity 
+              key={video.id} 
+              style={[styles.videoCard, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}
+              onPress={() => router.push(`/location?id=${video.id}`)}
+            >
               <View style={styles.thumbnailContainer}>
                 <Image source={{ uri: video.thumbnail }} style={styles.thumbnail} />
                 <View style={styles.durationBadge}>

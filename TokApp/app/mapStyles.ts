@@ -97,4 +97,7 @@ export const realisticFlairStyle = [
     "elementType": "labels.text.fill",
     "stylers": [{"color": "#0d47a1"}]
   }
-]; 
+];
+
+// Default export to satisfy Expo Router
+export default { realisticFlairStyle }; 
