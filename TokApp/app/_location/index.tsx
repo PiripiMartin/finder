@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '../context/ThemeContext';
 import { tiktokEmbedUrls } from '../videoData';
 
 const { width } = Dimensions.get('window');
-const tileWidth = (width - 30) / 2; // 2 columns with padding
+const tileWidth = (width - 30) / 2; // Less padding within video grid
 
 interface LocationData {
   id: string;
@@ -99,6 +99,22 @@ export default function Location() {
     setSelectedVideo(null);
   };
 
+  const openDirections = () => {
+    if (locationData) {
+      const address = encodeURIComponent(locationData.address);
+      
+      if (Platform.OS === 'ios') {
+        // Use Apple Maps on iOS
+        const url = `http://maps.apple.com/?daddr=${address}`;
+        Linking.openURL(url);
+      } else {
+        // Use Google Maps on Android
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${address}`;
+        Linking.openURL(url);
+      }
+    }
+  };
+
   if (!locationData) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -166,24 +182,77 @@ export default function Location() {
             <Ionicons name="globe" size={20} color={theme.colors.primary} />
             <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.website}</Text>
           </View>
+          
+          {/* Directions Button */}
+          <TouchableOpacity 
+            style={[styles.directionsButton, { backgroundColor: theme.colors.primary }]}
+            onPress={openDirections}
+          >
+            <Ionicons name="navigate" size={20} color="#ffffff" />
+            <Text style={styles.directionsButtonText}>Get Directions</Text>
+          </TouchableOpacity>
         </View>
 
         {/* TikTok Videos Section */}
         <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>TikTok Videos</Text>
           <View style={styles.videoGrid}>
-            {locationData.tiktokVideos.map((videoId, index) => (
-              <TouchableOpacity 
-                key={videoId} 
-                style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
-                onPress={() => handleVideoPress(videoId)}
-              >
-                <View style={styles.videoThumbnail}>
-                  <Text style={styles.videoNumber}>#{index + 1}</Text>
-                </View>
-                <Text style={[styles.videoTitle, { color: theme.colors.text }]}>Video {index + 1}</Text>
-              </TouchableOpacity>
-            ))}
+            {locationData.tiktokVideos.map((videoId, index) => {
+              const videoUrl = tiktokEmbedUrls[videoId];
+              return (
+                <TouchableOpacity 
+                  key={videoId} 
+                  style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
+                  onPress={() => handleVideoPress(videoId)}
+                >
+                  <View style={styles.videoThumbnail}>
+                    <WebView
+                      source={{
+                        html: `
+                          <!DOCTYPE html>
+                          <html>
+                          <head>
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                            <style>
+                              body { 
+                                margin: 0; 
+                                padding: 0; 
+                                background: #000; 
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                height: 100vh;
+                              }
+                              iframe { 
+                                border: none; 
+                                display: block;
+                                width: 100%;
+                                height: 100%;
+                              }
+                            </style>
+                          </head>
+                          <body>
+                            <iframe 
+                              src="${videoUrl}" 
+                              allow="fullscreen" 
+                              title="TikTok Video">
+                            </iframe>
+                          </body>
+                          </html>
+                        `
+                      }}
+                      style={styles.videoThumbnail}
+                      allowsInlineMediaPlayback={true}
+                      mediaPlaybackRequiresUserAction={false}
+                      javaScriptEnabled={true}
+                      domStorageEnabled={true}
+                      scrollEnabled={false}
+                      bounces={false}
+                    />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       </ScrollView>
@@ -300,7 +369,8 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   section: {
-    padding: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 20,
     marginTop: 10,
   },
   sectionTitle: {
@@ -326,6 +396,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    marginLeft: -5,
+    marginRight: -5,
   },
   videoTile: {
     width: tileWidth,
@@ -344,9 +416,8 @@ const styles = StyleSheet.create({
   videoThumbnail: {
     width: '100%',
     height: tileWidth * 1.5,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   videoNumber: {
     fontSize: 24,
@@ -406,5 +477,20 @@ const styles = StyleSheet.create({
   loadingButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  directionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 15,
+  },
+  directionsButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });

@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '../context/ThemeContext';
@@ -12,6 +12,7 @@ export default function Index() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const buttonAnim = useRef(new Animated.Value(0)).current;
   const [userLocation, setUserLocation] = useState<Region | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [isVideoVisible, setIsVideoVisible] = useState(false);
@@ -41,9 +42,8 @@ export default function Index() {
       }, 1000);
     }
     
-    // If tapping the same marker, deselect it
+    // If tapping the same marker, do nothing (keep it selected)
     if (selectedMarkerId === pointId) {
-      setSelectedMarkerId(null);
       return;
     }
     
@@ -61,6 +61,23 @@ export default function Index() {
         duration: 1100,
         useNativeDriver: true,
       }).start();
+
+      // Start button animation
+      buttonAnim.setValue(0);
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(buttonAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(buttonAnim, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
       
       // Calculate video position based on screen dimensions
       if (event.nativeEvent) {
@@ -86,8 +103,10 @@ export default function Index() {
     }).start(() => {
       setIsVideoVisible(false);
       setSelectedVideo(null);
-      setSelectedMarkerId(null);
     });
+
+    // Stop button animation
+    buttonAnim.stopAnimation();
   };
 
   useEffect(() => {
@@ -119,7 +138,7 @@ export default function Index() {
       {/* Full-screen map */}
       <MapView
         ref={mapRef}
-        provider={PROVIDER_GOOGLE}
+        provider={Platform.OS === 'ios' ? undefined : PROVIDER_GOOGLE}
         style={styles.map}
         initialRegion={userLocation || {
           latitude: -37.8136,
@@ -144,7 +163,7 @@ export default function Index() {
               }}
               title={point.title}
               description={point.description}
-              tracksViewChanges={true}
+              tracksViewChanges={false}
               onPress={(event) => {
                 handleMarkerPress(point.id, event);
               }}
@@ -184,14 +203,27 @@ export default function Index() {
           ]}
         >
           {/* Shop Button with Arrow */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.shopButton, { backgroundColor: '#ffffff' }]}
             onPress={() => {
               // Navigate to location page
               router.push(`/_location?id=${selectedMarkerId}`);
             }}
           >
-            <Text style={styles.shopButtonText}>→ Check it out</Text>
+            <Animated.View
+              style={{
+                transform: [
+                  {
+                    translateX: buttonAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 8], // Move 8px to the right
+                    }),
+                  },
+                ],
+              }}
+            >
+              <Text style={styles.shopButtonText}>→ Check it out</Text>
+            </Animated.View>
           </TouchableOpacity>
           
           <View style={[styles.videoContainer, { backgroundColor: theme.colors.surface }]}>
