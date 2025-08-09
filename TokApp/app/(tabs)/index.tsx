@@ -26,6 +26,25 @@ export default function Index() {
   const handleMarkerPress = (pointId: string, event: any) => {
     const videoUrl = videoUrls[pointId];
     
+    // Pan camera to the clicked marker - position it in the top middle of the screen
+    const selectedPoint = mapPoints.find(point => point.id === pointId);
+    if (selectedPoint && mapRef.current) {
+      // Calculate the offset to position the marker in the top middle
+      const screenHeight = Dimensions.get('window').height;
+      const screenWidth = Dimensions.get('window').width;
+      
+      // Calculate the latitude offset to move the marker to the top third of the screen
+      // Subtract the offset to move the marker up on the screen
+      const latitudeOffset = 0.003; // Reduced offset to move it lower down
+      
+      mapRef.current.animateToRegion({
+        latitude: selectedPoint.latitude - latitudeOffset,
+        longitude: selectedPoint.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 1000);
+    }
+    
     // If tapping the same marker, shrink it back to normal size
     if (selectedMarkerId === pointId) {
       setAnimatingMarkers(prev => new Set([...prev, pointId]));
@@ -185,40 +204,42 @@ export default function Index() {
       >
         {/* Render all map points as markers */}
         {mapPoints.map((point: MapPoint) => {
-          // Ensure animated value exists for this marker (only create once)
+          // Ensure animated value exists for this marker
           if (!markerAnimations[point.id]) {
             markerAnimations[point.id] = new Animated.Value(1);
           }
           
           return (
             <Marker
-              key={`marker-${point.id}`}
+              key={point.id}
               coordinate={{
                 latitude: point.latitude,
                 longitude: point.longitude,
               }}
               title={point.title}
               description={point.description}
-              tracksViewChanges={animatingMarkers.has(point.id)}
+              tracksViewChanges={true}
               onPress={(event) => {
                 handleMarkerPress(point.id, event);
               }}
             >
-              <Animated.Text
-                style={[
-                  styles.markerEmoji,
-                  {
-                    transform: [
-                      {
-                        scale: markerAnimations[point.id],
-                      },
-                    ],
-                    textAlign: 'center',
-                  },
-                ]}
+              <Animated.View
+                style={{
+                  width: 48,
+                  height: 48,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transform: [
+                    {
+                      scale: markerAnimations[point.id],
+                    },
+                  ],
+                }}
               >
-                {point.emoji}
-              </Animated.Text>
+                <Text style={styles.markerEmoji}>
+                  {point.emoji}
+                </Text>
+              </Animated.View>
             </Marker>
           );
         })}
