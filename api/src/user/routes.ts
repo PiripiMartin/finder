@@ -1,5 +1,7 @@
+import type { BunRequest } from "bun";
 import { db, toCamelCase } from "../database";
 import type { User } from "./types";
+import { generateSessionToken } from "./session";
 
 
 
@@ -10,7 +12,7 @@ interface LoginRequest {
 
 
 
-export async function login(req: Request): Promise<Response> {
+export async function login(req: BunRequest): Promise<Response> {
 
     if (!req.body) {
         return new Response("Missing request body", {status: 400});
@@ -30,15 +32,23 @@ export async function login(req: Request): Promise<Response> {
 
     const results: User[] = toCamelCase(rows);
 
+    if (results.length == 0) {
+        return new Response("Couldn't find an account with that name.", {status: 404});
+    }
+
+    // Can safely make this typecast now
+    const account = results[0] as User;
+    
 
     // Compare hashes
-    const validCredentials = await Bun.password.verify(loginRequest.password, results[0]?.passwordHash || "", "argon2id");
+    const validCredentials = await Bun.password.verify(loginRequest.password, account.passwordHash || "", "argon2id");
+    if (!validCredentials) {
+        return new Response("Invalid credentials", {status: 401});
+    }
 
 
-
-    // TODO: Generate this to initiate session
-    const sessionToken = "";
-
+    // Generate session token and send back to user
+    const sessionToken = await generateSessionToken(account.id);
     return new Response(sessionToken, {status: validCredentials ? 200 : 401});
 }
 
