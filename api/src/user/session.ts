@@ -1,6 +1,5 @@
 import type { BunRequest } from "bun";
 import { db } from "../database";
-import type { TokenValidation } from "./routes";
 
 const SESSION_LENGTH = 7; // Days
 const DAYS_TO_MS = 86400000;
@@ -23,21 +22,21 @@ export async function generateSessionToken(accountId: number): Promise<string> {
 }
 
 
-export async function verifySessionToken(tokenInfo: TokenValidation): Promise<boolean> {
+export async function verifySessionToken(token: string): Promise<number | null> {
     
     const [results, _] = await db.execute(
-        "SELECT COUNT(*) AS count FROM user_sessions WHERE user_id = ? AND session_token = ? AND expires_at > NOW()",
-        [tokenInfo.userId, tokenInfo.sessionToken]
+        "SELECT user_id FROM user_sessions WHERE session_token = ? AND expires_at > NOW()",
+        [token]
     ) as [any[], any];
 
     if (results.length == 0) {
-        return false;
+        return null;
     }
 
-    if (results[0].count != 1) {
-        return false;
+    if (!("user_id" in results[0])) {
+        return null;
     }
 
-    return true;
+    return results[0].user_id as number;
 }
 
