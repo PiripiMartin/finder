@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Dimensions, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '../context/ThemeContext';
@@ -11,20 +11,104 @@ import { videoUrls } from '../videoData';
 export default function Index() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const [userLocation, setUserLocation] = useState<Region | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [isVideoVisible, setIsVideoVisible] = useState(false);
   const [videoPosition, setVideoPosition] = useState({ x: 0, y: 0 });
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
+  
+  // Create animated values for each marker
+  const markerAnimations = useRef<{ [key: string]: Animated.Value }>({}).current;
+  const [animatingMarkers, setAnimatingMarkers] = useState<Set<string>>(new Set());
+
+  // Log when selectedMarkerId changes
+  useEffect(() => {
+    if (selectedMarkerId) {
+      console.log('🎯 Selected marker changed to:', selectedMarkerId);
+      console.log('📊 Current animation values:', Object.keys(markerAnimations).map(id => `${id}: ${markerAnimations[id] ? 'exists' : 'missing'}`));
+    }
+  }, [selectedMarkerId]);
 
   const handleMarkerPress = (pointId: string, event: any) => {
     const videoUrl = videoUrls[pointId];
     console.log('Marker pressed:', pointId, 'Video URL:', videoUrl);
+    
+    // If tapping the same marker, shrink it back to normal size
+    if (selectedMarkerId === pointId) {
+      console.log('🔄 Tapping same marker, shrinking back to normal size:', pointId);
+      setAnimatingMarkers(prev => new Set([...prev, pointId]));
+      Animated.spring(markerAnimations[pointId], {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }).start(() => {
+        console.log('✅ Shrink animation completed for marker:', pointId);
+        setAnimatingMarkers(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(pointId);
+          return newSet;
+        });
+      });
+      setSelectedMarkerId(null);
+      return;
+    }
+    
+    // Reset the previously selected marker first
+    if (selectedMarkerId && selectedMarkerId !== pointId && markerAnimations[selectedMarkerId]) {
+      console.log('🔄 Resetting previously selected marker:', selectedMarkerId, 'to scale 1.0');
+      setAnimatingMarkers(prev => new Set([...prev, selectedMarkerId]));
+      Animated.spring(markerAnimations[selectedMarkerId], {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }).start(() => {
+        setAnimatingMarkers(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(selectedMarkerId);
+          return newSet;
+        });
+      });
+    }
+    
+    // Animate the selected marker
+    if (markerAnimations[pointId]) {
+      console.log('🎯 Animating marker:', pointId, 'to scale 1.3');
+      setAnimatingMarkers(prev => new Set([...prev, pointId]));
+      Animated.spring(markerAnimations[pointId], {
+        toValue: 1.3,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }).start(() => {
+        console.log('✅ Animation completed for marker:', pointId);
+        setAnimatingMarkers(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(pointId);
+          return newSet;
+        });
+      });
+    } else {
+      console.log('⚠️ No animation value found for marker:', pointId);
+    }
+    
+    // Always set the selected marker ID for visual feedback
+    setSelectedMarkerId(pointId);
+    
     if (videoUrl) {
       setSelectedVideo(videoUrl);
       setIsVideoVisible(true);
-      setSelectedMarkerId(pointId);
+      
+      // Start fade-in animation
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1100,
+        useNativeDriver: true,
+      }).start();
       
       // Calculate video position based on screen dimensions
       if (event.nativeEvent) {
@@ -42,8 +126,40 @@ export default function Index() {
   };
 
   const closeVideo = () => {
-    setIsVideoVisible(false);
-    setSelectedVideo(null);
+    console.log('🎬 Closing video, resetting all marker animations');
+    // Start fade-out animation
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsVideoVisible(false);
+      setSelectedVideo(null);
+      setSelectedMarkerId(null);
+      
+      // Reset all marker animations
+      const markersToReset = Object.keys(markerAnimations);
+      if (markersToReset.length > 0) {
+        setAnimatingMarkers(new Set(markersToReset));
+        markersToReset.forEach((id) => {
+          if (markerAnimations[id]) {
+            console.log('🔄 Resetting marker:', id, 'to scale 1.0 (from closeVideo)');
+            Animated.spring(markerAnimations[id], {
+              toValue: 1,
+              useNativeDriver: true,
+              tension: 100,
+              friction: 8,
+            }).start(() => {
+              setAnimatingMarkers(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(id);
+                return newSet;
+              });
+            });
+          }
+        });
+      }
+    });
   };
 
   useEffect(() => {
@@ -91,34 +207,68 @@ export default function Index() {
         moveOnMarkerPress={false}
       >
         {/* Render all map points as markers */}
-        {mapPoints.map((point: MapPoint) => (
-          <Marker
-            key={point.id}
-            coordinate={{
-              latitude: point.latitude,
-              longitude: point.longitude,
-            }}
-            title={point.title}
-            description={point.description}
-            tracksViewChanges={false}
-            onPress={(event) => handleMarkerPress(point.id, event)}
-          >
-            <Text style={styles.markerEmoji}>{point.emoji}</Text>
-          </Marker>
-        ))}
+        {mapPoints.map((point: MapPoint) => {
+          // Ensure animated value exists for this marker
+          if (!markerAnimations[point.id]) {
+            console.log('🆕 Creating new animated value for marker:', point.id);
+            markerAnimations[point.id] = new Animated.Value(1);
+          }
+          
+          return (
+            <Marker
+              key={point.id}
+              coordinate={{
+                latitude: point.latitude,
+                longitude: point.longitude,
+              }}
+              title={point.title}
+              description={point.description}
+              tracksViewChanges={point.id === selectedMarkerId || animatingMarkers.has(point.id)}
+              onPress={(event) => {
+                console.log('👆 Marker pressed:', point.id);
+                handleMarkerPress(point.id, event);
+              }}
+            >
+              <Animated.Text
+                style={[
+                  styles.markerEmoji,
+                  {
+                    fontSize: point.id === selectedMarkerId ? 48 : 32,
+                    transform: [
+                      {
+                        scale: markerAnimations[point.id],
+                      },
+                    ],
+                  }
+                ]}
+              >
+                {point.emoji}
+              </Animated.Text>
+            </Marker>
+          );
+        })}
       </MapView>
 
       {/* Picture-in-Picture Video */}
       {isVideoVisible && selectedVideo && (
-        <View style={[styles.videoOverlay, { left: videoPosition.x, top: videoPosition.y }]}>
+        <Animated.View 
+          style={[
+            styles.videoOverlay, 
+            { 
+              left: videoPosition.x, 
+              top: videoPosition.y,
+              opacity: fadeAnim,
+            }
+          ]}
+        >
           {/* Shop Button with Arrow */}
           <TouchableOpacity 
             style={[styles.shopButton, { backgroundColor: '#ffffff' }]}
-                               onPress={() => {
-                     // Navigate to location page
-                     console.log('Navigating to location with ID:', selectedMarkerId);
-                     router.push(`/_location?id=${selectedMarkerId}`);
-                   }}
+            onPress={() => {
+              // Navigate to location page
+              console.log('Navigating to location with ID:', selectedMarkerId);
+              router.push(`/_location?id=${selectedMarkerId}`);
+            }}
           >
             <Text style={styles.shopButtonText}>→ Check it out</Text>
           </TouchableOpacity>
@@ -181,7 +331,7 @@ export default function Index() {
               }}
             />
           </View>
-        </View>
+        </Animated.View>
       )}
     </View>
   );
@@ -210,9 +360,12 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
-           markerEmoji: {
-           fontSize: 32,
-         },
+  markerEmoji: {
+    fontSize: 32,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
   videoOverlay: {
     position: 'absolute',
     zIndex: 1000,

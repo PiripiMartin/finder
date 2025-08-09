@@ -168,4 +168,7 @@ export const mapPoints: MapPoint[] = [
     latitude: -37.8250,
     longitude: 144.9500,
   },
-]; 
+];
+
+// Default export to satisfy Expo Router
+export default { mapPoints }; 

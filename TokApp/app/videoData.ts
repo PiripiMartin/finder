@@ -28,4 +28,7 @@ export const tiktokEmbedUrls: { [key: string]: string } = {
 };
 
 // Keep the old videoUrls for backward compatibility if needed
-export const videoUrls: { [key: string]: string } = tiktokEmbedUrls; 
+export const videoUrls: { [key: string]: string } = tiktokEmbedUrls;
+
+// Default export to satisfy Expo Router
+export default { tiktokEmbedUrls, videoUrls }; 
