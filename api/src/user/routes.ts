@@ -2,13 +2,32 @@ import type { BunRequest } from "bun";
 import { db, toCamelCase } from "../database";
 import type { User } from "./types";
 import { generateSessionToken, verifySessionToken } from "./session";
+import type { Post } from "../posts/types";
+import type { MapPoint } from "../map/types";
+import { getSavedLocationsWithTopPost, getRecommendedLocationsWithTopPost, type LocationAndPost } from "../map/queries";
 
 
 
 interface LoginRequest {
+    // General login information
     username: string,
     password: string,
+
+    // Information for fetching initial data
+    coordinates: {
+        latitude: number,
+        longitude: number
+    }
 };
+
+
+interface LoginResponse {
+    sessionToken: string,
+    savedLocations: Array<LocationAndPost>,
+    recommendedLocations: Array<LocationAndPost>
+}
+
+
 
 export interface TokenValidation {
     userId: string,
@@ -51,9 +70,32 @@ export async function login(req: BunRequest): Promise<Response> {
         return new Response("Invalid credentials", {status: 401});
     }
 
-    // Generate session token and send back to user
+    // Generate session token
     const sessionToken = await generateSessionToken(account.id);
-    return new Response(sessionToken, {status: validCredentials ? 200 : 401});
+    
+    // Fetch saved and recommended locations with their top posts
+    const [savedLocationData, recommendedLocationData] = await Promise.all([
+        getSavedLocationsWithTopPost(account.id),
+        getRecommendedLocationsWithTopPost(
+            loginRequest.coordinates.latitude, 
+            loginRequest.coordinates.longitude
+        )
+    ]);
+
+    // Data is already in the correct format from the query functions
+    const savedLocations = savedLocationData;
+    const recommendedLocations = recommendedLocationData;
+
+    const response: LoginResponse = {
+        sessionToken,
+        savedLocations,
+        recommendedLocations
+    };
+
+    return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+    });
 }
 
 
