@@ -71,7 +71,7 @@ export async function getRecommendedLocationsWithTopPost(
     limit: number = 20
 ): Promise<LocationAndPost[]> {
     const query = `
-        SELECT 
+        SELECT DISTINCT
             mp.id,
             mp.title,
             mp.description,
