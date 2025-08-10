@@ -2,6 +2,13 @@ import { db, toCamelCase } from "../database";
 import type { MapPoint } from "./types";
 import type { Post } from "../posts/types";
 
+
+export interface LocationAndPost {
+    location: MapPoint;
+    topPost: Post;
+} 
+
+
 /**
  * Fetches saved locations for a user (locations where they've posted) with their top post (most recent)
  */
@@ -32,7 +39,7 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
         ORDER BY p.posted_at DESC
     `;
 
-    const [rows] = await db.execute(query, [userId]) as [any[], any];
+    const [rows, _] = await db.execute(query, [userId]) as [any[], any];
     const results = toCamelCase(rows) as any[];
     
     return results.map(row => ({
@@ -91,7 +98,7 @@ export async function getRecommendedLocationsWithTopPost(
         LIMIT ?
     `;
 
-    const [rows] = await db.execute(query, [longitude, latitude, longitude, latitude, radiusKm, limit]) as [any[], any];
+    const [rows, _] = await db.execute(query, [longitude, latitude, longitude, latitude, radiusKm, limit]) as [any[], any];
     const results = toCamelCase(rows) as any[];
     
     // Filter out locations without posts and transform to LocationAndPost format
@@ -116,7 +123,21 @@ export async function getRecommendedLocationsWithTopPost(
         }));
 }
 
-export interface LocationAndPost {
-    location: MapPoint;
-    topPost: Post;
-} 
+
+export async function fetchPostsForLocation(locationId: number): Promise<Post[]> {
+    const query = `
+        SELECT 
+            id,
+            url,
+            posted_by,
+            map_point_id,
+            posted_at
+        FROM posts
+        WHERE map_point_id = ?
+    `;
+
+    const [rows, _] = await db.execute(query, [locationId]) as [any[], any];
+    const results = toCamelCase(rows) as Post[];
+
+    return results;
+}
