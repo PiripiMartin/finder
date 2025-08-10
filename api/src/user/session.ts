@@ -17,7 +17,6 @@ export async function generateSessionToken(accountId: number): Promise<string> {
         [token, accountId, expiresAt]
     );
 
-
     return token;
 }
 
