@@ -85,20 +85,26 @@ export async function getRecommendedLocationsWithTopPost(
             ST_Distance_Sphere(mp.location, POINT(?, ?)) / 1000 as distance_km
         FROM map_points mp
         LEFT JOIN (
-            SELECT DISTINCT
+            SELECT
                 map_point_id,
                 FIRST_VALUE(id) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as id,
                 FIRST_VALUE(url) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as url,
                 FIRST_VALUE(posted_by) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_by,
                 FIRST_VALUE(posted_at) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_at
-            FROM posts
+        FROM posts
         ) p ON mp.id = p.map_point_id
         WHERE ST_Distance_Sphere(mp.location, POINT(?, ?)) <= ? * 1000
         ORDER BY distance_km ASC, mp.created_at DESC
-        LIMIT ?
+        LIMIT ${Number(limit)}
     `;
 
-    const [rows, _] = await db.execute(query, [longitude, latitude, longitude, latitude, radiusKm, limit]) as [any[], any];
+    const [rows] = await db.execute(query, [
+        Number(longitude),
+        Number(latitude),
+        Number(longitude),
+        Number(latitude),
+        Number(radiusKm)
+    ]);
     const results = toCamelCase(rows) as any[];
     
     // Filter out locations without posts and transform to LocationAndPost format

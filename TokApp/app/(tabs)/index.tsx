@@ -6,9 +6,12 @@ import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, Touchable
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { getApiUrl } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { MapPoint } from '../mapData';
 import { videoUrls } from '../videoData';
+import { DeepLinkHandler } from '../utils/deepLinkHandler';
 
 // Function to calculate distance between two coordinates in meters
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -59,6 +62,7 @@ export default function Index() {
   const [videoPosition, setVideoPosition] = useState({ x: 0, y: 0 });
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
+  const { sessionToken, logout } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Filter state
@@ -68,7 +72,6 @@ export default function Index() {
   const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   // Shake animation refs for each marker
   const shakeAnims = useRef<{ [key: string]: Animated.Value }>({}).current;
@@ -76,180 +79,189 @@ export default function Index() {
   // Fetch map points from API
   const fetchMapPoints = async () => {
     try {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // Create a timeout promise
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Request timeout')), 5000); // 5 second timeout
-        });
-        
-        // Replace with your actual API endpoint
-        const fetchPromise = fetch('YOUR_API_ENDPOINT/login', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${sessionToken || ''}`,
-          },
-        });
-        
-        // Race between fetch and timeout
-        const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        // Extract session token and recommended locations
-        setSessionToken(data.sessionToken);
-        
-        // Transform recommended locations to MapPoint format
-        const transformedMapPoints: MapPoint[] = data.recommendedLocations.map((item: any) => ({
-          id: item.location.id,
-          title: item.location.title,
-          description: item.location.description,
-          emoji: item.location.emoji,
-          latitude: item.location.latitude,
-          longitude: item.location.longitude,
-          videoUrl: item.topPost.url, // Use the top post URL as the video
-        }));
-        
-        setMapPoints(transformedMapPoints);
-        console.log('Successfully fetched data from API');
-      } catch (err) {
-        console.error('Error fetching map points:', err);
-        // Don't throw the error, just log it and continue with fallback
+      setIsLoading(true);
+      setError(null);
+      
+      // Check if we have user location before making the API call
+      if (!userLocation) {
+        console.log('No user location available, skipping API call');
+        setIsLoading(false);
+        return;
       }
       
-      // Always ensure we have data, even if API call failed
-      if (mapPoints.length === 0) {
-        console.log('Using fallback data - API unavailable');
+      // Build the API URL with coordinates
+      const apiUrl = `${getApiUrl('MAP_POINTS')}?lat=${userLocation.latitude}&lon=${userLocation.longitude}`;
+      console.log('Fetching map points from:', apiUrl);
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 5000); // 5 second timeout
+      });
+      
+      // Fetch map points from API
+      const fetchPromise = fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        },
+      });
+      
+      // Race between fetch and timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('API response data:', data);
+      
+      // Safely extract and validate the data
+      const savedLocations = Array.isArray(data.savedLocations) ? data.savedLocations : [];
+      const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+      
+      // Combine saved and recommended locations
+      const allLocations = [...savedLocations, ...recommendedLocations];
+      
+      if (allLocations.length === 0) {
+        throw new Error('No locations returned from API');
+      }
+      
+      // Transform locations to MapPoint format with error handling
+      const transformedMapPoints: MapPoint[] = allLocations.map((item: any) => {
+        // Validate required fields
+        if (!item.location || !item.location.id || !item.location.latitude || !item.location.longitude) {
+          console.warn('Invalid location data:', item);
+          return null;
+        }
         
-        const fallbackData = {
-          sessionToken: "fallback-token-12345",
-          recommendedLocations: [
-            {
-              location: {
-                id: "125",
-                title: "Rooftop Bar",
-                description: "Amazing city views and cocktails",
-                emoji: "☕",
-                latitude: -37.8100,
-                longitude: 144.9600
-              },
-              topPost: {
-                id: 458,
-                url: "https://www.tiktok.com/player/v1/7519892034644135182?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
-                postedBy: 991,
-                mapPointId: 125,
-                postedAt: "2024-01-16T18:45:00.000Z"
-              }
-            },
-            {
-              location: {
-                id: "126",
-                title: "Street Art Alley",
-                description: "Colorful murals and graffiti",
-                emoji: "☕",
-                latitude: -37.8150,
-                longitude: 144.9650
-              },
-              topPost: {
-                id: 459,
-                url: "https://www.tiktok.com/player/v1/7487245729363266822?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
-                postedBy: 442,
-                mapPointId: 126,
-                postedAt: "2024-01-16T16:20:00.000Z"
-              }
-            },
-            {
-              location: {
-                id: "127",
-                title: "Downtown Coffee Shop",
-                description: "Best espresso in the city with great wifi",
-                emoji: "☕",
-                latitude: -37.8136,
-                longitude: 144.9631
-              },
-              topPost: {
-                id: 456,
-                url: "https://www.tiktok.com/player/v1/7522762748745452818?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
-                postedBy: 789,
-                mapPointId: 127,
-                postedAt: "2024-01-15T14:30:00.000Z"
-            }
-            },
-            {
-              location: {
-                id: "128",
-                title: "Central Park Bench",
-                description: "Peaceful spot for lunch breaks",
-                emoji: "☕",
-                latitude: -37.8200,
-                longitude: 144.9700
-              },
-              topPost: {
-                id: 457,
-                url: "https://www.tiktok.com/player/v1/7519892034644135182?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
-                postedBy: 789,
-                mapPointId: 128,
-                postedAt: "2024-01-14T12:15:00.000Z"
-              }
-            }
-          ]
+        return {
+          id: String(item.location.id), // Ensure ID is a string
+          title: item.location.title || 'Unknown Location',
+          description: item.location.description || '',
+          emoji: item.location.emoji || '📍',
+          latitude: Number(item.location.latitude),
+          longitude: Number(item.location.longitude),
+          videoUrl: item.topPost?.url || '',
         };
-        
-        // Use fallback data
-        setSessionToken(fallbackData.sessionToken);
-        const fallbackMapPoints: MapPoint[] = fallbackData.recommendedLocations.map((item: any) => ({
-          id: item.location.id,
-          title: item.location.title,
-          description: item.location.description,
-          emoji: item.location.emoji,
-          latitude: item.location.latitude,
-          longitude: item.location.longitude,
-          videoUrl: item.topPost.url,
-        }));
-        
-        setMapPoints(fallbackMapPoints);
-        setError('Using offline data - network unavailable');
+      }).filter(Boolean) as MapPoint[]; // Remove null entries
+      
+      if (transformedMapPoints.length === 0) {
+        throw new Error('No valid locations after transformation');
       }
-    } catch (outerError) {
-      // Ultimate fallback - if anything goes wrong, use static data
-      console.error('Critical error in fetchMapPoints:', outerError);
       
-      const emergencyData: MapPoint[] = [
-        {
-          id: "999",
-          title: "Emergency Location",
-          description: "App is using emergency fallback data",
-          emoji: "🚨",
-          latitude: -37.8136,
-          longitude: 144.9631,
-          videoUrl: "https://www.tiktok.com/player/v1/7519892034644135182?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0"
-        }
-      ];
+      setMapPoints(transformedMapPoints);
+      setError(null); // Clear any previous errors
+      console.log('Successfully fetched data from API, total points:', transformedMapPoints.length);
       
-      setMapPoints(emergencyData);
-      setSessionToken("emergency-token");
-      setError('App is using emergency fallback data');
+    } catch (err) {
+      console.error('Error fetching map points:', err);
+      
+      // Use fallback data if API fails
+      const fallbackData = {
+        recommendedLocations: [
+          {
+            location: {
+              id: "125",
+              title: "Rooftop Bar",
+              description: "Amazing city views and cocktails",
+              emoji: "🧩",
+              latitude: -37.8100,
+              longitude: 144.9600
+            },
+            topPost: {
+              id: 458,
+              url: "https://www.tiktok.com/player/v1/7519892034644135182?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
+              postedBy: 991,
+              mapPointId: 125,
+              postedAt: "2024-01-16T18:45:00.000Z"
+            }
+          },
+          {
+            location: {
+              id: "126",
+              title: "Street Art Alley",
+              description: "Colorful murals and graffiti",
+              emoji: "🧩",
+              latitude: -37.8150,
+              longitude: 144.9650
+            },
+            topPost: {
+              id: 459,
+              url: "https://www.tiktok.com/player/v1/7487245729363266822?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
+              postedBy: 442,
+              mapPointId: 126,
+              postedAt: "2024-01-16T18:45:00.000Z"
+            }
+          },
+          {
+            location: {
+              id: "127",
+              title: "Downtown Coffee Shop",
+              description: "Best espresso in the city with great wifi",
+              emoji: "🍉",
+              latitude: -37.8136,
+              longitude: 144.9631
+            },
+            topPost: {
+              id: 456,
+              url: "https://www.tiktok.com/player/v1/7522762748745452818?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
+              postedBy: 789,
+              mapPointId: 127,
+              postedAt: "2024-01-15T14:30:00.000Z"
+            }
+          },
+          {
+            location: {
+              id: "128",
+              title: "Central Park Bench",
+              description: "Peaceful spot for lunch breaks",
+              emoji: "☕",
+              latitude: -37.8200,
+              longitude: 144.9700
+            },
+            topPost: {
+              id: 457,
+              url: "https://www.tiktok.com/player/v1/7519892034644135182?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
+              postedBy: 789,
+              mapPointId: 128,
+              postedAt: "2024-01-14T12:15:00.000Z"
+            }
+          }
+        ]
+      };
+      
+      // Use fallback data
+      const fallbackMapPoints: MapPoint[] = fallbackData.recommendedLocations.map((item: any) => ({
+        id: item.location.id,
+        title: item.location.title,
+        description: item.location.description,
+        emoji: item.location.emoji,
+        latitude: item.location.latitude,
+        longitude: item.location.longitude,
+        videoUrl: item.topPost.url,
+      }));
+      
+      setMapPoints(fallbackMapPoints);
+      setError('Using offline data - network unavailable');
+      
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Load map points on component mount
+  // Load map points when user location is available
   useEffect(() => {
-    fetchMapPoints();
-    
-    // Set up periodic refresh every 5 minutes
-    const refreshInterval = setInterval(fetchMapPoints, 5 * 60 * 1000);
-    
-    return () => clearInterval(refreshInterval);
-  }, []);
+    if (userLocation) {
+      fetchMapPoints();
+      
+      // Set up periodic refresh every 5 minutes
+      const refreshInterval = setInterval(fetchMapPoints, 5 * 60 * 1000);
+      
+      return () => clearInterval(refreshInterval);
+    }
+  }, [userLocation]);
 
   // Function to manually refresh data
   const handleRefresh = () => {
@@ -623,6 +635,43 @@ export default function Index() {
         />
       </TouchableOpacity>
 
+      {/* Test Deep Link Button - Top Center */}
+      <TouchableOpacity 
+        style={[
+          styles.testButton,
+          {
+            top: insets.top + 20,
+            left: '50%',
+            marginLeft: -20, // Center the button
+          }
+        ]}
+        onPress={() => {
+          const testUrl = "tokapp://share/123456789";
+          console.log('Testing deep link:', testUrl);
+          DeepLinkHandler.handleTikTokShare(testUrl);
+        }}
+      >
+        <Ionicons name="link" size={24} color="#007AFF" />
+      </TouchableOpacity>
+
+      {/* Clear Token Button - Top Center Right */}
+      <TouchableOpacity 
+        style={[
+          styles.clearButton,
+          {
+            top: insets.top + 20,
+            left: '50%',
+            marginLeft: 20, // Position to the right of test button
+          }
+        ]}
+        onPress={() => {
+          logout();
+          console.log('Session token cleared');
+        }}
+      >
+        <Ionicons name="log-out" size={24} color="#FF3B30" />
+      </TouchableOpacity>
+
       {/* Filter Buttons - Bottom */}
       <View style={[
         styles.filterContainer,
@@ -893,6 +942,34 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   refreshButton: {
+    position: 'absolute',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  testButton: {
+    position: 'absolute',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  clearButton: {
     position: 'absolute',
     backgroundColor: 'white',
     borderRadius: 20,
