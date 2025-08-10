@@ -5,7 +5,7 @@ export const API_CONFIG = {
   ENDPOINTS: {
     LOGIN: '/login',
     CREATE_ACCOUNT: '/signup', // Note: API uses /signup, not /create-account
-    MAP_POINTS: '/map/1/posts', // Use location ID 1 as default, will be replaced dynamically
+    MAP_POINTS: '/map/saved-and-recommended', 
     VALIDATE_TOKEN: '/validate-token',
   },
 };
