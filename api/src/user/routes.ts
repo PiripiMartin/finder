@@ -84,12 +84,12 @@ export async function login(req: BunRequest): Promise<Response> {
     if (!req.body) {
         return new Response("Missing request body", {status: 400});
     }
-    const data = await req.body.json();
 
-    if (!("username" in data) || !("password" in data)) {
+    const loginRequest = await checkedExtractBody(req, ["username", "password", "coordinates"]) as LoginRequest | null;
+    if (!loginRequest) {
         return new Response("Malformed body", {status: 400});
     }
-    const loginRequest = data as LoginRequest;
+
 
     // Fetch the corresponding account
     const [rows, _] = await db.execute(
@@ -116,26 +116,8 @@ export async function login(req: BunRequest): Promise<Response> {
     // Generate session token
     const sessionToken = await generateSessionToken(account.id);
     
-    // Fetch saved and recommended locations with their top posts
-    const [savedLocationData, recommendedLocationData] = await Promise.all([
-        getSavedLocationsWithTopPost(account.id),
-        getRecommendedLocationsWithTopPost(
-            loginRequest.coordinates.latitude, 
-            loginRequest.coordinates.longitude
-        )
-    ]);
 
-    // Data is already in the correct format from the query functions
-    const savedLocations = savedLocationData;
-    const recommendedLocations = recommendedLocationData;
-
-    const response: LoginResponse = {
-        sessionToken,
-        savedLocations,
-        recommendedLocations
-    };
-
-    return new Response(JSON.stringify(response), {
+    return new Response(JSON.stringify({sessionToken: sessionToken}), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
     });
