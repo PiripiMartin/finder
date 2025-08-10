@@ -5,6 +5,7 @@ export interface MapPoint {
   emoji: string;
   latitude: number;
   longitude: number;
+  videoUrl?: string; // Optional video URL from API response
 }
 
 export const mapPoints: MapPoint[] = [

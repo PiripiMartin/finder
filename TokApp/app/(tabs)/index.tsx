@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '../context/ThemeContext';
-import { MapPoint, mapPoints } from '../mapData';
+import { MapPoint } from '../mapData';
 import { videoUrls } from '../videoData';
 
 // Function to calculate distance between two coordinates in meters
@@ -63,21 +63,252 @@ export default function Index() {
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  
+  // API state
+  const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   // Shake animation refs for each marker
   const shakeAnims = useRef<{ [key: string]: Animated.Value }>({}).current;
 
+  // Fetch map points from API
+  const fetchMapPoints = async () => {
+    try {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timeout')), 5000); // 5 second timeout
+        });
+        
+        // Replace with your actual API endpoint
+        const fetchPromise = fetch('YOUR_API_ENDPOINT/login', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionToken || ''}`,
+          },
+        });
+        
+        // Race between fetch and timeout
+        const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Extract session token and recommended locations
+        setSessionToken(data.sessionToken);
+        
+        // Transform recommended locations to MapPoint format
+        const transformedMapPoints: MapPoint[] = data.recommendedLocations.map((item: any) => ({
+          id: item.location.id,
+          title: item.location.title,
+          description: item.location.description,
+          emoji: item.location.emoji,
+          latitude: item.location.latitude,
+          longitude: item.location.longitude,
+          videoUrl: item.topPost.url, // Use the top post URL as the video
+        }));
+        
+        setMapPoints(transformedMapPoints);
+        console.log('Successfully fetched data from API');
+      } catch (err) {
+        console.error('Error fetching map points:', err);
+        // Don't throw the error, just log it and continue with fallback
+      }
+      
+      // Always ensure we have data, even if API call failed
+      if (mapPoints.length === 0) {
+        console.log('Using fallback data - API unavailable');
+        
+        const fallbackData = {
+          sessionToken: "fallback-token-12345",
+          recommendedLocations: [
+            {
+              location: {
+                id: "125",
+                title: "Rooftop Bar",
+                description: "Amazing city views and cocktails",
+                emoji: "☕",
+                latitude: -37.8100,
+                longitude: 144.9600
+              },
+              topPost: {
+                id: 458,
+                url: "https://www.tiktok.com/player/v1/7519892034644135182?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
+                postedBy: 991,
+                mapPointId: 125,
+                postedAt: "2024-01-16T18:45:00.000Z"
+              }
+            },
+            {
+              location: {
+                id: "126",
+                title: "Street Art Alley",
+                description: "Colorful murals and graffiti",
+                emoji: "☕",
+                latitude: -37.8150,
+                longitude: 144.9650
+              },
+              topPost: {
+                id: 459,
+                url: "https://www.tiktok.com/player/v1/7487245729363266822?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
+                postedBy: 442,
+                mapPointId: 126,
+                postedAt: "2024-01-16T16:20:00.000Z"
+              }
+            },
+            {
+              location: {
+                id: "127",
+                title: "Downtown Coffee Shop",
+                description: "Best espresso in the city with great wifi",
+                emoji: "☕",
+                latitude: -37.8136,
+                longitude: 144.9631
+              },
+              topPost: {
+                id: 456,
+                url: "https://www.tiktok.com/player/v1/7522762748745452818?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
+                postedBy: 789,
+                mapPointId: 127,
+                postedAt: "2024-01-15T14:30:00.000Z"
+            }
+            },
+            {
+              location: {
+                id: "128",
+                title: "Central Park Bench",
+                description: "Peaceful spot for lunch breaks",
+                emoji: "☕",
+                latitude: -37.8200,
+                longitude: 144.9700
+              },
+              topPost: {
+                id: 457,
+                url: "https://www.tiktok.com/player/v1/7519892034644135182?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0",
+                postedBy: 789,
+                mapPointId: 128,
+                postedAt: "2024-01-14T12:15:00.000Z"
+              }
+            }
+          ]
+        };
+        
+        // Use fallback data
+        setSessionToken(fallbackData.sessionToken);
+        const fallbackMapPoints: MapPoint[] = fallbackData.recommendedLocations.map((item: any) => ({
+          id: item.location.id,
+          title: item.location.title,
+          description: item.location.description,
+          emoji: item.location.emoji,
+          latitude: item.location.latitude,
+          longitude: item.location.longitude,
+          videoUrl: item.topPost.url,
+        }));
+        
+        setMapPoints(fallbackMapPoints);
+        setError('Using offline data - network unavailable');
+      }
+    } catch (outerError) {
+      // Ultimate fallback - if anything goes wrong, use static data
+      console.error('Critical error in fetchMapPoints:', outerError);
+      
+      const emergencyData: MapPoint[] = [
+        {
+          id: "999",
+          title: "Emergency Location",
+          description: "App is using emergency fallback data",
+          emoji: "🚨",
+          latitude: -37.8136,
+          longitude: 144.9631,
+          videoUrl: "https://www.tiktok.com/player/v1/7519892034644135182?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0"
+        }
+      ];
+      
+      setMapPoints(emergencyData);
+      setSessionToken("emergency-token");
+      setError('App is using emergency fallback data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load map points on component mount
+  useEffect(() => {
+    fetchMapPoints();
+    
+    // Set up periodic refresh every 5 minutes
+    const refreshInterval = setInterval(fetchMapPoints, 5 * 60 * 1000);
+    
+    return () => clearInterval(refreshInterval);
+  }, []);
+
+  // Function to manually refresh data
+  const handleRefresh = () => {
+    fetchMapPoints();
+  };
+
+  // Helper function to get label for emoji
+  const getEmojiLabel = (emoji: string): string => {
+    const emojiLabels: { [key: string]: string } = {
+      '☕': 'Coffee',
+      '🧋': 'Bubble Tea',
+      '𫖖': 'Tea',
+      '🍰': 'Dessert',
+      '🍕': 'Pizza',
+      '🍜': 'Noodles',
+      '🍣': 'Sushi',
+      '🍔': 'Burgers',
+      '🍸': 'Cocktails',
+      '🎨': 'Art',
+      '🌳': 'Nature',
+    };
+    return emojiLabels[emoji] || 'Unknown';
+  };
+
   // Get unique marker types from emojis
-  const markerTypes = [
-    { emoji: '☕', label: 'Coffee' },
-    { emoji: '🧋', label: 'Bubble Tea' },
-    { emoji: '𫖖', label: 'Tea' },
-    { emoji: '🍰', label: 'Dessert' },
-    { emoji: '🍕', label: 'Pizza' },
-    { emoji: '🍜', label: 'Noodles' },
-    { emoji: '🍣', label: 'Sushi' },
-    { emoji: '🍔', label: 'Burgers' },
-  ];
+  const markerTypes = useMemo(() => {
+    const emojiCounts: { [key: string]: number } = {};
+    
+    mapPoints.forEach(point => {
+      if (emojiCounts[point.emoji]) {
+        emojiCounts[point.emoji]++;
+      } else {
+        emojiCounts[point.emoji] = 1;
+      }
+    });
+    
+    // Convert to array format and add some default types if needed
+    const types = Object.entries(emojiCounts).map(([emoji, count]) => ({
+      emoji,
+      label: getEmojiLabel(emoji),
+      count
+    }));
+    
+    // Add default types if no data yet
+    if (types.length === 0) {
+      return [
+        { emoji: '☕', label: 'Coffee', count: 0 },
+        { emoji: '🧋', label: 'Bubble Tea', count: 0 },
+        { emoji: '𫖖', label: 'Tea', count: 0 },
+        { emoji: '🍰', label: 'Dessert', count: 0 },
+        { emoji: '🍕', label: 'Pizza', count: 0 },
+        { emoji: '🍜', label: 'Noodles', count: 0 },
+        { emoji: '🍣', label: 'Sushi', count: 0 },
+        { emoji: '🍔', label: 'Burgers', count: 0 },
+      ];
+    }
+    
+    return types;
+  }, [mapPoints]);
 
   // Filtered map points based on active filter
   const filteredMapPoints = activeFilter
@@ -138,78 +369,57 @@ export default function Index() {
     console.log('Marker pressed:', pointId);
     console.log('Current selectedMarkerId:', selectedMarkerId);
     
-    const videoUrl = videoUrls[pointId];
-    
-    // Pan camera to the clicked marker - position it in the top middle of the screen
+    // Find the selected point
     const selectedPoint = mapPoints.find(point => point.id === pointId);
-    if (selectedPoint && mapRef.current) {
-      // Calculate the offset to position the marker in the top middle
-      const screenHeight = Dimensions.get('window').height;
-      const screenWidth = Dimensions.get('window').width;
-      
-      // Calculate the latitude offset to move the marker to the top third of the screen
-      // Subtract the offset to move the marker up on the screen
-      const latitudeOffset = 0.003; // Reduced offset to move it lower down
-      
-      mapRef.current.animateToRegion({
-        latitude: selectedPoint.latitude - latitudeOffset,
-        longitude: selectedPoint.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 1000);
-    }
+    if (!selectedPoint) return;
     
-    // If tapping the same marker, do nothing (keep it selected)
-    if (selectedMarkerId === pointId) {
-      console.log('Same marker tapped, keeping selected');
-      return;
-    }
-    
-    // Set the selected marker ID for visual feedback
     console.log('Setting selectedMarkerId to:', pointId);
     setSelectedMarkerId(pointId);
+    
+    // Use the videoUrl from the API response if available, otherwise fall back to videoData
+    let videoUrl = selectedPoint.videoUrl;
+    
+    if (!videoUrl) {
+      // Fallback to static video data if no videoUrl in API response
+      const fallbackVideo = videoUrls[pointId];
+      if (fallbackVideo) {
+        videoUrl = fallbackVideo;
+      }
+    }
     
     if (videoUrl) {
       setSelectedVideo(videoUrl);
       setIsVideoVisible(true);
       
-      // Start fade-in animation
+      // Pan camera to the clicked marker - position it in the top middle of the screen
+      if (selectedPoint && mapRef.current) {
+        // Calculate the offset to position the marker in the top middle
+        const screenHeight = Dimensions.get('window').height;
+        const screenWidth = Dimensions.get('window').width;
+        
+        // Calculate the latitude offset to move the marker to the top third of the screen
+        // Subtract the offset to move the marker up on the screen
+        const latitudeOffset = 0.003; // Reduced offset to move it lower down
+        
+        mapRef.current.animateToRegion({
+          latitude: selectedPoint.latitude - latitudeOffset,
+          longitude: selectedPoint.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        }, 1000);
+      }
+      
+      // Get marker position for video placement
+      const { pageX, pageY } = event.nativeEvent;
+      setVideoPosition({ x: pageX, y: pageY });
+      
+      // Animate video fade in
       fadeAnim.setValue(0);
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 1100,
+        duration: 500,
         useNativeDriver: true,
       }).start();
-
-      // Start button animation
-      buttonAnim.setValue(0);
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(buttonAnim, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(buttonAnim, {
-            toValue: 0,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-      
-      // Calculate video position based on screen dimensions
-      if (event.nativeEvent) {
-        const screenHeight = Dimensions.get('window').height;
-        const videoHeight = 298; // Height of video container
-        const margin = 20;
-        
-        // Place video in bottom left, above the filters
-        const x = margin;
-        // Remove y calculation since we're using bottom positioning now
-        
-        setVideoPosition({ x, y: 0 }); // y is no longer used
-      }
     }
   };
 
@@ -265,12 +475,29 @@ export default function Index() {
           latitudeDelta: 0.0922,
           longitudeDelta: 0.0421,
         }}
-        region={userLocation || undefined} // This will center the map on user location when available
+        region={userLocation || undefined}
         showsUserLocation={true}
         showsMyLocationButton={false}
         followsUserLocation={true}
         moveOnMarkerPress={false}
       >
+        {/* Loading indicator */}
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <Text style={styles.loadingText}>Loading locations...</Text>
+          </View>
+        )}
+        
+        {/* Error indicator */}
+        {error && (
+          <View style={styles.errorOverlay}>
+            <Text style={styles.errorText}>Error: {error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={fetchMapPoints}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Render all map points as markers */}
         {filteredMapPoints.map((point: MapPoint) => {
           // Calculate distance from user to this marker
@@ -301,8 +528,6 @@ export default function Index() {
                 latitude: point.latitude,
                 longitude: point.longitude,
               }}
-              title={point.title}
-              description={point.description}
               tracksViewChanges={false}
               onPress={(event) => {
                 handleMarkerPress(point.id, event);
@@ -310,8 +535,8 @@ export default function Index() {
             >
               <Animated.View
                 style={{
-                  width: 48,
-                  height: 48,
+                  width: 64, // Increased from 48 to 64
+                  height: 64, // Increased from 48 to 64
                   alignItems: 'center',
                   justifyContent: 'center',
                   transform: [
@@ -338,6 +563,21 @@ export default function Index() {
                 >
                   {point.emoji}
                 </Animated.Text>
+                
+                {/* Custom Label - Only show when selected */}
+                {point.id === selectedMarkerId && (
+                  <View style={[
+                    styles.customLabel,
+                    {
+                      top: -30, // Moved down (was -70)
+                      left: -60, // Wider label (was -40)
+                      right: -60, // Wider label (was -40)
+                    }
+                  ]}>
+                    <Text style={styles.labelTitle}>{point.title}</Text>
+                    <Text style={styles.labelDescription}>{point.description}</Text>
+                  </View>
+                )}
               </Animated.View>
             </Marker>
           );
@@ -362,6 +602,25 @@ export default function Index() {
         }}
       >
         <Ionicons name="navigate" size={24} color="#007AFF" />
+      </TouchableOpacity>
+
+      {/* Refresh Button - Top Right */}
+      <TouchableOpacity 
+        style={[
+          styles.refreshButton,
+          {
+            top: insets.top + 20,
+            right: insets.right + 20,
+          }
+        ]}
+        onPress={handleRefresh}
+        disabled={isLoading}
+      >
+        <Ionicons 
+          name="refresh" 
+          size={24} 
+          color={isLoading ? "#999" : "#007AFF"} 
+        />
       </TouchableOpacity>
 
       {/* Filter Buttons - Bottom */}
@@ -420,7 +679,7 @@ export default function Index() {
           style={[
             styles.videoOverlay, 
             { 
-              left: videoPosition.x, 
+              left: 15, // Hardcoded 50px from left edge
               bottom: insets.bottom + 20, // Position above the filters
               opacity: fadeAnim,
             }
@@ -633,6 +892,20 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
+  refreshButton: {
+    position: 'absolute',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
   filterContainer: {
     position: 'absolute',
     flexDirection: 'row',
@@ -662,5 +935,68 @@ const styles = StyleSheet.create({
   filterButtonText: {
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    zIndex: 100,
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#333',
+  },
+  errorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    zIndex: 100,
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#ff0000',
+    textAlign: 'center',
+    padding: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  customLabel: {
+    position: 'absolute',
+    backgroundColor: '#ffffff',
+    padding: 8,
+    borderRadius: 6,
+    zIndex: 1000,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  labelTitle: {
+    color: '#000000',
+    fontSize: 10, // Smaller font
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 1,
+  },
+  labelDescription: {
+    color: '#666666',
+    fontSize: 8, // Smaller font
+    textAlign: 'center',
+    lineHeight: 10,
   },
 });
