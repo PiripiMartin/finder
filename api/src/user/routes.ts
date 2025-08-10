@@ -5,6 +5,7 @@ import { generateSessionToken, verifySessionToken } from "./session";
 import type { Post } from "../posts/types";
 import type { MapPoint } from "../map/types";
 import { getSavedLocationsWithTopPost, getRecommendedLocationsWithTopPost, type LocationAndPost } from "../map/queries";
+import { checkedExtractBody } from "../utils";
 
 
 
@@ -20,12 +21,62 @@ interface LoginRequest {
     }
 };
 
+interface SignupRequest {
+    username: string,
+    password: string,
+    email: string
+};
+
 
 interface LoginResponse {
     sessionToken: string,
     savedLocations: Array<LocationAndPost>,
     recommendedLocations: Array<LocationAndPost>
 }
+
+
+export async function signup(req: BunRequest): Promise<Response> {
+
+    const data = await checkedExtractBody(req, ["username", "password", "email"]);
+    if (!data) {
+        return new Response("Malformed body", {status: 400});
+    }
+
+    const signupRequest = data as SignupRequest;
+
+    // Check if the username or email is already taken
+    const [duplicateCheckRows, _1] = await db.execute(
+        "SELECT COUNT(*) as count FROM users WHERE username = ? OR email = ?", 
+        [signupRequest.username, signupRequest.email]
+    ) as [any[], any];
+
+    if (duplicateCheckRows[0].count > 0) {
+        return new Response("Username or email already taken", {status: 400});
+    }
+
+    // Hash the password
+    const passwordHash = await Bun.password.hash(signupRequest.password, "argon2id");
+
+    // Create the account
+    await db.execute(
+        "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)", 
+        [signupRequest.username, signupRequest.email, passwordHash]
+    );
+
+    const [accountFetchRows, _2] = await db.execute(
+        "SELECT LAST_INSERT_ID() as id"
+    ) as [any[], any];
+    const accountId = accountFetchRows[0].id;
+
+    // Generate session token
+    const sessionToken = await generateSessionToken(accountId);
+
+    return new Response(
+        JSON.stringify({sessionToken: sessionToken}),
+        {status: 200, headers: {'Content-Type': 'application/json'}}
+    );
+}
+
 
 
 export async function login(req: BunRequest): Promise<Response> {
