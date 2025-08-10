@@ -106,7 +106,7 @@ export default function Saved() {
             <TouchableOpacity 
               key={video.id} 
               style={[styles.videoCard, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}
-              onPress={() => router.push(`/location?id=${video.id}`)}
+              onPress={() => router.push(`/_location?id=${video.id}`)}
             >
               <View style={styles.thumbnailContainer}>
                 <Image source={{ uri: video.thumbnail }} style={styles.thumbnail} />
