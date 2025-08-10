@@ -1,6 +1,6 @@
 import { db } from "./database";
 import { getLocationPosts } from "./map/routes";
-import { login, validateSessionToken } from "./user/routes";
+import { login, validateSessionToken, signup } from "./user/routes";
 
 
 Bun.serve({
@@ -8,6 +8,7 @@ Bun.serve({
     routes: {
         // Account management routes
         "/api/login":          {POST: login},
+        "/api/signup":         {POST: signup},
         "/api/validate-token": {GET: validateSessionToken},
 
         // Post management routes
