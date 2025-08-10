@@ -6,9 +6,12 @@ import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, Touchable
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { getApiUrl } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { MapPoint } from '../mapData';
 import { videoUrls } from '../videoData';
+import { DeepLinkHandler } from '../utils/deepLinkHandler';
 
 // Function to calculate distance between two coordinates in meters
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -59,6 +62,7 @@ export default function Index() {
   const [videoPosition, setVideoPosition] = useState({ x: 0, y: 0 });
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
+  const { sessionToken, logout } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Filter state
@@ -68,7 +72,6 @@ export default function Index() {
   const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   // Shake animation refs for each marker
   const shakeAnims = useRef<{ [key: string]: Animated.Value }>({}).current;
@@ -85,8 +88,8 @@ export default function Index() {
           setTimeout(() => reject(new Error('Request timeout')), 5000); // 5 second timeout
         });
         
-        // Replace with your actual API endpoint
-        const fetchPromise = fetch('YOUR_API_ENDPOINT/login', {
+        // Fetch map points from API
+        const fetchPromise = fetch(getApiUrl('MAP_POINTS'), {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -103,8 +106,7 @@ export default function Index() {
         
         const data = await response.json();
         
-        // Extract session token and recommended locations
-        setSessionToken(data.sessionToken);
+        // Extract recommended locations (session token is managed by auth context)
         
         // Transform recommended locations to MapPoint format
         const transformedMapPoints: MapPoint[] = data.recommendedLocations.map((item: any) => ({
@@ -129,14 +131,13 @@ export default function Index() {
         console.log('Using fallback data - API unavailable');
         
         const fallbackData = {
-          sessionToken: "fallback-token-12345",
           recommendedLocations: [
             {
               location: {
                 id: "125",
                 title: "Rooftop Bar",
                 description: "Amazing city views and cocktails",
-                emoji: "☕",
+                emoji: "🧩",
                 latitude: -37.8100,
                 longitude: 144.9600
               },
@@ -153,7 +154,7 @@ export default function Index() {
                 id: "126",
                 title: "Street Art Alley",
                 description: "Colorful murals and graffiti",
-                emoji: "☕",
+                emoji: "🧩",
                 latitude: -37.8150,
                 longitude: 144.9650
               },
@@ -170,7 +171,7 @@ export default function Index() {
                 id: "127",
                 title: "Downtown Coffee Shop",
                 description: "Best espresso in the city with great wifi",
-                emoji: "☕",
+                emoji: "🍉",
                 latitude: -37.8136,
                 longitude: 144.9631
               },
@@ -203,7 +204,6 @@ export default function Index() {
         };
         
         // Use fallback data
-        setSessionToken(fallbackData.sessionToken);
         const fallbackMapPoints: MapPoint[] = fallbackData.recommendedLocations.map((item: any) => ({
           id: item.location.id,
           title: item.location.title,
@@ -234,7 +234,6 @@ export default function Index() {
       ];
       
       setMapPoints(emergencyData);
-      setSessionToken("emergency-token");
       setError('App is using emergency fallback data');
     } finally {
       setIsLoading(false);
@@ -623,6 +622,43 @@ export default function Index() {
         />
       </TouchableOpacity>
 
+      {/* Test Deep Link Button - Top Center */}
+      <TouchableOpacity 
+        style={[
+          styles.testButton,
+          {
+            top: insets.top + 20,
+            left: '50%',
+            marginLeft: -20, // Center the button
+          }
+        ]}
+        onPress={() => {
+          const testUrl = "tokapp://share/123456789";
+          console.log('Testing deep link:', testUrl);
+          DeepLinkHandler.handleTikTokShare(testUrl);
+        }}
+      >
+        <Ionicons name="link" size={24} color="#007AFF" />
+      </TouchableOpacity>
+
+      {/* Clear Token Button - Top Center Right */}
+      <TouchableOpacity 
+        style={[
+          styles.clearButton,
+          {
+            top: insets.top + 20,
+            left: '50%',
+            marginLeft: 20, // Position to the right of test button
+          }
+        ]}
+        onPress={() => {
+          logout();
+          console.log('Session token cleared');
+        }}
+      >
+        <Ionicons name="log-out" size={24} color="#FF3B30" />
+      </TouchableOpacity>
+
       {/* Filter Buttons - Bottom */}
       <View style={[
         styles.filterContainer,
@@ -893,6 +929,34 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   refreshButton: {
+    position: 'absolute',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  testButton: {
+    position: 'absolute',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  clearButton: {
     position: 'absolute',
     backgroundColor: 'white',
     borderRadius: 20,

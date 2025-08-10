@@ -1,9 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { useRouter } from 'expo-router';
+import { Alert, Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 export default function Profile() {
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
+  const { logout } = useAuth();
+  const router = useRouter();
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]} showsVerticalScrollIndicator={false}>
@@ -98,6 +102,34 @@ export default function Profile() {
             </View>
           </View>
         </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity 
+          style={[styles.logoutButton, { backgroundColor: '#ff4757' }]}
+          onPress={() => {
+            Alert.alert(
+              'Logout',
+              'Are you sure you want to logout?',
+              [
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                },
+                {
+                  text: 'Logout',
+                  style: 'destructive',
+                  onPress: async () => {
+                    await logout();
+                    router.replace('/auth/login');
+                  },
+                },
+              ]
+            );
+          }}
+        >
+          <Ionicons name="log-out-outline" size={20} color="#ffffff" />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
 
         {/* Settings */}
         <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}>
@@ -292,6 +324,21 @@ const styles = StyleSheet.create({
   activityTime: {
     fontSize: 12,
     color: '#999',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ff4757',
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    gap: 8,
+  },
+  logoutText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   settingsList: {
     gap: 8,
