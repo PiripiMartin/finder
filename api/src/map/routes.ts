@@ -1,8 +1,15 @@
 import type { BunRequest } from "bun";
 import { verifySessionToken } from "../user/session";
+import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, getSavedLocationsWithTopPost } from "./queries";
 
 
-export async function getLocationPosts(req: BunRequest): Promise<Response> {
+/**
+ * Fetches the posts for a given map point id
+ * 
+ * @param req - The request object (Must contain the map point id in the URL path)
+ * @returns A response object containing the posts
+ */
+export async function getPostsForLocation(req: BunRequest): Promise<Response> {
 
     // First, check user has a valid session
     const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
@@ -19,10 +26,52 @@ export async function getLocationPosts(req: BunRequest): Promise<Response> {
         return new Response("Missing map point id", {status: 400});
     }
 
-    
+    const posts = await fetchPostsForLocation(id);
+
+    return new Response(
+        JSON.stringify(posts),
+        {status: 200, headers: {'Content-Type': 'application/json'}}
+    );
+}
 
 
-    //TODO: Implement
-    return new Response();
+/**
+ * Fetches:
+ * - The user's saved locations (and their top posts)
+ * - The recommended locations near the user's coordinates (and their top posts)
+ * 
+ * @param req - The request object (Must contain the coordinates in the query parameters as lat and lon)
+ * @returns A response object containing the relevant locations
+ */
+export async function getSavedAndRecommendedLocations(req: BunRequest): Promise<Response> {
+
+    // First, check user has a valid session
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", {status: 401});
+    }
+    const accountId = await verifySessionToken(sessionToken);
+    if (accountId == null) {
+        return new Response("Invalid session token", {status: 401});
+    }
+
+    // Then, get the provided coordinates
+    const url = new URL(req.url);
+    if (!url.searchParams.has("lat") || !url.searchParams.has("lon")) {
+        return new Response("Missing coordinates", {status: 400});
+    }
+
+    const latitude = parseFloat(url.searchParams.get("lat") || "0");
+    const longitude = parseFloat(url.searchParams.get("lon") || "0");
+
+    const [savedLocations, recommendedLocations] = await Promise.all([
+        getSavedLocationsWithTopPost(accountId),
+        getRecommendedLocationsWithTopPost(latitude, longitude)
+    ]);
+
+    return new Response(
+        JSON.stringify({savedLocations, recommendedLocations}), 
+        {status: 200, headers: {'Content-Type': 'application/json'}}
+    );
 }
 
