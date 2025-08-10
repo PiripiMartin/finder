@@ -98,13 +98,13 @@ export async function getRecommendedLocationsWithTopPost(
         LIMIT ${Number(limit)}
     `;
 
-    const [rows] = await db.execute(query, [
+    const [rows, _] = await db.execute(query, [
         Number(longitude),
         Number(latitude),
         Number(longitude),
         Number(latitude),
         Number(radiusKm)
-    ]);
+    ]) as [any[], any];
     const results = toCamelCase(rows) as any[];
     
     // Filter out locations without posts and transform to LocationAndPost format
