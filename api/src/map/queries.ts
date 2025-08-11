@@ -49,7 +49,8 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             description: row.description,
             emoji: row.emoji,
             latitude: row.latitude,
-            longitude: row.longitude
+            longitude: row.longitude,
+            recommendable: row.recommendable
         },
         topPost: {
             id: row.postId,
@@ -65,6 +66,7 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
  * Fetches recommended locations near user coordinates with their top post (most recent)
  */
 export async function getRecommendedLocationsWithTopPost(
+    accountId: number,
     latitude: number, 
     longitude: number, 
     radiusKm: number = 10,
@@ -91,9 +93,13 @@ export async function getRecommendedLocationsWithTopPost(
                 FIRST_VALUE(url) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as url,
                 FIRST_VALUE(posted_by) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_by,
                 FIRST_VALUE(posted_at) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_at
-        FROM posts
+            FROM posts
         ) p ON mp.id = p.map_point_id
         WHERE ST_Distance_Sphere(mp.location, POINT(?, ?)) <= ? * 1000
+        AND mp.id NOT IN (
+            SELECT map_point_id FROM posts WHERE posted_by = ?
+        )
+        AND mp.recommendable = TRUE
         ORDER BY distance_km ASC, mp.created_at DESC
         LIMIT ${Number(limit)}
     `;
@@ -103,7 +109,8 @@ export async function getRecommendedLocationsWithTopPost(
         Number(latitude),
         Number(longitude),
         Number(latitude),
-        Number(radiusKm)
+        Number(radiusKm),
+        Number(accountId)
     ]) as [any[], any];
     const results = toCamelCase(rows) as any[];
     
@@ -117,7 +124,8 @@ export async function getRecommendedLocationsWithTopPost(
                 description: row.description,
                 emoji: row.emoji,
                 latitude: row.latitude,
-                longitude: row.longitude
+                longitude: row.longitude,
+                recommendable: row.recommendable
             },
             topPost: {
                 id: row.postId,
