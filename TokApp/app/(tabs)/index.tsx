@@ -6,7 +6,7 @@ import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, Touchable
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { getApiUrl } from '../config/api';
+import { getApiUrl, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { MapPoint } from '../mapData';
@@ -77,6 +77,60 @@ export default function Index() {
 
   // Shake animation refs for each marker
   const shakeAnims = useRef<{ [key: string]: Animated.Value }>({}).current;
+
+  // Pre-fetch location videos for performance
+  const [locationVideos, setLocationVideos] = useState<{ [key: string]: any[] }>({});
+  const [isLoadingVideos, setIsLoadingVideos] = useState<{ [key: string]: boolean }>({});
+
+  // Fetch videos for a specific location
+  const fetchLocationVideos = async (locationId: string) => {
+    // Skip if already loading or already fetched
+    if (isLoadingVideos[locationId] || locationVideos[locationId]) {
+      console.log('🎬 [fetchLocationVideos] Skipping fetch for location', locationId, '- already loading or cached');
+      return;
+    }
+
+    try {
+      console.log('🎬 [fetchLocationVideos] Starting video fetch for location ID:', locationId);
+      setIsLoadingVideos(prev => ({ ...prev, [locationId]: true }));
+      
+      const apiUrl = getMapPointsUrl(Number(locationId));
+      console.log('🌐 [fetchLocationVideos] API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('🎬 [fetchLocationVideos] API response for location', locationId, ':', data);
+      
+      // Extract videos from the API response
+      const fetchedVideos = data.map((item: any) => ({
+        id: String(item.id || item.topPost?.id || Math.random().toString()),
+        url: item.topPost?.url || item.url || '',
+        title: item.topPost?.title || item.title || '',
+        description: item.topPost?.description || item.description || ''
+      })).filter((video: any) => video.url);
+      
+      console.log('🎬 [fetchLocationVideos] Processed videos for location', locationId, ':', fetchedVideos);
+      setLocationVideos(prev => ({ ...prev, [locationId]: fetchedVideos }));
+      
+    } catch (error) {
+      console.error('🎬 [fetchLocationVideos] Error fetching videos for location', locationId, ':', error);
+      // Set empty array to prevent retry attempts
+      setLocationVideos(prev => ({ ...prev, [locationId]: [] }));
+    } finally {
+      setIsLoadingVideos(prev => ({ ...prev, [locationId]: false }));
+    }
+  };
 
   // Fetch map points from API
   const fetchMapPoints = async () => {
@@ -501,6 +555,10 @@ export default function Index() {
     
     console.log('Setting selectedMarkerId to:', pointId);
     setSelectedMarkerId(pointId);
+    
+    // 🚀 PERFORMANCE OPTIMIZATION: Start fetching videos immediately when marker is pressed
+    console.log('🚀 [handleMarkerPress] Starting video pre-fetch for location:', pointId);
+    fetchLocationVideos(pointId);
     
     // Use the videoUrl from the API response if available, otherwise fall back to videoData
     let videoUrl = selectedPoint.videoUrl;

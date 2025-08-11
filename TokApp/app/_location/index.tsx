@@ -133,6 +133,8 @@ export default function Location() {
     console.log('Location page received ID:', id);
     console.log('Session token available:', !!sessionToken);
     console.log('Timestamp:', new Date().toISOString());
+    console.log('📍 [Location] Page accessed with location ID:', id);
+    console.log('🚀 [Location] This could be from map marker tap or saved locations list');
     
     if (id) {
       console.log('🔍 Looking up location data for ID:', id);
@@ -143,6 +145,7 @@ export default function Location() {
         console.log('✅ Setting location data and fetching videos');
         setLocationData(data);
         // Fetch videos for this location
+        // 🚀 NOTE: Videos are now pre-fetched when marker is tapped for better performance!
         fetchLocationVideos(data.id);
       } else {
         // If no data found, use a default location but fetch videos for the actual ID
