@@ -84,7 +84,7 @@ export async function getSavedAndRecommendedLocations(req: BunRequest): Promise<
 
     const [savedLocations, recommendedLocations] = await Promise.all([
         getSavedLocationsWithTopPost(accountId),
-        getRecommendedLocationsWithTopPost(latitude, longitude)
+        getRecommendedLocationsWithTopPost(accountId, latitude, longitude)
     ]);
 
     return new Response(
