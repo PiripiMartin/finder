@@ -35,6 +35,24 @@ export async function getPostsForLocation(req: BunRequest): Promise<Response> {
 }
 
 
+export async function getSavedLocations(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", {status: 401});
+    }
+    const accountId = await verifySessionToken(sessionToken);
+    if (accountId == null) {
+        return new Response("Invalid session token", {status: 401});
+    }
+
+    const savedLocations = await getSavedLocationsWithTopPost(accountId);
+
+    return new Response(
+        JSON.stringify(savedLocations),
+        {status: 200, headers: {'Content-Type': 'application/json'}}
+    );
+}
+
 /**
  * Fetches:
  * - The user's saved locations (and their top posts)

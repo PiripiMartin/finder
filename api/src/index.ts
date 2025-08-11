@@ -14,6 +14,7 @@ Bun.serve({
 
         // Map routes
         "/api/map/saved-and-recommended": {GET: getSavedAndRecommendedLocations},
+        "/api/map/saved": {GET: getSavedLocations},
         "/api/map/:id/posts": {GET: getPostsForLocation}
 
     }
