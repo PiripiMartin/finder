@@ -27,12 +27,11 @@ interface SignupRequest {
     email: string
 };
 
-
-interface LoginResponse {
-    sessionToken: string,
-    savedLocations: Array<LocationAndPost>,
-    recommendedLocations: Array<LocationAndPost>
-}
+interface ProfileStats {
+    username: string,
+    email: string,
+    createdAt: Date
+};
 
 
 export async function signup(req: BunRequest): Promise<Response> {
@@ -123,19 +122,62 @@ export async function login(req: BunRequest): Promise<Response> {
     });
 }
 
-
+/**
+ * Standalone endpoint for checking if the user has a valid session token.
+ * The primary use case for this is for preventing the user from accessing a page
+ * that requires being logged in (e.g. map page), you can just call this endpoint 
+ * and redirect away if they're not authenticated.
+ */
 export async function validateSessionToken(req: BunRequest): Promise<Response> {
 
     const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
-
     if (!sessionToken) {
         return new Response("Missing session token", {status: 401});
     }
-
     const maybeUserId = await verifySessionToken(sessionToken);
 
     // Return user id if valid, null otherwise
     return new Response(maybeUserId?.toString() || null, {status: maybeUserId != null ? 200 : 401});
 }
+
+
+export async function getProfileData(req: BunRequest): Promise<Response> {
+
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", {status: 401});
+    }
+    const maybeUserId = await verifySessionToken(sessionToken);
+
+    if (!maybeUserId) {
+        return new Response("Invalid session token", {status: 401});
+    }
+
+    /* 
+    Currently this is the only 'profile data' we have. In the future we could
+    potentially incorporate:
+    - Profle picture
+    - Post counts
+    - Other 'fun stats' ??
+    */
+    const [rows, _] = await db.execute(`
+        SELECT 
+            username,
+            email,
+            created_at
+        FROM users WHERE id = ?;`,
+        [maybeUserId]
+    ) as [any[], []];
+
+    const results: ProfileStats = toCamelCase(rows);
+
+    return new Response(
+        JSON.stringify(results),
+        {headers: {"Content-Type": "application/json"}}
+    );
+}
+
+
+
 
 

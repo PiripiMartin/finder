@@ -1,10 +1,6 @@
 
-# Temporary test API call before proper login page is implemented
+# Temporary test API calls
 
-#curl -X POST http://localhost:8000/api/login \
-#  -H "Content-Type: application/json" \
-#  -d '{"username": "admin", "password": "test"}'
 
-curl -X POST http://localhost:8000/api/validate-token \
-  -H "Content-Type: application/json" \
-  -d '{"userId": 2, "sessionToken": "396c92fd-f224-470e-ac38-a2f352104c58"}'
+curl -X GET "localhost:8000/api/profile" \
+  -H "Authorization: Bearer 37654809-145a-4eaa-894d-fde775d08f7e"
