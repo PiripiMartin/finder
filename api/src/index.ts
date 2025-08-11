@@ -1,5 +1,5 @@
 import { db } from "./database";
-import { getPostsForLocation, getSavedAndRecommendedLocations } from "./map/routes";
+import { getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations } from "./map/routes";
 import { login, validateSessionToken, signup, getProfileData } from "./user/routes";
 
 
