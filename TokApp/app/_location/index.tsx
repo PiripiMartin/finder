@@ -87,8 +87,9 @@ export default function Location() {
       setIsLoadingVideos(true);
       setVideosError(null);
       
+      console.log('🎬 [fetchLocationVideos] Starting video fetch for location ID:', locationId);
       const apiUrl = getMapPointsUrl(Number(locationId));
-      console.log('Fetching videos for location:', apiUrl);
+      console.log('🌐 [fetchLocationVideos] API URL:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -128,23 +129,31 @@ export default function Location() {
   };
 
   useEffect(() => {
+    console.log('=== Location Page Loaded ===');
     console.log('Location page received ID:', id);
+    console.log('Session token available:', !!sessionToken);
+    console.log('Timestamp:', new Date().toISOString());
+    
     if (id) {
+      console.log('🔍 Looking up location data for ID:', id);
       const data = mockLocationData[id as string];
       console.log('Found location data:', data);
+      
       if (data) {
+        console.log('✅ Setting location data and fetching videos');
         setLocationData(data);
         // Fetch videos for this location
         fetchLocationVideos(data.id);
       } else {
-        // If no data found, use a default location
-        console.log('No data found for ID, using default');
+        // If no data found, use a default location but fetch videos for the actual ID
+        console.log('⚠️ No data found for ID, using default location data but fetching videos for actual ID:', id);
         setLocationData(mockLocationData['1']);
-        fetchLocationVideos('1');
+        // Always fetch videos for the actual location ID from the URL
+        fetchLocationVideos(id as string);
       }
     } else {
       // If no ID provided, use default location
-      console.log('No ID provided, using default');
+      console.log('⚠️ No ID provided, using default location');
       setLocationData(mockLocationData['1']);
       fetchLocationVideos('1');
     }

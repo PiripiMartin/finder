@@ -852,8 +852,18 @@ export default function Index() {
           <TouchableOpacity
             style={[styles.shopButton, { backgroundColor: '#ffffff' }]}
             onPress={() => {
+              // Log the "Check it out" process
+              console.log('=== "Check it out" Button Tapped ===');
+              console.log('Selected Marker ID:', selectedMarkerId);
+              console.log('Selected Video:', selectedVideo);
+              console.log('User Location:', userLocation);
+              console.log('Timestamp:', new Date().toISOString());
+              
               // Navigate to location page
+              console.log('Navigating to location page with ID:', selectedMarkerId);
               router.push(`/_location?id=${selectedMarkerId}`);
+              
+              console.log('Navigation initiated successfully');
             }}
           >
             <Animated.View
