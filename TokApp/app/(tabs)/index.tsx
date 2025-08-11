@@ -10,8 +10,8 @@ import { getApiUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { MapPoint } from '../mapData';
-import { videoUrls } from '../videoData';
 import { DeepLinkHandler } from '../utils/deepLinkHandler';
+import { videoUrls } from '../videoData';
 
 // Function to calculate distance between two coordinates in meters
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -852,8 +852,18 @@ export default function Index() {
           <TouchableOpacity
             style={[styles.shopButton, { backgroundColor: '#ffffff' }]}
             onPress={() => {
+              // Log the "Check it out" process
+              console.log('=== "Check it out" Button Tapped ===');
+              console.log('Selected Marker ID:', selectedMarkerId);
+              console.log('Selected Video:', selectedVideo);
+              console.log('User Location:', userLocation);
+              console.log('Timestamp:', new Date().toISOString());
+              
               // Navigate to location page
+              console.log('Navigating to location page with ID:', selectedMarkerId);
               router.push(`/_location?id=${selectedMarkerId}`);
+              
+              console.log('Navigation initiated successfully');
             }}
           >
             <Animated.View

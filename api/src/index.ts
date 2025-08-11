@@ -1,5 +1,5 @@
 import { db } from "./database";
-import { getPostsForLocation, getSavedAndRecommendedLocations } from "./map/routes";
+import { getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations } from "./map/routes";
 import { login, validateSessionToken, signup, getProfileData } from "./user/routes";
 
 
@@ -14,6 +14,7 @@ Bun.serve({
 
         // Map routes
         "/api/map/saved-and-recommended": {GET: getSavedAndRecommendedLocations},
+        "/api/map/saved": {GET: getSavedLocations},
         "/api/map/:id/posts": {GET: getPostsForLocation}
 
     }

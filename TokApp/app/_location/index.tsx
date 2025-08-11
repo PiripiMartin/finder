@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { Dimensions, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '../context/ThemeContext';
-import { tiktokEmbedUrls } from '../videoData';
+import { useAuth } from '../context/AuthContext';
+import { getMapPointsUrl } from '../config/api';
 
 const { width } = Dimensions.get('window');
 const tileWidth = (width - 30) / 2; // Less padding within video grid
@@ -20,6 +21,13 @@ interface LocationData {
   phone: string;
   website: string;
   tiktokVideos: string[];
+}
+
+interface VideoPost {
+  id: string;
+  url: string;
+  title?: string;
+  description?: string;
 }
 
 // Mock location data - you can replace with real data
@@ -66,30 +74,92 @@ export default function Location() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { theme } = useTheme();
+  const { sessionToken } = useAuth();
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const [videos, setVideos] = useState<VideoPost[]>([]);
+  const [isLoadingVideos, setIsLoadingVideos] = useState(false);
+  const [videosError, setVideosError] = useState<string | null>(null);
+
+  // Fetch videos for the current location
+  const fetchLocationVideos = async (locationId: string) => {
+    try {
+      setIsLoadingVideos(true);
+      setVideosError(null);
+      
+      console.log('🎬 [fetchLocationVideos] Starting video fetch for location ID:', locationId);
+      const apiUrl = getMapPointsUrl(Number(locationId));
+      console.log('🌐 [fetchLocationVideos] API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Location videos API response:', data);
+      
+      // Extract videos from the API response
+      // Assuming the API returns an array of posts with topPost data
+      const fetchedVideos: VideoPost[] = data.map((item: any) => ({
+        id: String(item.id || item.topPost?.id || Math.random().toString()),
+        url: item.topPost?.url || item.url || '',
+        title: item.topPost?.title || item.title || '',
+        description: item.topPost?.description || item.description || ''
+      })).filter((video: VideoPost) => video.url); // Only include videos with valid URLs
+      
+      console.log('Processed videos:', fetchedVideos);
+      setVideos(fetchedVideos);
+      
+    } catch (error) {
+      console.error('Error fetching location videos:', error);
+      setVideosError(error instanceof Error ? error.message : 'Failed to fetch videos');
+      // Fallback to empty videos array
+      setVideos([]);
+    } finally {
+      setIsLoadingVideos(false);
+    }
+  };
 
   useEffect(() => {
+    console.log('=== Location Page Loaded ===');
     console.log('Location page received ID:', id);
+    console.log('Session token available:', !!sessionToken);
+    console.log('Timestamp:', new Date().toISOString());
+    
     if (id) {
+      console.log('🔍 Looking up location data for ID:', id);
       const data = mockLocationData[id as string];
       console.log('Found location data:', data);
+      
       if (data) {
+        console.log('✅ Setting location data and fetching videos');
         setLocationData(data);
+        // Fetch videos for this location
+        fetchLocationVideos(data.id);
       } else {
-        // If no data found, use a default location
-        console.log('No data found for ID, using default');
+        // If no data found, use a default location but fetch videos for the actual ID
+        console.log('⚠️ No data found for ID, using default location data but fetching videos for actual ID:', id);
         setLocationData(mockLocationData['1']);
+        // Always fetch videos for the actual location ID from the URL
+        fetchLocationVideos(id as string);
       }
     } else {
       // If no ID provided, use default location
-      console.log('No ID provided, using default');
+      console.log('⚠️ No ID provided, using default location');
       setLocationData(mockLocationData['1']);
+      fetchLocationVideos('1');
     }
-  }, [id]);
+  }, [id, sessionToken]);
 
-  const handleVideoPress = (videoId: string) => {
-    const videoUrl = tiktokEmbedUrls[videoId];
+  const handleVideoPress = (videoUrl: string) => {
     if (videoUrl) {
       setSelectedVideo(videoUrl);
     }
@@ -197,13 +267,33 @@ export default function Location() {
         <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>TikTok Videos</Text>
           <View style={styles.videoGrid}>
-            {locationData.tiktokVideos.map((videoId, index) => {
-              const videoUrl = tiktokEmbedUrls[videoId];
-              return (
+            {isLoadingVideos ? (
+              <View style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="refresh" size={24} color={theme.colors.primary} />
+                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading videos...</Text>
+              </View>
+            ) : videosError ? (
+              <View style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="alert-circle" size={24} color="#ff6b6b" />
+                <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>Failed to load videos</Text>
                 <TouchableOpacity 
-                  key={videoId} 
+                  style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => locationData && fetchLocationVideos(locationData.id)}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : videos.length === 0 ? (
+              <View style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="videocam-off" size={24} color={theme.colors.textSecondary} />
+                <Text style={[styles.noVideosText, { color: theme.colors.textSecondary }]}>No videos available</Text>
+              </View>
+            ) : (
+              videos.map((video, index) => (
+                <TouchableOpacity 
+                  key={video.id} 
                   style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
-                  onPress={() => handleVideoPress(videoId)}
+                  onPress={() => handleVideoPress(video.url)}
                 >
                   <View style={styles.videoThumbnail}>
                     <WebView
@@ -233,7 +323,7 @@ export default function Location() {
                           </head>
                           <body>
                             <iframe 
-                              src="${videoUrl}" 
+                              src="${video.url}" 
                               allow="fullscreen" 
                               title="TikTok Video">
                             </iframe>
@@ -251,8 +341,8 @@ export default function Location() {
                     />
                   </View>
                 </TouchableOpacity>
-              );
-            })}
+              ))
+            )}
           </View>
         </View>
       </ScrollView>
@@ -463,9 +553,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   loadingText: {
-    fontSize: 18,
+    fontSize: 16,
     textAlign: 'center',
-    marginTop: 100,
+    marginTop: 10,
   },
   loadingButton: {
     marginTop: 20,
@@ -492,5 +582,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  noVideosText: {
+    fontSize: 16,
+    marginTop: 10,
+    textAlign: 'center',
   },
 });
