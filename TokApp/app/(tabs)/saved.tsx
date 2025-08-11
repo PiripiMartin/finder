@@ -1,128 +1,229 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { getApiUrl, API_CONFIG } from '../config/api';
 
 const { width } = Dimensions.get('window');
-const videoWidth = (width - 30) / 2; // 2 columns with padding
+const locationCardWidth = width - 40; // Full width with padding
 
-// Mock TikTok videos data
-const mockVideos = [
-  {
-    id: '1',
-    title: 'Amazing Coffee Art ☕',
-    thumbnail: 'https://picsum.photos/200/300?random=1',
-    duration: '0:15',
-    likes: '2.1K',
-  },
-  {
-    id: '2',
-    title: 'Bubble Tea Making 🧋',
-    thumbnail: 'https://picsum.photos/200/300?random=2',
-    duration: '0:32',
-    likes: '5.4K',
-  },
-  {
-    id: '3',
-    title: 'Tea Ceremony 🫖',
-    thumbnail: 'https://picsum.photos/200/300?random=3',
-    duration: '0:28',
-    likes: '1.8K',
-  },
-  {
-    id: '4',
-    title: 'Coffee Shop Tour ☕',
-    thumbnail: 'https://picsum.photos/200/300?random=4',
-    duration: '0:45',
-    likes: '3.2K',
-  },
-  {
-    id: '5',
-    title: 'Bubble Tea Recipe 🧋',
-    thumbnail: 'https://picsum.photos/200/300?random=5',
-    duration: '0:52',
-    likes: '8.7K',
-  },
-  {
-    id: '6',
-    title: 'Tea Tasting Guide 🫖',
-    thumbnail: 'https://picsum.photos/200/300?random=6',
-    duration: '0:38',
-    likes: '4.1K',
-  },
-  {
-    id: '7',
-    title: 'Coffee Bean Roasting ☕',
-    thumbnail: 'https://picsum.photos/200/300?random=7',
-    duration: '0:24',
-    likes: '6.3K',
-  },
-  {
-    id: '8',
-    title: 'Bubble Tea Flavors 🧋',
-    thumbnail: 'https://picsum.photos/200/300?random=8',
-    duration: '0:41',
-    likes: '2.9K',
-  },
-  {
-    id: '9',
-    title: 'Tea Garden Visit 🫖',
-    thumbnail: 'https://picsum.photos/200/300?random=9',
-    duration: '0:35',
-    likes: '1.5K',
-  },
-  {
-    id: '10',
-    title: 'Coffee Latte Art ☕',
-    thumbnail: 'https://picsum.photos/200/300?random=10',
-    duration: '0:19',
-    likes: '7.2K',
-  },
-  {
-    id: '11',
-    title: 'Bubble Tea DIY 🧋',
-    thumbnail: 'https://picsum.photos/200/300?random=11',
-    duration: '0:47',
-    likes: '3.8K',
-  },
-  {
-    id: '12',
-    title: 'Tea Meditation 🫖',
-    thumbnail: 'https://picsum.photos/200/300?random=12',
-    duration: '0:33',
-    likes: '2.4K',
-  },
-];
+interface SavedLocation {
+  location: {
+    id: number;
+    title: string;
+    description: string;
+    emoji: string;
+    latitude: number;
+    longitude: number;
+  };
+  topPost: {
+    id: number;
+    url: string;
+    postedBy: number;
+    mapPointId: number;
+    postedAt: string;
+  };
+}
 
 export default function Saved() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { sessionToken } = useAuth();
+  
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch saved locations from API
+  const fetchSavedLocations = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('📚 [Saved] Fetching saved locations...');
+      const apiUrl = `${API_CONFIG.BASE_URL}/map/saved`;
+      console.log('🌐 [Saved] API URL:', apiUrl);
+      
+      // Log the complete request details
+      console.log('📤 [Saved] Request Details:', {
+        method: 'GET',
+        url: apiUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken ? sessionToken.substring(0, 20) + '...' : 'NO_TOKEN'}`,
+        },
+        sessionTokenLength: sessionToken ? sessionToken.length : 0,
+        timestamp: new Date().toISOString()
+      });
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        },
+      });
+      
+      // Log response details
+      console.log('📥 [Saved] Response Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
+        url: response.url,
+        timestamp: new Date().toISOString()
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📚 [Saved] API response data:', data);
+      
+      // Extract locations - the API returns an array directly, not wrapped in savedLocations
+      const locations = Array.isArray(data) ? data : [];
+      console.log('📚 [Saved] Found saved locations:', locations.length);
+      
+      setSavedLocations(locations);
+      
+    } catch (error) {
+      console.error('📚 [Saved] Error fetching saved locations:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch saved locations');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle location tap - navigate to location page
+  const handleLocationPress = (locationId: number) => {
+    console.log('📍 [Saved] Location tapped:', locationId);
+    console.log('🚀 [Saved] Navigating to location page with ID:', locationId);
+    
+    // Navigate to location page with the location ID
+    router.push(`/_location?id=${locationId}`);
+  };
+
+  // Refresh saved locations
+  const handleRefresh = () => {
+    console.log('🔄 [Saved] Refreshing saved locations...');
+    fetchSavedLocations();
+  };
+
+  useEffect(() => {
+    console.log('📚 [Saved] Page loaded, fetching saved locations...');
+    fetchSavedLocations();
+  }, [sessionToken]);
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading saved locations...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
+        </View>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color="#ff6b6b" />
+          <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>Failed to load saved locations</Text>
+          <Text style={[styles.errorSubtext, { color: theme.colors.textSecondary }]}>{error}</Text>
+          <TouchableOpacity 
+            style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+            onPress={handleRefresh}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text style={[styles.header, { color: theme.colors.text, backgroundColor: theme.colors.surface }]}>Saved Tiktoks</Text>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
+        <TouchableOpacity 
+          style={[styles.refreshButton, { backgroundColor: theme.colors.primary }]}
+          onPress={handleRefresh}
+        >
+          <Ionicons name="refresh" size={20} color="#ffffff" />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.videoGrid}>
-          {mockVideos.map((video) => (
-            <TouchableOpacity 
-              key={video.id} 
-              style={[styles.videoCard, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}
-              onPress={() => router.push(`/_location?id=${video.id}`)}
-            >
-              <View style={styles.thumbnailContainer}>
-                <Image source={{ uri: video.thumbnail }} style={styles.thumbnail} />
-                <View style={styles.durationBadge}>
-                  <Text style={styles.durationText}>{video.duration}</Text>
+        {savedLocations.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="bookmark-outline" size={64} color={theme.colors.textSecondary} />
+            <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Saved Locations</Text>
+            <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
+              Save locations from the map to see them here
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.locationsList}>
+            {savedLocations.map((item) => (
+              <TouchableOpacity 
+                key={item.location.id} 
+                style={[styles.locationCard, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}
+                onPress={() => handleLocationPress(item.location.id)}
+              >
+                {/* Location Header */}
+                <View style={styles.locationHeader}>
+                  <View style={styles.locationInfo}>
+                    <Text style={styles.locationEmoji}>{item.location.emoji}</Text>
+                    <View style={styles.locationText}>
+                      <Text style={[styles.locationTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                        {item.location.title}
+                      </Text>
+                      <Text style={[styles.locationDescription, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+                        {item.location.description}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
                 </View>
-              </View>
-              <View style={styles.videoInfo}>
-                <Text style={[styles.videoTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                  {video.title}
-                </Text>
-                <Text style={[styles.likesText, { color: theme.colors.textSecondary }]}>❤️ {video.likes}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+
+                {/* Video Preview */}
+                {item.topPost?.url && (
+                  <View style={styles.videoPreview}>
+                    <View style={styles.videoThumbnail}>
+                      <Ionicons name="play-circle" size={32} color="#ffffff" />
+                    </View>
+                    <View style={styles.videoInfo}>
+                      <Text style={[styles.videoLabel, { color: theme.colors.textSecondary }]}>Featured Video</Text>
+                      <Text style={[styles.videoDate, { color: theme.colors.textSecondary }]}>
+                        {new Date(item.topPost.postedAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Coordinates */}
+                <View style={styles.coordinates}>
+                  <Ionicons name="location" size={16} color={theme.colors.primary} />
+                  <Text style={[styles.coordinatesText, { color: theme.colors.textSecondary }]}>
+                    {item.location.latitude.toFixed(6)}, {item.location.longitude.toFixed(6)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -131,74 +232,168 @@ export default function Saved() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#ffffff',
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
   },
-  videoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 10,
-    justifyContent: 'space-between',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  videoCard: {
-    width: videoWidth,
+  loadingText: {
+    fontSize: 16,
+    marginTop: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  errorSubtext: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  retryButton: {
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 60,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 16,
+    marginTop: 8,
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  locationsList: {
+    padding: 20,
+  },
+  locationCard: {
+    width: locationCardWidth,
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    marginBottom: 15,
+    borderRadius: 16,
+    marginBottom: 16,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  thumbnailContainer: {
-    position: 'relative',
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  thumbnail: {
-    width: '100%',
-    height: videoWidth * 1.5,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
-  durationBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+  locationEmoji: {
+    fontSize: 32,
+    marginRight: 12,
   },
-  durationText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
+  locationText: {
+    flex: 1,
+  },
+  locationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  locationDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  videoPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  videoThumbnail: {
+    width: 60,
+    height: 60,
+    backgroundColor: '#000',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   videoInfo: {
-    padding: 12,
+    flex: 1,
   },
-  videoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-    lineHeight: 18,
-  },
-  likesText: {
+  videoLabel: {
     fontSize: 12,
-    color: '#666',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  videoDate: {
+    fontSize: 12,
+  },
+  coordinates: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  coordinatesText: {
+    fontSize: 12,
+    marginLeft: 6,
+    fontFamily: 'monospace',
   },
 }); 

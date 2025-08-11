@@ -7,6 +7,7 @@ export const API_CONFIG = {
     CREATE_ACCOUNT: '/signup', // Note: API uses /signup, not /create-account
     MAP_POINTS: '/map/saved-and-recommended', 
     VALIDATE_TOKEN: '/validate-token',
+    PROFILE: '/profile',
   },
 };
 

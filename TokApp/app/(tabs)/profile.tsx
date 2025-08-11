@@ -1,16 +1,134 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Alert, Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl } from "react-native";
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { getApiUrl, API_CONFIG } from '../config/api';
+
+interface ProfileData {
+  username: string;
+  email: string;
+  createdAt: string;
+}
 
 export default function Profile() {
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
-  const { logout } = useAuth();
+  const { logout, sessionToken } = useAuth();
   const router = useRouter();
+  
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch profile data from API
+  const fetchProfileData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('👤 [Profile] Fetching profile data...');
+      const apiUrl = `${API_CONFIG.BASE_URL}/profile`;
+      console.log('🌐 [Profile] API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        },
+      });
+      
+      console.log('📥 [Profile] Response Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        timestamp: new Date().toISOString()
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('👤 [Profile] API response data:', data);
+      
+      // The API returns an array, so we take the first item
+      const profile = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      
+      if (profile) {
+        setProfileData(profile);
+        console.log('👤 [Profile] Profile data set:', profile);
+      } else {
+        throw new Error('No profile data received');
+      }
+      
+    } catch (error) {
+      console.error('👤 [Profile] Error fetching profile data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch profile data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Refresh profile data
+  const handleRefresh = () => {
+    console.log('🔄 [Profile] Refreshing profile data...');
+    fetchProfileData();
+  };
+
+  useEffect(() => {
+    console.log('👤 [Profile] Page loaded, fetching profile data...');
+    if (sessionToken) {
+      fetchProfileData();
+    } else {
+      setIsLoading(false);
+      setError('No authentication token available');
+    }
+  }, [sessionToken]);
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading profile...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color="#ff6b6b" />
+          <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>Failed to load profile</Text>
+          <Text style={[styles.errorSubtext, { color: theme.colors.textSecondary }]}>{error}</Text>
+          <TouchableOpacity 
+            style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+            onPress={handleRefresh}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: theme.colors.background }]} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={isLoading}
+          onRefresh={handleRefresh}
+          colors={[theme.colors.primary]}
+          tintColor={theme.colors.primary}
+        />
+      }
+    >
       {/* Header with Avatar */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.avatarContainer}>
@@ -23,12 +141,14 @@ export default function Profile() {
           </TouchableOpacity>
         </View>
         
-        <Text style={[styles.username, { color: theme.colors.text }]}>@beverage_lover</Text>
-        <Text style={[styles.displayName, { color: theme.colors.textSecondary }]}>Coffee & Tea Enthusiast</Text>
+        <Text style={[styles.username, { color: theme.colors.text }]}>@{profileData?.username || 'loading...'}</Text>
+        <Text style={[styles.displayName, { color: theme.colors.textSecondary }]}>
+          {profileData?.email || 'loading...'}
+        </Text>
         
         <View style={styles.bioContainer}>
           <Text style={[styles.bio, { color: theme.colors.text }]}>
-            ☕ Coffee addict | 🧋 Bubble tea explorer | 🫖 Tea ceremony lover
+            Member since {profileData?.createdAt ? new Date(profileData.createdAt).toLocaleDateString() : 'loading...'}
           </Text>
         </View>
 
@@ -53,6 +173,14 @@ export default function Profile() {
         {/* Edit Profile Button */}
         <TouchableOpacity style={[styles.editProfileButton, { backgroundColor: theme.colors.primary }]}>
           <Text style={styles.editProfileText}>Edit Profile</Text>
+        </TouchableOpacity>
+        
+        {/* Refresh Button */}
+        <TouchableOpacity 
+          style={[styles.refreshButton, { backgroundColor: theme.colors.primary }]}
+          onPress={handleRefresh}
+        >
+          <Ionicons name="refresh" size={20} color="#ffffff" />
         </TouchableOpacity>
       </View>
 
@@ -262,6 +390,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+  },
   sectionsContainer: {
     padding: 20,
   },
@@ -356,5 +492,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     marginLeft: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  loadingText: {
+    marginTop: 10,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f8f9fa',
+  },
+  errorText: {
+    fontSize: 18,
+    marginBottom: 10,
+  },
+  errorSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 
