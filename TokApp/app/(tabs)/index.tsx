@@ -10,7 +10,6 @@ import { getApiUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { MapPoint } from '../mapData';
-import { videoUrls } from '../videoData';
 import { DeepLinkHandler } from '../utils/deepLinkHandler';
 
 // Function to calculate distance between two coordinates in meters
@@ -176,6 +175,12 @@ export default function Index() {
         };
         
         console.log(`✅ [fetchMapPoints] Transformed item ${index}:`, transformedItem);
+        console.log(`🎥 [fetchMapPoints] Video URL details for item ${index}:`, {
+          topPost: item.topPost,
+          url: item.topPost?.url,
+          hasUrl: !!item.topPost?.url,
+          urlLength: item.topPost?.url?.length || 0
+        });
         return transformedItem;
       }).filter(Boolean) as MapPoint[]; // Remove null entries
       
@@ -272,15 +277,26 @@ export default function Index() {
       };
       
       // Use fallback data
-      const fallbackMapPoints: MapPoint[] = fallbackData.recommendedLocations.map((item: any) => ({
-        id: item.location.id,
-        title: item.location.title,
-        description: item.location.description,
-        emoji: item.location.emoji,
-        latitude: item.location.latitude,
-        longitude: item.location.longitude,
-        videoUrl: item.topPost.url,
-      }));
+      const fallbackMapPoints: MapPoint[] = fallbackData.recommendedLocations.map((item: any) => {
+        const fallbackPoint = {
+          id: item.location.id,
+          title: item.location.title,
+          description: item.location.description,
+          emoji: item.location.emoji,
+          latitude: item.location.latitude,
+          longitude: item.location.longitude,
+          videoUrl: item.topPost.url,
+        };
+        
+        console.log('🔄 [fetchMapPoints] Fallback point created:', fallbackPoint);
+        console.log('🎥 [fetchMapPoints] Fallback video URL:', {
+          topPost: item.topPost,
+          url: item.topPost.url,
+          hasUrl: !!item.topPost.url
+        });
+        
+        return fallbackPoint;
+      });
       
       setMapPoints(fallbackMapPoints);
       setError('Using offline data - network unavailable');
@@ -502,18 +518,21 @@ export default function Index() {
     console.log('Setting selectedMarkerId to:', pointId);
     setSelectedMarkerId(pointId);
     
-    // Use the videoUrl from the API response if available, otherwise fall back to videoData
-    let videoUrl = selectedPoint.videoUrl;
+    // Use the videoUrl from the API response
+    const videoUrl = selectedPoint.videoUrl;
     
-    if (!videoUrl) {
-      // Fallback to static video data if no videoUrl in API response
-      const fallbackVideo = videoUrls[pointId];
-      if (fallbackVideo) {
-        videoUrl = fallbackVideo;
-      }
-    }
+    console.log('🎥 [handleMarkerPress] Video URL for point:', {
+      pointId,
+      pointTitle: selectedPoint.title,
+      videoUrl,
+      hasVideoUrl: !!videoUrl,
+      videoUrlLength: videoUrl?.length || 0,
+      videoUrlTrimmed: videoUrl?.trim() || '',
+      isEmpty: videoUrl?.trim() === ''
+    });
     
-    if (videoUrl) {
+    if (videoUrl && videoUrl.trim() !== '') {
+      console.log('✅ [handleMarkerPress] Setting video:', videoUrl);
       setSelectedVideo(videoUrl);
       setIsVideoVisible(true);
       
