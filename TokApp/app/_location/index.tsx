@@ -196,7 +196,7 @@ export default function Location() {
           style={[styles.loadingButton, { backgroundColor: theme.colors.primary }]}
           onPress={() => setLocationData(mockLocationData['1'])}
         >
-          <Text style={[styles.loadingButtonText, { color: '#ffffff' }]}>Load Demo Location</Text>
+          <Text style={[styles.loadingButtonText, { color: '#FFF0F0' }]}>Load Demo Location</Text>
         </TouchableOpacity>
       </View>
     );
@@ -261,7 +261,7 @@ export default function Location() {
             style={[styles.directionsButton, { backgroundColor: theme.colors.primary }]}
             onPress={openDirections}
           >
-            <Ionicons name="navigate" size={20} color="#ffffff" />
+            <Ionicons name="navigate" size={20} color="#FFF0F0" />
             <Text style={styles.directionsButtonText}>Get Directions</Text>
           </TouchableOpacity>
         </View>
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#835858',
   },
   backButton: {
     padding: 8,
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   heroSection: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#835858',
   },
   heroContent: {
     alignItems: 'center',
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
   videoNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#835858',
   },
   videoTitle: {
     fontSize: 14,
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   directionsButtonText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: 'bold',
   },

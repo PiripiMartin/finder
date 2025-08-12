@@ -21,25 +21,25 @@ interface Theme {
 
 const lightTheme: Theme = {
   colors: {
-    background: '#f8f9fa',
-    surface: '#ffffff',
+    background: '#EBD4D4',
+          surface: '#FFF0F0',
     text: '#333333',
-    textSecondary: '#666666',
-    primary: '#007AFF',
-    border: '#e0e0e0',
-    shadow: '#000000',
+    textSecondary: '#835858',
+    primary: '#4E8886',
+    border: '#835858',
+    shadow: '#463333',
   },
 };
 
 const darkTheme: Theme = {
   colors: {
-    background: '#1a1a1a',
-    surface: '#2d2d2d',
-    text: '#ffffff',
-    textSecondary: '#cccccc',
-    primary: '#0A84FF',
-    border: '#404040',
-    shadow: '#000000',
+    background: '#463333',
+    surface: '#835858',
+          text: '#FFF0F0',
+    textSecondary: '#EBD4D4',
+    primary: '#4E8886',
+    border: '#835858',
+    shadow: '#463333',
   },
 };
 

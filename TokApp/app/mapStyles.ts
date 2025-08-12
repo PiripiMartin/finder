@@ -2,7 +2,7 @@
 export const realisticFlairStyle = [
   {
     "elementType": "geometry",
-    "stylers": [{"color": "#f8f9fa"}]
+    "stylers": [{"color": "#EBD4D4"}]
   },
   {
     "elementType": "labels.text.fill",
@@ -15,22 +15,22 @@ export const realisticFlairStyle = [
   {
     "featureType": "administrative",
     "elementType": "geometry.stroke",
-    "stylers": [{"color": "#666666"}]
+    "stylers": [{"color": "#835858"}]
   },
   {
     "featureType": "landscape",
     "elementType": "geometry",
-    "stylers": [{"color": "#f0f0f0"}]
+    "stylers": [{"color": "#EBD4D4"}]
   },
   {
     "featureType": "landscape.natural",
     "elementType": "geometry",
-    "stylers": [{"color": "#e8e8e8"}]
+    "stylers": [{"color": "#EBD4D4"}]
   },
   {
     "featureType": "poi",
     "elementType": "geometry",
-    "stylers": [{"color": "#f8f9fa"}]
+    "stylers": [{"color": "#EBD4D4"}]
   },
   {
     "featureType": "poi",
@@ -55,7 +55,7 @@ export const realisticFlairStyle = [
   {
     "featureType": "road",
     "elementType": "geometry.stroke",
-    "stylers": [{"color": "#cccccc"}]
+    "stylers": [{"color": "#835858"}]
   },
   {
     "featureType": "road",
@@ -65,12 +65,12 @@ export const realisticFlairStyle = [
   {
     "featureType": "road.highway",
     "elementType": "geometry",
-    "stylers": [{"color": "#f8f9fa"}]
+    "stylers": [{"color": "#EBD4D4"}]
   },
   {
     "featureType": "road.highway",
     "elementType": "geometry.stroke",
-    "stylers": [{"color": "#999999"}]
+    "stylers": [{"color": "#835858"}]
   },
   {
     "featureType": "road.highway",
@@ -80,7 +80,7 @@ export const realisticFlairStyle = [
   {
     "featureType": "transit",
     "elementType": "geometry",
-    "stylers": [{"color": "#f8f9fa"}]
+    "stylers": [{"color": "#EBD4D4"}]
   },
   {
     "featureType": "transit",
@@ -90,12 +90,12 @@ export const realisticFlairStyle = [
   {
     "featureType": "water",
     "elementType": "geometry",
-    "stylers": [{"color": "#a8d8ff"}]
+    "stylers": [{"color": "#4E8886"}]
   },
   {
     "featureType": "water",
     "elementType": "labels.text.fill",
-    "stylers": [{"color": "#0d47a1"}]
+    "stylers": [{"color": "#4E8886"}]
   }
 ];
 

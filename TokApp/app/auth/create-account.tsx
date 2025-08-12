@@ -230,7 +230,7 @@ export default function CreateAccountScreen() {
       marginBottom: 20,
     },
     createButtonText: {
-      color: '#ffffff',
+      color: '#FFF0F0',
       fontSize: 18,
       fontWeight: '600',
     },
@@ -243,7 +243,7 @@ export default function CreateAccountScreen() {
       fontSize: 16,
     },
     disabledButton: {
-      backgroundColor: '#cccccc',
+      backgroundColor: '#835858',
     },
   });
 

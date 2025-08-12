@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
-const locationCardWidth = width - 40; // Full width with padding
+const locationCardWidth = width - 80; // Reduced width for smaller cards
 
 interface SavedLocation {
   location: {
@@ -186,7 +186,7 @@ export default function Saved() {
           style={[styles.refreshButton, { backgroundColor: theme.colors.primary }]}
           onPress={handleRefresh}
         >
-          <Ionicons name="refresh" size={20} color="#ffffff" />
+          <Ionicons name="refresh" size={20} color="#FFF0F0" />
         </TouchableOpacity>
       </View>
 
@@ -210,7 +210,7 @@ export default function Saved() {
               >
                 <Text style={[
                   styles.emojiFilterText,
-                  selectedEmoji === emoji && { color: '#ffffff' }
+                  selectedEmoji === emoji && { color: '#FFF0F0' }
                 ]}>
                   {emoji}
                 </Text>
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#835858',
   },
   headerTitle: {
     fontSize: 24,
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -354,28 +354,28 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   locationsList: {
-    padding: 20,
+    padding: 16,
   },
   locationCard: {
     width: locationCardWidth,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 16,
+    backgroundColor: '#FFF0F0',
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 6,
+    elevation: 3,
   },
   locationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   locationInfo: {
     flexDirection: 'row',
@@ -383,25 +383,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   locationEmoji: {
-    fontSize: 32,
-    marginRight: 12,
+    fontSize: 28,
+    marginRight: 10,
   },
   locationText: {
     flex: 1,
   },
   locationTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   locationDescription: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
   },
   filterContainer: {
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#835858',
   },
   filterScrollContent: {
     paddingHorizontal: 20,
@@ -420,6 +420,6 @@ const styles = StyleSheet.create({
   emojiFilterText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#666',
+    color: '#835858',
   },
 }); 

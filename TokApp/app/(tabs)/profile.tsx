@@ -177,7 +177,7 @@ export default function Profile() {
           style={[styles.refreshButton, { backgroundColor: theme.colors.primary }]}
           onPress={handleRefresh}
         >
-          <Ionicons name="refresh" size={20} color="#ffffff" />
+          <Ionicons name="refresh" size={20} color="#FFF0F0" />
         </TouchableOpacity>
       </View>
 
@@ -211,7 +211,7 @@ export default function Profile() {
             );
           }}
         >
-          <Ionicons name="log-out-outline" size={20} color="#ffffff" />
+          <Ionicons name="log-out-outline" size={20} color="#FFF0F0" />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
 
@@ -229,7 +229,7 @@ export default function Profile() {
                 value={isDarkMode}
                 onValueChange={toggleDarkMode}
                 trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                thumbColor={isDarkMode ? '#ffffff' : '#f4f3f4'}
+                thumbColor={isDarkMode ? '#FFF0F0' : '#f4f3f4'}
               />
             </View>
           </View>
@@ -242,10 +242,10 @@ export default function Profile() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#EBD4D4',
   },
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFF0F0',
     padding: 20,
     paddingTop: 60,
     alignItems: 'center',
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#007AFF',
+    borderColor: '#4E8886',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   },
   displayName: {
     fontSize: 16,
-    color: '#666',
+    color: '#835858',
     marginBottom: 12,
   },
   bioContainer: {
@@ -289,13 +289,13 @@ const styles = StyleSheet.create({
   },
 
   editProfileButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4E8886',
     paddingHorizontal: 24,
     paddingVertical: 8,
     borderRadius: 20,
   },
   editProfileText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   section: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFF0F0',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logoutText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#EBD4D4',
   },
   loadingText: {
     marginTop: 10,
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#EBD4D4',
   },
   errorText: {
     fontSize: 18,
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: '600',
   },

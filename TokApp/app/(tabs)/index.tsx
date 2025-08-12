@@ -778,7 +778,7 @@ export default function Index() {
           setSelectedMarkerId(null);
         }}
       >
-        <Ionicons name="navigate" size={24} color="#007AFF" />
+        <Ionicons name="navigate" size={24} color="#4E8886" />
       </TouchableOpacity>
 
       {/* Refresh Button - Top Right */}
@@ -796,7 +796,7 @@ export default function Index() {
         <Ionicons 
           name="refresh" 
           size={24} 
-          color={isLoading ? "#999" : "#007AFF"} 
+          color={isLoading ? "#999" : "#4E8886"} 
         />
       </TouchableOpacity>
 
@@ -816,7 +816,7 @@ export default function Index() {
           DeepLinkHandler.handleTikTokShare(testUrl);
         }}
       >
-        <Ionicons name="link" size={24} color="#007AFF" />
+        <Ionicons name="link" size={24} color="#4E8886" />
       </TouchableOpacity>
 
       {/* Clear Token Button - Top Center Right */}
@@ -882,7 +882,7 @@ export default function Index() {
         >
           {/* Shop Button with Arrow */}
           <TouchableOpacity
-            style={[styles.shopButton, { backgroundColor: '#ffffff' }]}
+            style={[styles.shopButton, { backgroundColor: '#FFF0F0' }]}
             onPress={() => {
               // Log the "Check it out" process
               console.log('=== "Check it out" Button Tapped ===');
@@ -987,11 +987,11 @@ const styles = StyleSheet.create({
     height: Dimensions.get('window').height,
   },
   customMarker: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFF0F0',
     borderRadius: 16,
     padding: 6,
     borderWidth: 1,
-    borderColor: '#007AFF',
+            borderColor: '#4E8886',
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1085,7 +1085,7 @@ const styles = StyleSheet.create({
   },
   locationButton: {
     position: 'absolute',
-    backgroundColor: 'white',
+    backgroundColor: '#FFF0F0',
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -1099,7 +1099,7 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     position: 'absolute',
-    backgroundColor: 'white',
+    backgroundColor: '#FFF0F0',
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
   },
   testButton: {
     position: 'absolute',
-    backgroundColor: 'white',
+    backgroundColor: '#FFF0F0',
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -1127,7 +1127,7 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     position: 'absolute',
-    backgroundColor: 'white',
+    backgroundColor: '#FFF0F0',
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -1195,19 +1195,19 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+            backgroundColor: '#4E8886',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: 'bold',
   },
   customLabel: {
     position: 'absolute',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFF0F0',
     padding: 8,
     borderRadius: 6,
     zIndex: 1000,
@@ -1218,7 +1218,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+            borderColor: '#835858',
   },
   labelTitle: {
     color: '#000000',
@@ -1228,7 +1228,7 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   labelDescription: {
-    color: '#666666',
+            color: '#835858',
     fontSize: 8, // Smaller font
     textAlign: 'center',
     lineHeight: 10,
