@@ -67,11 +67,9 @@ export default function Index() {
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const [showSavedOnly, setShowSavedOnly] = useState(false);
   
   // API state
   const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
-  const [savedLocations, setSavedLocations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(0);
@@ -183,16 +181,13 @@ export default function Index() {
       console.log('API response data:', data);
       
       // Safely extract and validate the data
-      const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
+      const savedLocations = Array.isArray(data.savedLocations) ? data.savedLocations : [];
       const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
-      
-      // Store saved locations in state for filtering
-      setSavedLocations(savedLocationsData);
       
       console.log('🔍 [fetchMapPoints] API Response Data:', {
         savedLocations: {
-          count: savedLocationsData.length,
-          data: savedLocationsData
+          count: savedLocations.length,
+          data: savedLocations
         },
         recommendedLocations: {
           count: recommendedLocations.length,
@@ -201,7 +196,7 @@ export default function Index() {
       });
       
       // Combine saved and recommended locations
-      const allLocations = [...savedLocationsData, ...recommendedLocations];
+      const allLocations = [...savedLocations, ...recommendedLocations];
       
       console.log('📊 [fetchMapPoints] Combined Locations:', {
         totalCount: allLocations.length,
@@ -351,21 +346,6 @@ export default function Index() {
     }
   }, [userLocation]);
 
-  // Debug effect to monitor savedLocations changes
-  useEffect(() => {
-    console.log('🔍 [Debug] savedLocations changed:', {
-      count: savedLocations.length,
-      data: savedLocations,
-      timestamp: new Date().toISOString()
-    });
-  }, [savedLocations]);
-
-  // Function to reset all filters
-  const resetFilters = () => {
-    setActiveFilter(null);
-    setShowSavedOnly(false);
-  };
-
   // Function to manually refresh data (bypasses interval check)
   const handleRefresh = async () => {
     try {
@@ -409,14 +389,11 @@ export default function Index() {
       console.log('Manual refresh - API response data:', data);
       
       // Safely extract and validate the data
-      const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
+      const savedLocations = Array.isArray(data.savedLocations) ? data.savedLocations : [];
       const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
       
-      // Store saved locations in state for filtering
-      setSavedLocations(savedLocationsData);
-      
       // Combine saved and recommended locations
-      const allLocations = [...savedLocationsData, ...recommendedLocations];
+      const allLocations = [...savedLocations, ...recommendedLocations];
       
       
       
@@ -506,73 +483,10 @@ export default function Index() {
     return types;
   }, [mapPoints]);
 
-  // Get saved locations count for display
-  const savedLocationsCount = useMemo(() => {
-    return savedLocations.length;
-  }, [savedLocations]);
-
-  // Filtered map points based on active filter and saved locations
-  const filteredMapPoints = useMemo(() => {
-    let filtered = mapPoints;
-    
-    // First filter by saved locations if that filter is active
-    if (showSavedOnly) {
-      console.log('🔍 [Filtering] Starting saved locations filter...');
-      console.log('🔍 [Filtering] savedLocations count:', savedLocations.length);
-      console.log('🔍 [Filtering] savedLocations structure:', savedLocations.map(saved => ({
-        hasLocation: !!saved.location,
-        locationId: saved.location?.id,
-        locationIdType: typeof saved.location?.id,
-        locationTitle: saved.location?.title
-      })));
-      console.log('🔍 [Filtering] mapPoints count:', mapPoints.length);
-      console.log('🔍 [Filtering] mapPoints structure:', mapPoints.map(p => ({ 
-        id: p.id, 
-        idType: typeof p.id,
-        title: p.title 
-      })));
-      
-      filtered = filtered.filter(point => {
-        const isSaved = savedLocations && savedLocations.some(saved => {
-          const savedId = saved.location?.id;
-          const pointId = point.id;
-          
-          // Convert both to strings for comparison to handle type mismatches
-          const savedIdStr = String(savedId);
-          const pointIdStr = String(pointId);
-          const matches = savedIdStr === pointIdStr;
-          
-          if (savedId && pointId) {
-            console.log(`🔍 [Filtering] Comparing saved ID: "${savedId}" (${typeof savedId}) with point ID: "${pointId}" (${typeof pointId})`);
-            console.log(`🔍 [Filtering] String comparison: "${savedIdStr}" === "${pointIdStr}" = ${matches}`);
-          }
-          
-          return saved.location && matches;
-        });
-        
-        console.log(`🔍 [Filtering] Point "${point.title}" (ID: ${point.id}) is saved: ${isSaved}`);
-        return isSaved;
-      });
-      
-      console.log('🔍 [Filtering] Saved locations filter active, filtered to:', filtered.length, 'points');
-    }
-    
-    // Then filter by emoji if that filter is active
-    if (activeFilter) {
-      filtered = filtered.filter(point => point.emoji === activeFilter);
-      console.log('🔍 [Filtering] Emoji filter active:', activeFilter, 'filtered to:', filtered.length, 'points');
-    }
-    
-    console.log('🔍 [Filtering] Final filtered result:', {
-      totalPoints: mapPoints.length,
-      filteredPoints: filtered.length,
-      showSavedOnly,
-      activeFilter,
-      savedLocationsCount: savedLocations.length
-    });
-    
-    return filtered;
-  }, [mapPoints, activeFilter, showSavedOnly, savedLocations]);
+  // Filtered map points based on active filter
+  const filteredMapPoints = activeFilter
+    ? mapPoints.filter(point => point.emoji === activeFilter)
+    : mapPoints;
 
   // Clear selection if selected marker is no longer visible after filtering
   useEffect(() => {
@@ -905,43 +819,23 @@ export default function Index() {
         <Ionicons name="link" size={24} color="#007AFF" />
       </TouchableOpacity>
 
-              {/* Clear Token Button - Top Center Right */}
-        <TouchableOpacity 
-          style={[
-            styles.clearButton,
-            {
-              top: insets.top + 20,
-              left: '50%',
-              marginLeft: 20, // Position to the right of test button
-            }
-          ]}
-          onPress={() => {
-            logout();
-            console.log('Session token cleared');
-          }}
-        >
-          <Ionicons name="log-out" size={24} color="#FF3B30" />
-        </TouchableOpacity>
-
-        {/* Debug Saved Locations Button - Top Right */}
-        <TouchableOpacity 
-          style={[
-            styles.debugButton,
-            {
-              top: insets.top + 20,
-              right: 20,
-            }
-          ]}
-          onPress={() => {
-            console.log('🐛 [Debug] Current state:');
-            console.log('🐛 [Debug] savedLocations:', savedLocations);
-            console.log('🐛 [Debug] mapPoints:', mapPoints);
-            console.log('🐛 [Debug] showSavedOnly:', showSavedOnly);
-            console.log('🐛 [Debug] activeFilter:', activeFilter);
-          }}
-        >
-          <Ionicons name="bug" size={24} color="#FF9500" />
-        </TouchableOpacity>
+      {/* Clear Token Button - Top Center Right */}
+      <TouchableOpacity 
+        style={[
+          styles.clearButton,
+          {
+            top: insets.top + 20,
+            left: '50%',
+            marginLeft: 20, // Position to the right of test button
+          }
+        ]}
+        onPress={() => {
+          logout();
+          console.log('Session token cleared');
+        }}
+      >
+        <Ionicons name="log-out" size={24} color="#FF3B30" />
+      </TouchableOpacity>
 
       {/* Filter Buttons - Bottom */}
       <View style={[
@@ -960,46 +854,17 @@ export default function Index() {
             style={[
               styles.filterButton,
               {
-                backgroundColor: (activeFilter === null && !showSavedOnly) ? theme.colors.primary : theme.colors.surface,
-                borderColor: (activeFilter === null && !showSavedOnly) ? theme.colors.primary : theme.colors.border,
+                backgroundColor: activeFilter === null ? theme.colors.primary : theme.colors.surface,
+                borderColor: activeFilter === null ? theme.colors.primary : theme.colors.border,
               }
             ]}
-            onPress={() => {
-              setActiveFilter(null);
-              setShowSavedOnly(false);
-            }}
+            onPress={() => setActiveFilter(null)}
           >
             <Text style={[
               styles.filterButtonText,
-              { color: (activeFilter === null && !showSavedOnly) ? '#ffffff' : theme.colors.text }
+              { color: activeFilter === null ? '#ffffff' : theme.colors.text }
             ]}>
               All
-            </Text>
-          </TouchableOpacity>
-
-          {/* Saved Locations Filter Button */}
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              {
-                backgroundColor: showSavedOnly ? theme.colors.primary : theme.colors.surface,
-                borderColor: showSavedOnly ? theme.colors.primary : theme.colors.border,
-              }
-            ]}
-            onPress={() => {
-              if (showSavedOnly) {
-                setShowSavedOnly(false);
-              } else {
-                setShowSavedOnly(true);
-                setActiveFilter(null); // Clear emoji filter when showing saved only
-              }
-            }}
-          >
-            <Text style={[
-              styles.filterButtonText,
-              { color: showSavedOnly ? '#ffffff' : theme.colors.text }
-            ]}>
-              💾 Saved ({savedLocationsCount})
             </Text>
           </TouchableOpacity>
 
@@ -1014,14 +879,7 @@ export default function Index() {
                   borderColor: activeFilter === type.emoji ? theme.colors.primary : theme.colors.border,
                 }
               ]}
-              onPress={() => {
-                if (activeFilter === type.emoji) {
-                  setActiveFilter(null);
-                } else {
-                  setActiveFilter(type.emoji);
-                  setShowSavedOnly(false); // Clear saved filter when emoji is selected
-                }
-              }}
+              onPress={() => setActiveFilter(activeFilter === type.emoji ? null : type.emoji)}
             >
               <Text style={styles.filterEmoji}>{type.emoji}</Text>
             </TouchableOpacity>
@@ -1287,20 +1145,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   clearButton: {
-    position: 'absolute',
-    backgroundColor: 'white',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  debugButton: {
     position: 'absolute',
     backgroundColor: 'white',
     borderRadius: 20,

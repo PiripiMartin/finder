@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
-import { useTheme } from '../context/ThemeContext';
+import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
-import { getApiUrl, API_CONFIG } from '../config/api';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const locationCardWidth = width - 40; // Full width with padding
@@ -33,6 +33,8 @@ export default function Saved() {
   const { sessionToken } = useAuth();
   
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
+  const [filteredLocations, setFilteredLocations] = useState<SavedLocation[]>([]);
+  const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,12 +90,30 @@ export default function Saved() {
       console.log('📚 [Saved] Found saved locations:', locations.length);
       
       setSavedLocations(locations);
+      setFilteredLocations(locations);
       
     } catch (error) {
       console.error('📚 [Saved] Error fetching saved locations:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch saved locations');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Get unique emojis from saved locations
+  const getUniqueEmojis = () => {
+    const emojis = savedLocations.map(item => item.location.emoji);
+    return [...new Set(emojis)];
+  };
+
+  // Filter locations by selected emoji
+  const filterByEmoji = (emoji: string | null) => {
+    setSelectedEmoji(emoji);
+    if (emoji === null) {
+      setFilteredLocations(savedLocations);
+    } else {
+      const filtered = savedLocations.filter(item => item.location.emoji === emoji);
+      setFilteredLocations(filtered);
     }
   };
 
@@ -165,18 +185,69 @@ export default function Saved() {
         </TouchableOpacity>
       </View>
 
+      {/* Emoji Filter Bar */}
+      {savedLocations.length > 0 && (
+        <View style={[styles.filterContainer, { backgroundColor: theme.colors.surface }]}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScrollContent}
+          >
+            {/* All locations filter */}
+            <TouchableOpacity
+              style={[
+                styles.emojiFilterButton,
+                selectedEmoji === null && { backgroundColor: theme.colors.primary }
+              ]}
+              onPress={() => filterByEmoji(null)}
+            >
+              <Text style={[
+                styles.emojiFilterText,
+                selectedEmoji === null && { color: '#ffffff' }
+              ]}>
+                All
+              </Text>
+            </TouchableOpacity>
+            
+            {/* Emoji filters */}
+            {getUniqueEmojis().map((emoji) => (
+              <TouchableOpacity
+                key={emoji}
+                style={[
+                  styles.emojiFilterButton,
+                  selectedEmoji === emoji && { backgroundColor: theme.colors.primary }
+                ]}
+                onPress={() => filterByEmoji(emoji)}
+              >
+                <Text style={[
+                  styles.emojiFilterText,
+                  selectedEmoji === emoji && { color: '#ffffff' }
+                ]}>
+                  {emoji}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {savedLocations.length === 0 ? (
+        {filteredLocations.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="bookmark-outline" size={64} color={theme.colors.textSecondary} />
-            <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Saved Locations</Text>
+            <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+              {selectedEmoji ? `No ${selectedEmoji} Locations` : 'No Saved Locations'}
+            </Text>
             <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
-              Save locations from the map to see them here
+              {selectedEmoji 
+                ? `No saved locations with ${selectedEmoji} emoji found`
+                : 'Save locations from the map to see them here'
+              }
             </Text>
           </View>
         ) : (
           <View style={styles.locationsList}>
-            {savedLocations.map((item) => (
+            {filteredLocations.map((item) => (
               <TouchableOpacity 
                 key={item.location.id} 
                 style={[styles.locationCard, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}
@@ -198,28 +269,7 @@ export default function Saved() {
                   <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
                 </View>
 
-                {/* Video Preview */}
-                {item.topPost?.url && (
-                  <View style={styles.videoPreview}>
-                    <View style={styles.videoThumbnail}>
-                      <Ionicons name="play-circle" size={32} color="#ffffff" />
-                    </View>
-                    <View style={styles.videoInfo}>
-                      <Text style={[styles.videoLabel, { color: theme.colors.textSecondary }]}>Featured Video</Text>
-                      <Text style={[styles.videoDate, { color: theme.colors.textSecondary }]}>
-                        {new Date(item.topPost.postedAt).toLocaleDateString()}
-                      </Text>
-                    </View>
-                  </View>
-                )}
 
-                {/* Coordinates */}
-                <View style={styles.coordinates}>
-                  <Ionicons name="location" size={16} color={theme.colors.primary} />
-                  <Text style={[styles.coordinatesText, { color: theme.colors.textSecondary }]}>
-                    {item.location.latitude.toFixed(6)}, {item.location.longitude.toFixed(6)}
-                  </Text>
-                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -359,41 +409,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  videoPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+  filterContainer: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  videoThumbnail: {
-    width: 60,
-    height: 60,
-    backgroundColor: '#000',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+  filterScrollContent: {
+    paddingHorizontal: 20,
+  },
+  emojiFilterButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     marginRight: 12,
-  },
-  videoInfo: {
-    flex: 1,
-  },
-  videoLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  videoDate: {
-    fontSize: 12,
-  },
-  coordinates: {
-    flexDirection: 'row',
+    minWidth: 44,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  coordinatesText: {
-    fontSize: 12,
-    marginLeft: 6,
-    fontFamily: 'monospace',
+  emojiFilterText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
   },
 }); 
