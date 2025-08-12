@@ -19,6 +19,10 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             mp.title,
             mp.description,
             mp.emoji,
+            mp.website_url,
+            mp.phone_number,
+            mp.address,
+            mp.created_at,
             ST_X(mp.location) as longitude,
             ST_Y(mp.location) as latitude,
             p.id as post_id,
@@ -50,7 +54,11 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             emoji: row.emoji,
             latitude: row.latitude,
             longitude: row.longitude,
-            recommendable: row.recommendable
+            recommendable: row.recommendable,
+            website_url: row.websiteUrl,
+            phone_number: row.phoneNumber,
+            address: row.address,
+            created_at: row.createdAt
         },
         topPost: {
             id: row.postId,
@@ -78,6 +86,10 @@ export async function getRecommendedLocationsWithTopPost(
             mp.title,
             mp.description,
             mp.emoji,
+            mp.website_url,
+            mp.phone_number,
+            mp.address,
+            mp.created_at,
             ST_X(mp.location) as longitude,
             ST_Y(mp.location) as latitude,
             p.id as post_id,
@@ -125,7 +137,11 @@ export async function getRecommendedLocationsWithTopPost(
                 emoji: row.emoji,
                 latitude: row.latitude,
                 longitude: row.longitude,
-                recommendable: row.recommendable
+                recommendable: row.recommendable,
+                website_url: row.websiteUrl,
+                phone_number: row.phoneNumber,
+                address: row.address,
+                created_at: row.createdAt
             },
             topPost: {
                 id: row.postId,

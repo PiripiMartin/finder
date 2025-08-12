@@ -2,13 +2,21 @@
 
 
 export interface MapPoint {
-  id: number,
-  title: string,
-  description: string,
-  emoji: string,
-  latitude: number,
-  longitude: number,
-  recommendable: boolean
+    id: number,
+    title: string,
+    description: string,
+    emoji: string,
+    latitude: number,
+    longitude: number,
+    recommendable: boolean,
+
+
+    // Extra business information
+    website_url: string,
+    phone_number: string,
+    address: string,
+
+    created_at: Date,
 };
 
 
