@@ -91,6 +91,8 @@ export default function Saved() {
       
       setSavedLocations(locations);
       setFilteredLocations(locations);
+      // Start with no filter selected (show all locations)
+      setSelectedEmoji(null);
       
     } catch (error) {
       console.error('📚 [Saved] Error fetching saved locations:', error);
@@ -107,11 +109,14 @@ export default function Saved() {
   };
 
   // Filter locations by selected emoji
-  const filterByEmoji = (emoji: string | null) => {
-    setSelectedEmoji(emoji);
-    if (emoji === null) {
+  const filterByEmoji = (emoji: string) => {
+    if (selectedEmoji === emoji) {
+      // If clicking the same emoji, deselect it and show all locations
+      setSelectedEmoji(null);
       setFilteredLocations(savedLocations);
     } else {
+      // Filter by the new emoji
+      setSelectedEmoji(emoji);
       const filtered = savedLocations.filter(item => item.location.emoji === emoji);
       setFilteredLocations(filtered);
     }
@@ -193,22 +198,6 @@ export default function Saved() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterScrollContent}
           >
-            {/* All locations filter */}
-            <TouchableOpacity
-              style={[
-                styles.emojiFilterButton,
-                selectedEmoji === null && { backgroundColor: theme.colors.primary }
-              ]}
-              onPress={() => filterByEmoji(null)}
-            >
-              <Text style={[
-                styles.emojiFilterText,
-                selectedEmoji === null && { color: '#ffffff' }
-              ]}>
-                All
-              </Text>
-            </TouchableOpacity>
-            
             {/* Emoji filters */}
             {getUniqueEmojis().map((emoji) => (
               <TouchableOpacity
@@ -418,17 +407,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   emojiFilterButton: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    marginRight: 12,
-    minWidth: 44,
+    marginRight: 8,
+    minWidth: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emojiFilterText: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '600',
     color: '#666',
   },

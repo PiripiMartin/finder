@@ -849,25 +849,6 @@ export default function Index() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterScrollContent}
         >
-          {/* All Filter Button */}
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              {
-                backgroundColor: activeFilter === null ? theme.colors.primary : theme.colors.surface,
-                borderColor: activeFilter === null ? theme.colors.primary : theme.colors.border,
-              }
-            ]}
-            onPress={() => setActiveFilter(null)}
-          >
-            <Text style={[
-              styles.filterButtonText,
-              { color: activeFilter === null ? '#ffffff' : theme.colors.text }
-            ]}>
-              All
-            </Text>
-          </TouchableOpacity>
-
           {/* Type-specific Filter Buttons */}
           {markerTypes.map((type) => (
             <TouchableOpacity
@@ -1179,14 +1160,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'transparent',
+    marginRight: 2,
   },
   filterEmoji: {
     fontSize: 18,
     marginRight: 5,
   },
   filterButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 18,
+    
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
