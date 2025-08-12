@@ -467,41 +467,7 @@ export default function Index() {
     return emojiLabels[emoji] || 'Unknown';
   };
 
-  // Get unique marker types from emojis
-  const markerTypes = useMemo(() => {
-    const emojiCounts: { [key: string]: number } = {};
-    
-    mapPoints.forEach(point => {
-      if (emojiCounts[point.emoji]) {
-        emojiCounts[point.emoji]++;
-      } else {
-        emojiCounts[point.emoji] = 1;
-      }
-    });
-    
-    // Convert to array format and add some default types if needed
-    const types = Object.entries(emojiCounts).map(([emoji, count]) => ({
-      emoji,
-      label: getEmojiLabel(emoji),
-      count
-    }));
-    
-    // Add default types if no data yet
-    if (types.length === 0) {
-      return [
-        { emoji: '☕', label: 'Coffee', count: 0 },
-        { emoji: '🧋', label: 'Bubble Tea', count: 0 },
-        { emoji: '𫖖', label: 'Tea', count: 0 },
-        { emoji: '🍰', label: 'Dessert', count: 0 },
-        { emoji: '🍕', label: 'Pizza', count: 0 },
-        { emoji: '🍜', label: 'Noodles', count: 0 },
-        { emoji: '🍣', label: 'Sushi', count: 0 },
-        { emoji: '🍔', label: 'Burgers', count: 0 },
-      ];
-    }
-    
-    return types;
-  }, [mapPoints]);
+
 
   // Filtered map points based on active filter and saved locations
   const filteredMapPoints = useMemo(() => {
@@ -544,6 +510,45 @@ export default function Index() {
     setActiveFilter(null);
     setShowSavedOnly(false);
   };
+
+  // Get unique marker types from emojis - only show emojis of currently visible points
+  const markerTypes = useMemo(() => {
+    const emojiCounts: { [key: string]: number } = {};
+    
+    // Use filteredMapPoints instead of mapPoints to only show emojis of visible locations
+    const pointsToAnalyze = filteredMapPoints.length > 0 ? filteredMapPoints : mapPoints;
+    
+    pointsToAnalyze.forEach(point => {
+      if (emojiCounts[point.emoji]) {
+        emojiCounts[point.emoji]++;
+      } else {
+        emojiCounts[point.emoji] = 1;
+      }
+    });
+    
+    // Convert to array format and add some default types if needed
+    const types = Object.entries(emojiCounts).map(([emoji, count]) => ({
+      emoji,
+      label: getEmojiLabel(emoji),
+      count
+    }));
+    
+    // Add default types if no data yet
+    if (types.length === 0) {
+      return [
+        { emoji: '☕', label: 'Coffee', count: 0 },
+        { emoji: '🧋', label: 'Bubble Tea', count: 0 },
+        { emoji: '𫖖', label: 'Tea', count: 0 },
+        { emoji: '🍰', label: 'Dessert', count: 0 },
+        { emoji: '🍕', label: 'Pizza', count: 0 },
+        { emoji: '🍜', label: 'Noodles', count: 0 },
+        { emoji: '🍣', label: 'Sushi', count: 0 },
+        { emoji: '🍔', label: 'Burgers', count: 0 },
+      ];
+    }
+    
+    return types;
+  }, [filteredMapPoints, mapPoints]);
 
   // Clear selection if selected marker is no longer visible after filtering
   useEffect(() => {
@@ -823,8 +828,8 @@ export default function Index() {
         style={[
           styles.locationButton,
           {
-            top: insets.top + 20,
-            left: insets.left + 20,
+            top: insets.top + 30,
+            left: insets.left + 30,
           }
         ]}
         onPress={() => {
@@ -835,7 +840,7 @@ export default function Index() {
           setSelectedMarkerId(null);
         }}
       >
-        <Ionicons name="navigate" size={24} color="#4E8886" />
+        <Ionicons name="navigate" size={28} color="#4E8886" />
       </TouchableOpacity>
 
       {/* Refresh Button - Top Right */}
@@ -1169,9 +1174,9 @@ const styles = StyleSheet.create({
   locationButton: {
     position: 'absolute',
     backgroundColor: '#FFF0F0',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
+    borderRadius: 25,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
