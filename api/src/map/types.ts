@@ -8,15 +8,16 @@ export interface MapPoint {
     emoji: string,
     latitude: number,
     longitude: number,
+    isValidLocation: boolean,
     recommendable: boolean,
 
 
     // Extra business information
-    website_url: string,
-    phone_number: string,
+    websiteUrl: string,
+    phoneNumber: string,
     address: string,
 
-    created_at: Date,
+    createdAt: Date,
 };
 
 

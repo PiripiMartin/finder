@@ -23,6 +23,7 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             mp.phone_number,
             mp.address,
             mp.created_at,
+            mp.is_valid_location,
             ST_X(mp.location) as longitude,
             ST_Y(mp.location) as latitude,
             p.id as post_id,
@@ -55,10 +56,11 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             latitude: row.latitude,
             longitude: row.longitude,
             recommendable: row.recommendable,
-            website_url: row.websiteUrl,
-            phone_number: row.phoneNumber,
+            isValidLocation: row.isValidLocation,
+            websiteUrl: row.websiteUrl,
+            phoneNumber: row.phoneNumber,
             address: row.address,
-            created_at: row.createdAt
+            createdAt: row.createdAt
         },
         topPost: {
             id: row.postId,
@@ -90,6 +92,7 @@ export async function getRecommendedLocationsWithTopPost(
             mp.phone_number,
             mp.address,
             mp.created_at,
+            mp.is_valid_location,
             ST_X(mp.location) as longitude,
             ST_Y(mp.location) as latitude,
             p.id as post_id,
@@ -138,10 +141,11 @@ export async function getRecommendedLocationsWithTopPost(
                 latitude: row.latitude,
                 longitude: row.longitude,
                 recommendable: row.recommendable,
-                website_url: row.websiteUrl,
-                phone_number: row.phoneNumber,
+                isValidLocation: row.isValidLocation,
+                websiteUrl: row.websiteUrl,
+                phoneNumber: row.phoneNumber,
                 address: row.address,
-                created_at: row.createdAt
+                createdAt: row.createdAt
             },
             topPost: {
                 id: row.postId,
