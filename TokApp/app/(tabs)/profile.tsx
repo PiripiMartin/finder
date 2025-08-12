@@ -184,12 +184,29 @@ export default function Profile() {
       {/* Profile Sections */}
       <View style={styles.sectionsContainer}>
 
+        {/* Settings */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Settings</Text>
+          <View style={styles.settingsList}>
+            <View style={styles.settingItem}>
+              <Ionicons name="moon" size={20} color={theme.colors.text} />
+              <Text style={[styles.settingText, { color: theme.colors.text }]}>Dark Mode</Text>
+              <Switch
+                value={isDarkMode}
+                onValueChange={toggleDarkMode}
+                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                thumbColor={isDarkMode ? '#FFF0F0' : '#f4f3f4'}
+              />
+            </View>
+          </View>
+        </View>
 
-
+        {/* Spacing between settings and logout */}
+        <View style={styles.spacer} />
 
         {/* Logout Button */}
         <TouchableOpacity 
-          style={[styles.logoutButton, { backgroundColor: '#ff4757' }]}
+          style={[styles.logoutButton, { backgroundColor: '#B14D4D' }]}
           onPress={() => {
             Alert.alert(
               'Logout',
@@ -214,26 +231,6 @@ export default function Profile() {
           <Ionicons name="log-out-outline" size={20} color="#FFF0F0" />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
-
-        {/* Spacing between logout and settings */}
-        <View style={styles.spacer} />
-
-        {/* Settings */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Settings</Text>
-          <View style={styles.settingsList}>
-            <View style={styles.settingItem}>
-              <Ionicons name="moon" size={20} color={theme.colors.text} />
-              <Text style={[styles.settingText, { color: theme.colors.text }]}>Dark Mode</Text>
-              <Switch
-                value={isDarkMode}
-                onValueChange={toggleDarkMode}
-                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                thumbColor={isDarkMode ? '#FFF0F0' : '#f4f3f4'}
-              />
-            </View>
-          </View>
-        </View>
       </View>
     </ScrollView>
   );
@@ -335,7 +332,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ff4757',
+    backgroundColor: '#B14D4D',
     paddingVertical: 16,
     borderRadius: 12,
     marginTop: 20,

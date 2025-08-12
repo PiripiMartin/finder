@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
-const locationCardWidth = width - 80; // Reduced width for smaller cards
+const locationCardWidth = width - 100; // Even smaller width for more compact cards
 
 interface SavedLocation {
   location: {
@@ -279,8 +279,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#835858',
   },
   headerTitle: {
     fontSize: 24,
@@ -354,28 +352,28 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   locationsList: {
-    padding: 16,
+    padding: 12,
   },
   locationCard: {
     width: locationCardWidth,
     backgroundColor: '#FFF0F0',
-    borderRadius: 12,
-    marginBottom: 12,
-    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+    padding: 10,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowRadius: 5,
+    elevation: 2,
   },
   locationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   locationInfo: {
     flexDirection: 'row',
@@ -383,20 +381,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   locationEmoji: {
-    fontSize: 28,
-    marginRight: 10,
+    fontSize: 24,
+    marginRight: 8,
   },
   locationText: {
     flex: 1,
   },
   locationTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   locationDescription: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
   },
   filterContainer: {
     paddingVertical: 16,

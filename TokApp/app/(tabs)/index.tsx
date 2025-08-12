@@ -67,9 +67,11 @@ export default function Index() {
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
   
   // API state
   const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
+  const [savedLocations, setSavedLocations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(0);
@@ -181,13 +183,16 @@ export default function Index() {
       console.log('API response data:', data);
       
       // Safely extract and validate the data
-      const savedLocations = Array.isArray(data.savedLocations) ? data.savedLocations : [];
+      const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
       const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+      
+      // Update saved locations state
+      setSavedLocations(savedLocationsData);
       
       console.log('🔍 [fetchMapPoints] API Response Data:', {
         savedLocations: {
-          count: savedLocations.length,
-          data: savedLocations
+          count: savedLocationsData.length,
+          data: savedLocationsData
         },
         recommendedLocations: {
           count: recommendedLocations.length,
@@ -195,8 +200,14 @@ export default function Index() {
         }
       });
       
+      // Debug saved locations structure
+      if (savedLocationsData.length > 0) {
+        console.log('🔍 [fetchMapPoints] First saved location structure:', savedLocationsData[0]);
+        console.log('🔍 [fetchMapPoints] Saved location IDs:', savedLocationsData.map((s: any) => s.location?.id));
+      }
+      
       // Combine saved and recommended locations
-      const allLocations = [...savedLocations, ...recommendedLocations];
+      const allLocations = [...savedLocationsData, ...recommendedLocations];
       
       console.log('📊 [fetchMapPoints] Combined Locations:', {
         totalCount: allLocations.length,
@@ -389,11 +400,20 @@ export default function Index() {
       console.log('Manual refresh - API response data:', data);
       
       // Safely extract and validate the data
-      const savedLocations = Array.isArray(data.savedLocations) ? data.savedLocations : [];
+      const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
       const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
       
+      // Update saved locations state
+      setSavedLocations(savedLocationsData);
+      
+      // Debug saved locations structure
+      if (savedLocationsData.length > 0) {
+        console.log('🔍 [Manual Refresh] First saved location structure:', savedLocationsData[0]);
+        console.log('🔍 [Manual Refresh] Saved location IDs:', savedLocationsData.map((s: any) => s.location?.id));
+      }
+      
       // Combine saved and recommended locations
-      const allLocations = [...savedLocations, ...recommendedLocations];
+      const allLocations = [...savedLocationsData, ...recommendedLocations];
       
       
       
@@ -483,10 +503,47 @@ export default function Index() {
     return types;
   }, [mapPoints]);
 
-  // Filtered map points based on active filter
-  const filteredMapPoints = activeFilter
-    ? mapPoints.filter(point => point.emoji === activeFilter)
-    : mapPoints;
+  // Filtered map points based on active filter and saved locations
+  const filteredMapPoints = useMemo(() => {
+    let filtered = mapPoints;
+    
+    // Apply emoji filter
+    if (activeFilter) {
+      filtered = filtered.filter(point => point.emoji === activeFilter);
+    }
+    
+    // Apply saved locations filter
+    if (showSavedOnly) {
+      console.log('🔍 [Filter] Applying saved locations filter...');
+      console.log('🔍 [Filter] Saved locations count:', savedLocations.length);
+      console.log('🔍 [Filter] Map points count:', mapPoints.length);
+      console.log('🔍 [Filter] Saved locations:', savedLocations.map(s => ({ id: s.location?.id, title: s.location?.title })));
+      console.log('🔍 [Filter] Map points:', mapPoints.map(p => ({ id: p.id, title: p.title })));
+      
+      filtered = filtered.filter(point => {
+        const isSaved = savedLocations.some(saved => {
+          const savedId = String(saved.location?.id);
+          const pointId = String(point.id);
+          const matches = savedId === pointId;
+          if (matches) {
+            console.log('✅ [Filter] Found saved location match:', { savedId, pointId, title: point.title });
+          }
+          return matches;
+        });
+        return isSaved;
+      });
+      
+      console.log('🔍 [Filter] Filtered points count:', filtered.length);
+    }
+    
+    return filtered;
+  }, [mapPoints, activeFilter, showSavedOnly, savedLocations]);
+
+  // Function to clear all filters
+  const clearAllFilters = () => {
+    setActiveFilter(null);
+    setShowSavedOnly(false);
+  };
 
   // Clear selection if selected marker is no longer visible after filtering
   useEffect(() => {
@@ -849,6 +906,32 @@ export default function Index() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterScrollContent}
         >
+          {/* Saved Locations Filter Button */}
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              {
+                backgroundColor: showSavedOnly ? theme.colors.primary : theme.colors.surface,
+                borderColor: showSavedOnly ? theme.colors.primary : theme.colors.border,
+              }
+            ]}
+            onPress={() => {
+              const newShowSavedOnly = !showSavedOnly;
+              console.log('🔍 [Filter Toggle] Toggling saved locations filter:', { 
+                from: showSavedOnly, 
+                to: newShowSavedOnly,
+                savedLocationsCount: savedLocations.length,
+                mapPointsCount: mapPoints.length
+              });
+              setShowSavedOnly(newShowSavedOnly);
+              setActiveFilter(null); // Clear emoji filter when toggling saved filter
+            }}
+          >
+            <Text style={styles.filterButtonText}>Saved</Text>
+          </TouchableOpacity>
+          
+
+          
           {/* Type-specific Filter Buttons */}
           {markerTypes.map((type) => (
             <TouchableOpacity
