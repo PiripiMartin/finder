@@ -209,7 +209,6 @@ export default function Location() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{locationData.name}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -416,8 +415,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#835858',
   },
   backButton: {
     padding: 8,
