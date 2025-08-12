@@ -11,6 +11,7 @@ export interface LocationAndPost {
 
 /**
  * Fetches saved locations for a user (locations where they've posted) with their top post (most recent)
+ * These are locations the user has personally posted to and should NOT appear in recommendations
  */
 export async function getSavedLocationsWithTopPost(userId: number): Promise<LocationAndPost[]> {
     const query = `
@@ -74,6 +75,7 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
 
 /**
  * Fetches recommended locations near user coordinates with their top post (most recent)
+ * Excludes any locations where the user has posted (these are returned as saved locations)
  */
 export async function getRecommendedLocationsWithTopPost(
     accountId: number,
@@ -111,9 +113,13 @@ export async function getRecommendedLocationsWithTopPost(
             FROM posts
         ) p ON mp.id = p.map_point_id
         WHERE ST_Distance_Sphere(mp.location, POINT(?, ?)) <= ? * 1000
+        -- Exclude locations where the current user has posted (these are saved locations)
         AND mp.id NOT IN (
-            SELECT map_point_id FROM posts WHERE posted_by = ?
+            SELECT DISTINCT map_point_id 
+            FROM posts 
+            WHERE posted_by = ?
         )
+        -- Only include recommendable locations
         AND mp.recommendable = TRUE
         ORDER BY distance_km ASC, mp.created_at DESC
         LIMIT ${Number(limit)}
@@ -129,32 +135,31 @@ export async function getRecommendedLocationsWithTopPost(
     ]) as [any[], any];
     const results = toCamelCase(rows) as any[];
     
-    // Filter out locations without posts and transform to LocationAndPost format
-    return results
-        .filter(row => row.postId) // Only include locations that have posts
-        .map(row => ({
-            location: {
-                id: row.id,
-                title: row.title,
-                description: row.description,
-                emoji: row.emoji,
-                latitude: row.latitude,
-                longitude: row.longitude,
-                recommendable: row.recommendable,
-                isValidLocation: row.isValidLocation,
-                websiteUrl: row.websiteUrl,
-                phoneNumber: row.phoneNumber,
-                address: row.address,
-                createdAt: row.createdAt
-            },
-            topPost: {
-                id: row.postId,
-                url: row.postUrl,
-                postedBy: row.postPostedBy,
-                mapPointId: parseInt(row.id),
-                postedAt: row.postPostedAt
-            }
-        }));
+    // Transform to LocationAndPost format
+    // Note: We don't need to filter by postId anymore since we added "AND p.id IS NOT NULL" in the SQL
+    return results.map(row => ({
+        location: {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            emoji: row.emoji,
+            latitude: row.latitude,
+            longitude: row.longitude,
+            recommendable: row.recommendable,
+            isValidLocation: row.isValidLocation,
+            websiteUrl: row.websiteUrl,
+            phoneNumber: row.phoneNumber,
+            address: row.address,
+            createdAt: row.createdAt
+        },
+        topPost: {
+            id: row.postId,
+            url: row.postUrl,
+            postedBy: row.postPostedBy,
+            mapPointId: parseInt(row.id),
+            postedAt: row.postPostedAt
+        }
+    }));
 }
 
 

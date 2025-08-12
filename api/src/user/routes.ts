@@ -79,7 +79,7 @@ export async function signup(req: BunRequest): Promise<Response> {
 
 
 export async function login(req: BunRequest): Promise<Response> {
-
+    console.log("Login request received");
     if (!req.body) {
         return new Response("Missing request body", {status: 400});
     }
