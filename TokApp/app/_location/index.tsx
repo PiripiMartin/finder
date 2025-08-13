@@ -2,10 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Dimensions, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
-import { useTheme } from '../context/ThemeContext';
+import { API_CONFIG, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
-import { getMapPointsUrl } from '../config/api';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const tileWidth = (width - 30) / 2; // Less padding within video grid
@@ -72,7 +73,7 @@ const mockLocationData: { [key: string]: LocationData } = {
 
 export default function Location() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id, needsCoordinates } = useLocalSearchParams();
   const { theme } = useTheme();
   const { sessionToken } = useAuth();
   const [locationData, setLocationData] = useState<LocationData | null>(null);
@@ -80,6 +81,10 @@ export default function Location() {
   const [videos, setVideos] = useState<VideoPost[]>([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(false);
   const [videosError, setVideosError] = useState<string | null>(null);
+  const [isSelectingCoords, setIsSelectingCoords] = useState(false);
+  const [selectedCoords, setSelectedCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isSubmittingCoords, setIsSubmittingCoords] = useState(false);
+  const [submitCoordsError, setSubmitCoordsError] = useState<string | null>(null);
 
   // Fetch videos for the current location
   const fetchLocationVideos = async (locationId: string) => {
@@ -135,6 +140,7 @@ export default function Location() {
     console.log('Timestamp:', new Date().toISOString());
     console.log('📍 [Location] Page accessed with location ID:', id);
     console.log('🚀 [Location] This could be from map marker tap or saved locations list');
+    console.log('🗺️ [Location] needsCoordinates flag:', needsCoordinates);
     
     if (id) {
       console.log('🔍 Looking up location data for ID:', id);
@@ -160,7 +166,44 @@ export default function Location() {
       setLocationData(mockLocationData['1']);
       fetchLocationVideos('1');
     }
+    // Enter coordinate selection mode if requested via query param
+    setIsSelectingCoords(needsCoordinates === 'true');
   }, [id, sessionToken]);
+
+  const handleMapPressForCoords = (event: any) => {
+    const { latitude, longitude } = event.nativeEvent.coordinate;
+    console.log('📍 [Location] User selected coords:', { latitude, longitude });
+    setSelectedCoords({ latitude, longitude });
+  };
+
+  const submitSelectedCoordinates = async () => {
+    if (!selectedCoords || !id) return;
+    try {
+      setIsSubmittingCoords(true);
+      setSubmitCoordsError(null);
+      const url = `${API_CONFIG.BASE_URL}/map/${id}/coords`;
+      console.log('🌐 [Location] Submitting selected coords to:', url, selectedCoords);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        },
+        body: JSON.stringify({ latitude: selectedCoords.latitude, longitude: selectedCoords.longitude }),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      console.log('✅ [Location] Coords submitted successfully');
+      // Go back to previous screen (Saved) which can be refreshed by user
+      router.back();
+    } catch (err) {
+      console.error('❌ [Location] Failed to submit coords', err);
+      setSubmitCoordsError(err instanceof Error ? err.message : 'Failed to submit coordinates');
+    } finally {
+      setIsSubmittingCoords(false);
+    }
+  };
 
   const handleVideoPress = (videoUrl: string) => {
     if (videoUrl) {
@@ -196,8 +239,71 @@ export default function Location() {
           style={[styles.loadingButton, { backgroundColor: theme.colors.primary }]}
           onPress={() => setLocationData(mockLocationData['1'])}
         >
-          <Text style={[styles.loadingButtonText, { color: '#ffffff' }]}>Load Demo Location</Text>
+          <Text style={[styles.loadingButtonText, { color: '#FFF0F0' }]}>Load Demo Location</Text>
         </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Coordinate selection mode UI
+  if (isSelectingCoords) {
+    const initialRegion = {
+      latitude: -37.8136, // Default center (e.g., Melbourne CBD)
+      longitude: 144.9631,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
+    };
+
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>        
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>          
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        {/* Instruction Banner */}
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+          <Text style={{ color: theme.colors.text }}>
+            Tap on the map to set this location's coordinates.
+          </Text>
+          {submitCoordsError && (
+            <Text style={{ color: '#ff6b6b', marginTop: 6 }}>{submitCoordsError}</Text>
+          )}
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <MapView
+            style={{ flex: 1 }}
+            initialRegion={initialRegion}
+            onPress={handleMapPressForCoords}
+          >
+            {selectedCoords && (
+              <Marker coordinate={selectedCoords} />
+            )}
+          </MapView>
+        </View>
+
+        {/* Save Button */}
+        <View style={{ padding: 16 }}>
+          <TouchableOpacity
+            disabled={!selectedCoords || isSubmittingCoords}
+            onPress={submitSelectedCoordinates}
+            style={{
+              opacity: !selectedCoords || isSubmittingCoords ? 0.6 : 1,
+              backgroundColor: theme.colors.primary,
+              paddingVertical: 14,
+              borderRadius: 10,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#FFF0F0', fontWeight: 'bold', fontSize: 16 }}>
+              {isSubmittingCoords ? 'Saving…' : 'Save Coordinates'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -209,7 +315,6 @@ export default function Location() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{locationData.name}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -261,7 +366,7 @@ export default function Location() {
             style={[styles.directionsButton, { backgroundColor: theme.colors.primary }]}
             onPress={openDirections}
           >
-            <Ionicons name="navigate" size={20} color="#ffffff" />
+            <Ionicons name="navigate" size={20} color="#FFF0F0" />
             <Text style={styles.directionsButtonText}>Get Directions</Text>
           </TouchableOpacity>
         </View>
@@ -416,8 +521,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   backButton: {
     padding: 8,
@@ -437,7 +540,7 @@ const styles = StyleSheet.create({
   heroSection: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#835858',
   },
   heroContent: {
     alignItems: 'center',
@@ -515,7 +618,7 @@ const styles = StyleSheet.create({
   videoNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#835858',
   },
   videoTitle: {
     fontSize: 14,
@@ -581,7 +684,7 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   directionsButtonText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
@@ -598,7 +701,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: 'bold',
   },

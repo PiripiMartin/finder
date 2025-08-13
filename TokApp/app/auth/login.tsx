@@ -100,7 +100,7 @@ export default function LoginScreen() {
       marginBottom: 20,
     },
     loginButtonText: {
-      color: '#ffffff',
+      color: '#FFF0F0',
       fontSize: 18,
       fontWeight: '600',
     },
@@ -113,7 +113,7 @@ export default function LoginScreen() {
       fontSize: 16,
     },
     disabledButton: {
-      backgroundColor: '#cccccc',
+      backgroundColor: '#835858',
     },
   });
 

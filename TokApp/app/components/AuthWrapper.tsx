@@ -15,11 +15,11 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
     return (
       <View style={[
         styles.loadingContainer,
-        { backgroundColor: theme === 'dark' ? '#1a1a1a' : '#ffffff' }
+        { backgroundColor: theme === 'dark' ? '#1a1a1a' : '#FFF0F0' }
       ]}>
         <ActivityIndicator 
           size="large" 
-          color={theme === 'dark' ? '#007AFF' : '#007AFF'} 
+          color={theme === 'dark' ? '#4E8886' : '#4E8886'} 
         />
       </View>
     );

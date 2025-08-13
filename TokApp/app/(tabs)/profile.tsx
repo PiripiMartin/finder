@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Alert, Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl } from "react-native";
 import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { getApiUrl, API_CONFIG } from '../config/api';
 
 interface ProfileData {
   username: string;
@@ -132,47 +132,44 @@ export default function Profile() {
       {/* Header with Avatar */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.avatarContainer}>
-          <Image 
-            source={{ uri: 'https://picsum.photos/150/150?random=100' }} 
-            style={styles.avatar} 
-          />
-          <TouchableOpacity style={styles.editAvatarButton}>
-            <Ionicons name="camera" size={16} color={theme.colors.primary} />
-          </TouchableOpacity>
+          <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
+            <Text style={styles.avatarEmoji}>🐶</Text>
+          </View>
         </View>
         
-        <Text style={[styles.username, { color: theme.colors.text }]}>@{profileData?.username || 'loading...'}</Text>
+        <Text style={[styles.username, { color: theme.colors.text }]}>
+          @{profileData?.username || 'loading...'}
+        </Text>
         <Text style={[styles.displayName, { color: theme.colors.textSecondary }]}>
           {profileData?.email || 'loading...'}
         </Text>
         
-        <View style={styles.bioContainer}>
-          <Text style={[styles.bio, { color: theme.colors.text }]}>
-            Member since {profileData?.createdAt ? new Date(profileData.createdAt).toLocaleDateString() : 'loading...'}
+        {!profileData && (
+          <Text style={[styles.bio, { color: theme.colors.textSecondary, marginTop: 8 }]}>
+            Tap refresh to load your profile
           </Text>
-        </View>
+        )}
+        
+        {profileData?.createdAt ? (
+          <View style={styles.bioContainer}>
+            <Text style={[styles.bio, { color: theme.colors.text }]}>
+              Member since {new Date(profileData.createdAt).toLocaleDateString()}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.bioContainer}>
+            <Text style={[styles.bio, { color: theme.colors.textSecondary }]}>
+              Profile information loading...
+            </Text>
+          </View>
+        )}
 
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: theme.colors.text }]}>127</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Following</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: theme.colors.text }]}>2.4K</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Followers</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: theme.colors.text }]}>89</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Likes</Text>
-          </View>
-        </View>
-
-        {/* Edit Profile Button */}
-        <TouchableOpacity style={[styles.editProfileButton, { backgroundColor: theme.colors.primary }]}>
-          <Text style={styles.editProfileText}>Edit Profile</Text>
+        {/* Edit Profile Button - Placeholder for future functionality */}
+        <TouchableOpacity 
+          style={[styles.editProfileButton, { backgroundColor: theme.colors.primary, opacity: 0.6 }]}
+          disabled={true}
+        >
+          <Text style={styles.editProfileText}>Edit Profile (Coming Soon)</Text>
         </TouchableOpacity>
         
         {/* Refresh Button */}
@@ -180,60 +177,36 @@ export default function Profile() {
           style={[styles.refreshButton, { backgroundColor: theme.colors.primary }]}
           onPress={handleRefresh}
         >
-          <Ionicons name="refresh" size={20} color="#ffffff" />
+          <Ionicons name="refresh" size={20} color="#FFF0F0" />
         </TouchableOpacity>
       </View>
 
       {/* Profile Sections */}
       <View style={styles.sectionsContainer}>
-        {/* Favorite Beverages */}
+
+        {/* Settings */}
         <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Favorite Beverages</Text>
-          <View style={styles.beverageGrid}>
-            <View style={[styles.beverageItem, { backgroundColor: theme.colors.background }]}>
-              <Text style={styles.beverageEmoji}>☕</Text>
-              <Text style={[styles.beverageName, { color: theme.colors.text }]}>Espresso</Text>
-            </View>
-            <View style={[styles.beverageItem, { backgroundColor: theme.colors.background }]}>
-              <Text style={styles.beverageEmoji}>🧋</Text>
-              <Text style={[styles.beverageName, { color: theme.colors.text }]}>Taro Milk Tea</Text>
-            </View>
-            <View style={[styles.beverageItem, { backgroundColor: theme.colors.background }]}>
-              <Text style={styles.beverageEmoji}>🫖</Text>
-              <Text style={[styles.beverageName, { color: theme.colors.text }]}>Green Tea</Text>
-            </View>
-            <View style={[styles.beverageItem, { backgroundColor: theme.colors.background }]}>
-              <Text style={styles.beverageEmoji}>☕</Text>
-              <Text style={[styles.beverageName, { color: theme.colors.text }]}>Cappuccino</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Settings</Text>
+          <View style={styles.settingsList}>
+            <View style={styles.settingItem}>
+              <Ionicons name="moon" size={20} color={theme.colors.text} />
+              <Text style={[styles.settingText, { color: theme.colors.text }]}>Dark Mode</Text>
+              <Switch
+                value={isDarkMode}
+                onValueChange={toggleDarkMode}
+                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                thumbColor={isDarkMode ? '#FFF0F0' : '#f4f3f4'}
+              />
             </View>
           </View>
         </View>
 
-        {/* Recent Activity */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Activity</Text>
-          <View style={styles.activityList}>
-            <View style={styles.activityItem}>
-              <Ionicons name="heart" size={16} color="#ff4757" />
-              <Text style={[styles.activityText, { color: theme.colors.text }]}>Liked &ldquo;Amazing Coffee Art&rdquo;</Text>
-              <Text style={[styles.activityTime, { color: theme.colors.textSecondary }]}>2h ago</Text>
-            </View>
-            <View style={styles.activityItem}>
-              <Ionicons name="bookmark" size={16} color={theme.colors.primary} />
-              <Text style={[styles.activityText, { color: theme.colors.text }]}>Saved &ldquo;Bubble Tea Recipe&rdquo;</Text>
-              <Text style={[styles.activityTime, { color: theme.colors.textSecondary }]}>5h ago</Text>
-            </View>
-            <View style={styles.activityItem}>
-              <Ionicons name="location" size={16} color="#2ed573" />
-              <Text style={[styles.activityText, { color: theme.colors.text }]}>Visited Coffee Shop</Text>
-              <Text style={[styles.activityTime, { color: theme.colors.textSecondary }]}>1d ago</Text>
-            </View>
-          </View>
-        </View>
+        {/* Spacing between settings and logout */}
+        <View style={styles.spacer} />
 
         {/* Logout Button */}
         <TouchableOpacity 
-          style={[styles.logoutButton, { backgroundColor: '#ff4757' }]}
+          style={[styles.logoutButton, { backgroundColor: '#B14D4D' }]}
           onPress={() => {
             Alert.alert(
               'Logout',
@@ -255,46 +228,9 @@ export default function Profile() {
             );
           }}
         >
-          <Ionicons name="log-out-outline" size={20} color="#ffffff" />
+          <Ionicons name="log-out-outline" size={20} color="#FFF0F0" />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
-
-        {/* Settings */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Settings</Text>
-          <View style={styles.settingsList}>
-            <TouchableOpacity style={styles.settingItem}>
-              <Ionicons name="notifications" size={20} color={theme.colors.text} />
-              <Text style={[styles.settingText, { color: theme.colors.text }]}>Notifications</Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.settingItem}>
-              <Ionicons name="lock-closed" size={20} color={theme.colors.text} />
-              <Text style={[styles.settingText, { color: theme.colors.text }]}>Privacy</Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            <View style={styles.settingItem}>
-              <Ionicons name="moon" size={20} color={theme.colors.text} />
-              <Text style={[styles.settingText, { color: theme.colors.text }]}>Dark Mode</Text>
-              <Switch
-                value={isDarkMode}
-                onValueChange={toggleDarkMode}
-                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                thumbColor={isDarkMode ? '#ffffff' : '#f4f3f4'}
-              />
-            </View>
-            <TouchableOpacity style={styles.settingItem}>
-              <Ionicons name="help-circle" size={20} color={theme.colors.text} />
-              <Text style={[styles.settingText, { color: theme.colors.text }]}>Help & Support</Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.settingItem}>
-              <Ionicons name="information-circle" size={20} color={theme.colors.text} />
-              <Text style={[styles.settingText, { color: theme.colors.text }]}>About</Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </View>
       </View>
     </ScrollView>
   );
@@ -303,10 +239,10 @@ export default function Profile() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#EBD4D4',
   },
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFF0F0',
     padding: 20,
     paddingTop: 60,
     alignItems: 'center',
@@ -320,21 +256,14 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#007AFF',
-  },
-  editAvatarButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
+    borderColor: '#4E8886',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#007AFF',
   },
+  avatarEmoji: {
+    fontSize: 50,
+  },
+
   username: {
     fontSize: 18,
     fontWeight: '600',
@@ -343,7 +272,7 @@ const styles = StyleSheet.create({
   },
   displayName: {
     fontSize: 16,
-    color: '#666',
+    color: '#835858',
     marginBottom: 12,
   },
   bioContainer: {
@@ -355,38 +284,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: '#e0e0e0',
-  },
+
   editProfileButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4E8886',
     paddingHorizontal: 24,
     paddingVertical: 8,
     borderRadius: 20,
   },
   editProfileText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -402,7 +308,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   section: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFF0F0',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -421,60 +327,24 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 12,
   },
-  beverageGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  beverageItem: {
-    width: '48%',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  beverageEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  beverageName: {
-    fontSize: 12,
-    color: '#333',
-    textAlign: 'center',
-  },
-  activityList: {
-    gap: 12,
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  activityText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#333',
-    marginLeft: 8,
-  },
-  activityTime: {
-    fontSize: 12,
-    color: '#999',
-  },
+
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ff4757',
+    backgroundColor: '#B14D4D',
     paddingVertical: 16,
     borderRadius: 12,
     marginTop: 20,
     gap: 8,
   },
   logoutText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: '600',
+  },
+  spacer: {
+    height: 20,
   },
   settingsList: {
     gap: 8,
@@ -497,7 +367,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#EBD4D4',
   },
   loadingText: {
     marginTop: 10,
@@ -507,7 +377,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#EBD4D4',
   },
   errorText: {
     fontSize: 18,
@@ -524,7 +394,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: '600',
   },

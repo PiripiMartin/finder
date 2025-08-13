@@ -67,9 +67,11 @@ export default function Index() {
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
   
   // API state
   const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
+  const [savedLocations, setSavedLocations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(0);
@@ -181,13 +183,16 @@ export default function Index() {
       console.log('API response data:', data);
       
       // Safely extract and validate the data
-      const savedLocations = Array.isArray(data.savedLocations) ? data.savedLocations : [];
+      const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
       const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+      
+      // Update saved locations state
+      setSavedLocations(savedLocationsData);
       
       console.log('🔍 [fetchMapPoints] API Response Data:', {
         savedLocations: {
-          count: savedLocations.length,
-          data: savedLocations
+          count: savedLocationsData.length,
+          data: savedLocationsData
         },
         recommendedLocations: {
           count: recommendedLocations.length,
@@ -195,17 +200,21 @@ export default function Index() {
         }
       });
       
+      // Debug saved locations structure
+      if (savedLocationsData.length > 0) {
+        console.log('🔍 [fetchMapPoints] First saved location structure:', savedLocationsData[0]);
+        console.log('🔍 [fetchMapPoints] Saved location IDs:', savedLocationsData.map((s: any) => s.location?.id));
+      }
+      
       // Combine saved and recommended locations
-      const allLocations = [...savedLocations, ...recommendedLocations];
+      const allLocations = [...savedLocationsData, ...recommendedLocations];
       
       console.log('📊 [fetchMapPoints] Combined Locations:', {
         totalCount: allLocations.length,
         allLocations: allLocations
       });
       
-      if (allLocations.length === 0) {
-        throw new Error('No locations returned from API');
-      }
+      
       
       // Transform locations to MapPoint format with error handling
       console.log('🔄 [fetchMapPoints] Starting data transformation...');
@@ -238,10 +247,7 @@ export default function Index() {
         mapPoints: transformedMapPoints
       });
       
-      if (transformedMapPoints.length === 0) {
-        throw new Error('No valid locations after transformation');
-      }
-      
+     
       setMapPoints(transformedMapPoints);
       setError(null); // Clear any previous errors
       setLastRefresh(Date.now()); // Update last refresh timestamp
@@ -394,15 +400,22 @@ export default function Index() {
       console.log('Manual refresh - API response data:', data);
       
       // Safely extract and validate the data
-      const savedLocations = Array.isArray(data.savedLocations) ? data.savedLocations : [];
+      const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
       const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
       
-      // Combine saved and recommended locations
-      const allLocations = [...savedLocations, ...recommendedLocations];
+      // Update saved locations state
+      setSavedLocations(savedLocationsData);
       
-      if (allLocations.length === 0) {
-        throw new Error('No locations returned from API');
+      // Debug saved locations structure
+      if (savedLocationsData.length > 0) {
+        console.log('🔍 [Manual Refresh] First saved location structure:', savedLocationsData[0]);
+        console.log('🔍 [Manual Refresh] Saved location IDs:', savedLocationsData.map((s: any) => s.location?.id));
       }
+      
+      // Combine saved and recommended locations
+      const allLocations = [...savedLocationsData, ...recommendedLocations];
+      
+      
       
       // Transform locations to MapPoint format with error handling
       const transformedMapPoints: MapPoint[] = allLocations.map((item: any) => {
@@ -454,11 +467,58 @@ export default function Index() {
     return emojiLabels[emoji] || 'Unknown';
   };
 
-  // Get unique marker types from emojis
+
+
+  // Filtered map points based on active filter and saved locations
+  const filteredMapPoints = useMemo(() => {
+    let filtered = mapPoints;
+    
+    // Apply emoji filter
+    if (activeFilter) {
+      filtered = filtered.filter(point => point.emoji === activeFilter);
+    }
+    
+    // Apply saved locations filter
+    if (showSavedOnly) {
+      console.log('🔍 [Filter] Applying saved locations filter...');
+      console.log('🔍 [Filter] Saved locations count:', savedLocations.length);
+      console.log('🔍 [Filter] Map points count:', mapPoints.length);
+      console.log('🔍 [Filter] Saved locations:', savedLocations.map(s => ({ id: s.location?.id, title: s.location?.title })));
+      console.log('🔍 [Filter] Map points:', mapPoints.map(p => ({ id: p.id, title: p.title })));
+      
+      filtered = filtered.filter(point => {
+        const isSaved = savedLocations.some(saved => {
+          const savedId = String(saved.location?.id);
+          const pointId = String(point.id);
+          const matches = savedId === pointId;
+          if (matches) {
+            console.log('✅ [Filter] Found saved location match:', { savedId, pointId, title: point.title });
+          }
+          return matches;
+        });
+        return isSaved;
+      });
+      
+      console.log('🔍 [Filter] Filtered points count:', filtered.length);
+    }
+    
+    return filtered;
+  }, [mapPoints, activeFilter, showSavedOnly, savedLocations]);
+
+  // Function to clear all filters
+  const clearAllFilters = () => {
+    setActiveFilter(null);
+    setShowSavedOnly(false);
+  };
+
+  // Get unique marker types from emojis - only show emojis of currently visible points
   const markerTypes = useMemo(() => {
     const emojiCounts: { [key: string]: number } = {};
     
-    mapPoints.forEach(point => {
+    // Use filteredMapPoints instead of mapPoints to only show emojis of visible locations
+    const pointsToAnalyze = filteredMapPoints.length > 0 ? filteredMapPoints : mapPoints;
+    
+    pointsToAnalyze.forEach(point => {
       if (emojiCounts[point.emoji]) {
         emojiCounts[point.emoji]++;
       } else {
@@ -488,12 +548,7 @@ export default function Index() {
     }
     
     return types;
-  }, [mapPoints]);
-
-  // Filtered map points based on active filter
-  const filteredMapPoints = activeFilter
-    ? mapPoints.filter(point => point.emoji === activeFilter)
-    : mapPoints;
+  }, [filteredMapPoints, mapPoints]);
 
   // Clear selection if selected marker is no longer visible after filtering
   useEffect(() => {
@@ -773,8 +828,8 @@ export default function Index() {
         style={[
           styles.locationButton,
           {
-            top: insets.top + 20,
-            left: insets.left + 20,
+            top: insets.top + 30,
+            left: insets.left + 30,
           }
         ]}
         onPress={() => {
@@ -785,7 +840,7 @@ export default function Index() {
           setSelectedMarkerId(null);
         }}
       >
-        <Ionicons name="navigate" size={24} color="#007AFF" />
+        <Ionicons name="navigate" size={28} color="#4E8886" />
       </TouchableOpacity>
 
       {/* Refresh Button - Top Right */}
@@ -803,7 +858,7 @@ export default function Index() {
         <Ionicons 
           name="refresh" 
           size={24} 
-          color={isLoading ? "#999" : "#007AFF"} 
+          color={isLoading ? "#999" : "#4E8886"} 
         />
       </TouchableOpacity>
 
@@ -823,7 +878,7 @@ export default function Index() {
           DeepLinkHandler.handleTikTokShare(testUrl);
         }}
       >
-        <Ionicons name="link" size={24} color="#007AFF" />
+        <Ionicons name="link" size={24} color="#4E8886" />
       </TouchableOpacity>
 
       {/* Clear Token Button - Top Center Right */}
@@ -856,25 +911,32 @@ export default function Index() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterScrollContent}
         >
-          {/* All Filter Button */}
+          {/* Saved Locations Filter Button */}
           <TouchableOpacity
             style={[
               styles.filterButton,
               {
-                backgroundColor: activeFilter === null ? theme.colors.primary : theme.colors.surface,
-                borderColor: activeFilter === null ? theme.colors.primary : theme.colors.border,
+                backgroundColor: showSavedOnly ? theme.colors.primary : theme.colors.surface,
+                borderColor: showSavedOnly ? theme.colors.primary : theme.colors.border,
               }
             ]}
-            onPress={() => setActiveFilter(null)}
+            onPress={() => {
+              const newShowSavedOnly = !showSavedOnly;
+              console.log('🔍 [Filter Toggle] Toggling saved locations filter:', { 
+                from: showSavedOnly, 
+                to: newShowSavedOnly,
+                savedLocationsCount: savedLocations.length,
+                mapPointsCount: mapPoints.length
+              });
+              setShowSavedOnly(newShowSavedOnly);
+              setActiveFilter(null); // Clear emoji filter when toggling saved filter
+            }}
           >
-            <Text style={[
-              styles.filterButtonText,
-              { color: activeFilter === null ? '#ffffff' : theme.colors.text }
-            ]}>
-              All
-            </Text>
+            <Text style={styles.filterButtonText}>Saved</Text>
           </TouchableOpacity>
+          
 
+          
           {/* Type-specific Filter Buttons */}
           {markerTypes.map((type) => (
             <TouchableOpacity
@@ -908,7 +970,7 @@ export default function Index() {
         >
           {/* Shop Button with Arrow */}
           <TouchableOpacity
-            style={[styles.shopButton, { backgroundColor: '#ffffff' }]}
+            style={[styles.shopButton, { backgroundColor: '#FFF0F0' }]}
             onPress={() => {
               // Log the "Check it out" process
               console.log('=== "Check it out" Button Tapped ===');
@@ -1013,11 +1075,11 @@ const styles = StyleSheet.create({
     height: Dimensions.get('window').height,
   },
   customMarker: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFF0F0',
     borderRadius: 16,
     padding: 6,
     borderWidth: 1,
-    borderColor: '#007AFF',
+            borderColor: '#4E8886',
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1111,10 +1173,10 @@ const styles = StyleSheet.create({
   },
   locationButton: {
     position: 'absolute',
-    backgroundColor: 'white',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
+    backgroundColor: '#FFF0F0',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1125,7 +1187,7 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     position: 'absolute',
-    backgroundColor: 'white',
+    backgroundColor: '#FFF0F0',
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -1139,7 +1201,7 @@ const styles = StyleSheet.create({
   },
   testButton: {
     position: 'absolute',
-    backgroundColor: 'white',
+    backgroundColor: '#FFF0F0',
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -1153,7 +1215,7 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     position: 'absolute',
-    backgroundColor: 'white',
+    backgroundColor: '#FFF0F0',
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -1186,14 +1248,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'transparent',
+    marginRight: 2,
   },
   filterEmoji: {
     fontSize: 18,
     marginRight: 5,
   },
   filterButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 18,
+    
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1220,19 +1283,19 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+            backgroundColor: '#4E8886',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: '#FFF0F0',
     fontSize: 16,
     fontWeight: 'bold',
   },
   customLabel: {
     position: 'absolute',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFF0F0',
     padding: 8,
     borderRadius: 6,
     zIndex: 1000,
@@ -1243,7 +1306,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+            borderColor: '#835858',
   },
   labelTitle: {
     color: '#000000',
@@ -1253,7 +1316,7 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   labelDescription: {
-    color: '#666666',
+            color: '#835858',
     fontSize: 8, // Smaller font
     textAlign: 'center',
     lineHeight: 10,
