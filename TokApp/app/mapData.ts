@@ -5,6 +5,11 @@ export interface MapPoint {
   emoji: string;
   latitude: number;
   longitude: number;
+  isValidLocation: number;
+  websiteUrl: string | null;
+  phoneNumber: string | null;
+  address: string | null;
+  createdAt: string;
   videoUrl?: string; // Optional video URL from API response
 }
 
@@ -16,6 +21,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '☕',
     latitude: -37.8136,
     longitude: 144.9631,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '2',
@@ -24,6 +34,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🧋',
     latitude: -37.7950,
     longitude: 144.9500,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '3',
@@ -32,6 +47,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🫖',
     latitude: -37.8300,
     longitude: 144.9800,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '4',
@@ -40,6 +60,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '☕',
     latitude: -37.8150,
     longitude: 144.9650,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '5',
@@ -48,6 +73,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🧋',
     latitude: -37.8000,
     longitude: 144.9750,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '6',
@@ -56,6 +86,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🫖',
     latitude: -37.8250,
     longitude: 144.9450,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '7',
@@ -64,6 +99,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '☕',
     latitude: -37.8100,
     longitude: 144.9550,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '8',
@@ -72,6 +112,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🫖',
     latitude: -37.8200,
     longitude: 144.9700,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '9',
@@ -80,6 +125,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '☕',
     latitude: -37.8050,
     longitude: 144.9600,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '10',
@@ -88,6 +138,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🫖',
     latitude: -37.8350,
     longitude: 144.9650,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '11',
@@ -96,6 +151,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🧋',
     latitude: -37.7900,
     longitude: 144.9400,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '12',
@@ -104,6 +164,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '☕',
     latitude: -37.8400,
     longitude: 144.9750,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '13',
@@ -112,6 +177,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🫖',
     latitude: -37.8450,
     longitude: 144.9850,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '14',
@@ -120,6 +190,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '☕',
     latitude: -37.8000,
     longitude: 144.9350,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '15',
@@ -128,6 +203,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🧋',
     latitude: -37.8500,
     longitude: 144.9700,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '16',
@@ -136,6 +216,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '☕',
     latitude: -37.8600,
     longitude: 144.9900,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '17',
@@ -144,6 +229,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🫖',
     latitude: -37.7850,
     longitude: 144.9450,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '18',
@@ -152,6 +242,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '☕',
     latitude: -37.8550,
     longitude: 144.9550,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '19',
@@ -160,6 +255,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🧋',
     latitude: -37.7950,
     longitude: 144.9700,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
   {
     id: '20',
@@ -168,6 +268,11 @@ export const mapPoints: MapPoint[] = [
     emoji: '🫖',
     latitude: -37.8250,
     longitude: 144.9500,
+    isValidLocation: 1,
+    websiteUrl: null,
+    phoneNumber: null,
+    address: null,
+    createdAt: '2025-01-10T03:14:49.000Z',
   },
 ];
 
