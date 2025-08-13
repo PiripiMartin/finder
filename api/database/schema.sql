@@ -28,10 +28,17 @@ CREATE TABLE IF NOT EXISTS map_points (
     description TEXT,
     emoji VARCHAR(16) NOT NULL,
     location POINT NOT NULL,
+    is_valid_location BOOLEAN NOT NULL,
     recommendable BOOLEAN NOT NULL DEFAULT FALSE,
-    SPATIAL INDEX idx_location (location),
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    /* Extra business information */
+    website_url VARCHAR(2048),
+    phone_number VARCHAR(15),
+    address TEXT,
+
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    SPATIAL INDEX idx_location (location)
 );
 
 

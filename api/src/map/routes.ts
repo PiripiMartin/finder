@@ -87,6 +87,26 @@ export async function getSavedAndRecommendedLocations(req: BunRequest): Promise<
         getRecommendedLocationsWithTopPost(accountId, latitude, longitude)
     ]);
 
+    // Debug logging to ensure no overlap between saved and recommended locations
+    const savedIds = new Set(savedLocations.map(loc => loc.location.id));
+    const recommendedIds = new Set(recommendedLocations.map(loc => loc.location.id));
+    const overlap = [...savedIds].filter(id => recommendedIds.has(id));
+    
+    //if (overlap.length > 0) {
+    //    console.warn(`⚠️ WARNING: Found ${overlap.length} overlapping locations between saved and recommended:`, overlap);
+    //    console.warn('This should not happen - locations where user has posted should only appear in saved locations');
+    //}
+
+    //console.log(`📊 [getSavedAndRecommendedLocations] Response summary:`, {
+    //    accountId,
+    //    coordinates: { latitude, longitude },
+    //    savedCount: savedLocations.length,
+    //    recommendedCount: recommendedLocations.length,
+    //    overlapCount: overlap.length,
+    //    savedIds: Array.from(savedIds),
+    //    recommendedIds: Array.from(recommendedIds)
+    //});
+
     return new Response(
         JSON.stringify({savedLocations, recommendedLocations}), 
         {status: 200, headers: {'Content-Type': 'application/json'}}
