@@ -354,11 +354,6 @@ export default function Location() {
         <View style={[styles.heroSection, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.heroContent}>
             <Text style={[styles.locationName, { color: theme.colors.text }]}>{locationData.title}</Text>
-            <Text style={[styles.category, { color: theme.colors.primary }]}>{locationData.emoji}</Text>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={[styles.rating, { color: theme.colors.text }]}>4.5</Text>
-            </View>
           </View>
         </View>
 
@@ -551,7 +546,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 12,
   },
   backButton: {
     padding: 8,
@@ -569,7 +564,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroSection: {
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#835858',
   },
@@ -579,7 +574,7 @@ const styles = StyleSheet.create({
   locationName: {
     fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 0,
   },
   category: {
     fontSize: 16,
