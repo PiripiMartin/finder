@@ -15,8 +15,8 @@ interface SavedLocation {
     title: string;
     description: string;
     emoji: string;
-    latitude: number;
-    longitude: number;
+    latitude: number | null;
+    longitude: number | null;
   };
   topPost: {
     id: number;
@@ -37,6 +37,8 @@ export default function Saved() {
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+
 
   // Fetch saved locations from API
   const fetchSavedLocations = async () => {
@@ -122,13 +124,20 @@ export default function Saved() {
     }
   };
 
-  // Handle location tap - navigate to location page
+  // Handle location tap - navigate to location page or coordinate selection
   const handleLocationPress = (locationId: number) => {
     console.log('📍 [Saved] Location tapped:', locationId);
-    console.log('🚀 [Saved] Navigating to location page with ID:', locationId);
     
-    // Navigate to location page with the location ID
-    router.push(`/_location?id=${locationId}`);
+    const location = savedLocations.find(item => item.location.id === locationId);
+    if (location && (location.location.latitude === null || location.location.longitude === null)) {
+      console.log('⚠️ [Saved] Location has null coordinates, navigating to coordinate selection');
+      // Navigate to location page with coordinate selection flag
+      router.push(`/_location?id=${locationId}&needsCoordinates=true`);
+    } else {
+      console.log('🚀 [Saved] Navigating to location page with ID:', locationId);
+      // Navigate to normal location page
+      router.push(`/_location?id=${locationId}`);
+    }
   };
 
   // Refresh saved locations
@@ -255,7 +264,13 @@ export default function Saved() {
                       </Text>
                     </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                  <View style={styles.locationActions}>
+                    {/* Alert symbol for locations with null coordinates */}
+                    {(item.location.latitude === null || item.location.longitude === null) && (
+                      <Ionicons name="alert-circle" size={20} color="#ff6b6b" style={styles.alertIcon} />
+                    )}
+                    <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                  </View>
                 </View>
 
 
@@ -419,5 +434,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#835858',
+  },
+  locationActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  alertIcon: {
+    marginRight: 4,
   },
 }); 
