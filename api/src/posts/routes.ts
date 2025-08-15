@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
-import { extractPossibleLocationName, getTikTokEmbedInfo } from "./get-location";
+import { extractPossibleLocationName, getTikTokEmbedInfo, searchGooglePlaces } from "./get-location";
 
 
 interface NewPostRequest {
@@ -36,7 +36,18 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Error extracing location name from TikTok.", {status: 500});
     }
 
-    
+    const placesResult = await searchGooglePlaces(possiblePlaceName);
+    if (!placesResult) {
+        return new Response("Error searching Google Places.", {status: 500});
+    }
+
+    const placeId = placesResult.results[0].place_id;
+    if (!placeId) {
+        return new Response("Error finding place ID.", {status: 500});
+    }
+
+
+
     return new Response()
 }
 
