@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS user_sessions(
 
 CREATE TABLE IF NOT EXISTS map_points (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    google_place_id VARCHAR(255) UNIQUE, /* NOTE: UNIQUE still allows multiple nulls */
     title VARCHAR(100) NOT NULL,
     description TEXT,
     emoji VARCHAR(16) NOT NULL,
