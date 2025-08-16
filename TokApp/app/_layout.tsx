@@ -2,6 +2,7 @@ import { Stack, useRouter } from "expo-router";
 import { useEffect } from 'react';
 import { Linking } from 'react-native';
 import { AuthProvider } from './context/AuthContext';
+import { LocationProvider } from './context/LocationContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { DeepLinkHandler } from './utils/deepLinkHandler';
 
@@ -37,21 +38,23 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Stack 
-          screenOptions={{ 
-            headerShown: false,
-            animation: 'slide_from_left',
-          }}
-        >
-          <Stack.Screen name="auth" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen 
-            name="_location" 
-            options={{
+        <LocationProvider>
+          <Stack 
+            screenOptions={{ 
+              headerShown: false,
               animation: 'slide_from_left',
             }}
-          />
-        </Stack>
+          >
+            <Stack.Screen name="auth" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen 
+              name="_location" 
+              options={{
+                animation: 'slide_from_left',
+              }}
+            />
+          </Stack>
+        </LocationProvider>
       </AuthProvider>
     </ThemeProvider>
   );

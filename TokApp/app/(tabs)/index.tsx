@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { getApiUrl, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
+import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
 import { MapPoint } from '../mapData';
 import { DeepLinkHandler } from '../utils/deepLinkHandler';
@@ -63,6 +64,7 @@ export default function Index() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
   const { sessionToken, logout } = useAuth();
+  const { setSavedLocations: setContextSavedLocations, setRecommendedLocations: setContextRecommendedLocations } = useLocationContext();
   const insets = useSafeAreaInsets();
 
   // Filter state
@@ -188,6 +190,9 @@ export default function Index() {
       
       // Update saved locations state
       setSavedLocations(savedLocationsData);
+      // Also update the context for sharing with other components
+      setContextSavedLocations(savedLocationsData);
+      setContextRecommendedLocations(recommendedLocations);
       
       console.log('🔍 [fetchMapPoints] API Response Data:', {
         savedLocations: {
@@ -235,6 +240,11 @@ export default function Index() {
           emoji: item.location.emoji || '📍',
           latitude: Number(item.location.latitude),
           longitude: Number(item.location.longitude),
+          isValidLocation: Number(item.location.isValidLocation) || 0,
+          websiteUrl: item.location.websiteUrl || null,
+          phoneNumber: item.location.phoneNumber || null,
+          address: item.location.address || null,
+          createdAt: item.location.createdAt || new Date().toISOString(),
           videoUrl: item.topPost?.url || '',
         };
         
@@ -339,6 +349,11 @@ export default function Index() {
         emoji: item.location.emoji,
         latitude: item.location.latitude,
         longitude: item.location.longitude,
+        isValidLocation: 1,
+        websiteUrl: null,
+        phoneNumber: null,
+        address: null,
+        createdAt: new Date().toISOString(),
         videoUrl: item.topPost.url,
       }));
       
@@ -405,6 +420,9 @@ export default function Index() {
       
       // Update saved locations state
       setSavedLocations(savedLocationsData);
+      // Also update the context for sharing with other components
+      setContextSavedLocations(savedLocationsData);
+      setContextRecommendedLocations(recommendedLocations);
       
       // Debug saved locations structure
       if (savedLocationsData.length > 0) {
@@ -432,6 +450,11 @@ export default function Index() {
           emoji: item.location.emoji || '📍',
           latitude: Number(item.location.latitude),
           longitude: Number(item.location.longitude),
+          isValidLocation: Number(item.location.isValidLocation) || 0,
+          websiteUrl: item.location.websiteUrl || null,
+          phoneNumber: item.location.phoneNumber || null,
+          address: item.location.address || null,
+          createdAt: item.location.createdAt || new Date().toISOString(),
           videoUrl: item.topPost?.url || '',
         };
       }).filter(Boolean) as MapPoint[]; // Remove null entries

@@ -6,6 +6,7 @@ import MapView, { Marker } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
 import { API_CONFIG, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
+import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
@@ -13,14 +14,16 @@ const tileWidth = (width - 30) / 2; // Less padding within video grid
 
 interface LocationData {
   id: string;
-  name: string;
+  title: string;
   description: string;
-  address: string;
-  category: string;
-  rating: number;
-  hours: string;
-  phone: string;
-  website: string;
+  emoji: string;
+  latitude: number;
+  longitude: number;
+  isValidLocation: number;
+  websiteUrl: string | null;
+  phoneNumber: string | null;
+  address: string | null;
+  createdAt: string;
   tiktokVideos: string[];
 }
 
@@ -35,38 +38,44 @@ interface VideoPost {
 const mockLocationData: { [key: string]: LocationData } = {
   '1': {
     id: '1',
-    name: 'Coffee Haven',
+    title: 'Coffee Haven',
     description: 'A cozy coffee shop known for its artisanal brews and creative latte art. Perfect spot for coffee enthusiasts and remote workers.',
+    emoji: '☕',
+    latitude: -37.8136,
+    longitude: 144.9631,
+    isValidLocation: 1,
+    websiteUrl: 'coffeehaven.com',
+    phoneNumber: '(555) 123-4567',
     address: '123 Main Street, Downtown, City',
-    category: 'Coffee Shop',
-    rating: 4.8,
-    hours: 'Mon-Fri: 7AM-7PM, Sat-Sun: 8AM-6PM',
-    phone: '(555) 123-4567',
-    website: 'coffeehaven.com',
+    createdAt: '2025-01-10T03:14:49.000Z',
     tiktokVideos: ['1', '2', '3', '4', '5', '6']
   },
   '2': {
     id: '2',
-    name: 'Bubble Tea Paradise',
+    title: 'Bubble Tea Paradise',
     description: 'The ultimate destination for bubble tea lovers with over 50 unique flavors and customizable toppings.',
+    emoji: '🧋',
+    latitude: -37.7950,
+    longitude: 144.9500,
+    isValidLocation: 1,
+    websiteUrl: 'bubbleteaparadise.com',
+    phoneNumber: '(555) 234-5678',
     address: '456 Oak Avenue, Midtown, City',
-    category: 'Bubble Tea',
-    rating: 4.6,
-    hours: 'Daily: 10AM-10PM',
-    phone: '(555) 234-5678',
-    website: 'bubbleteaparadise.com',
+    createdAt: '2025-01-10T03:14:49.000Z',
     tiktokVideos: ['7', '8', '9', '10', '11', '12']
   },
   '3': {
     id: '3',
-    name: 'Tea Garden',
+    title: 'Tea Garden',
     description: 'Traditional tea house offering authentic tea ceremonies and premium loose-leaf teas from around the world.',
+    emoji: '🫖',
+    latitude: -37.8300,
+    longitude: 144.9800,
+    isValidLocation: 1,
+    websiteUrl: 'teagarden.com',
+    phoneNumber: '(555) 345-6789',
     address: '789 Pine Street, Uptown, City',
-    category: 'Tea House',
-    rating: 4.9,
-    hours: 'Tue-Sun: 11AM-8PM, Closed Monday',
-    phone: '(555) 345-6789',
-    website: 'teagarden.com',
+    createdAt: '2025-01-10T03:14:49.000Z',
     tiktokVideos: ['13', '14', '15', '16', '17', '18']
   }
 };
@@ -76,6 +85,7 @@ export default function Location() {
   const { id, needsCoordinates } = useLocalSearchParams();
   const { theme } = useTheme();
   const { sessionToken } = useAuth();
+  const { findLocationById } = useLocationContext();
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [videos, setVideos] = useState<VideoPost[]>([]);
@@ -144,21 +154,42 @@ export default function Location() {
     
     if (id) {
       console.log('🔍 Looking up location data for ID:', id);
-      const data = mockLocationData[id as string];
-      console.log('Found location data:', data);
       
-      if (data) {
-        console.log('✅ Setting location data and fetching videos');
-        setLocationData(data);
-        // Fetch videos for this location
-        // 🚀 NOTE: Videos are now pre-fetched when marker is tapped for better performance!
-        fetchLocationVideos(data.id);
+      // Try to find the location in the stored locations first
+      // This will be populated from the API call in the index page
+      const storedLocation = findLocationById(id as string);
+      
+      if (storedLocation) {
+        console.log('✅ Found location in stored data:', storedLocation);
+        // Transform StoredLocation to LocationData format
+        const transformedLocation: LocationData = {
+          id: String(storedLocation.location.id),
+          title: storedLocation.location.title,
+          description: storedLocation.location.description,
+          emoji: storedLocation.location.emoji,
+          latitude: storedLocation.location.latitude || 0,
+          longitude: storedLocation.location.longitude || 0,
+          isValidLocation: storedLocation.location.isValidLocation,
+          websiteUrl: storedLocation.location.websiteUrl,
+          phoneNumber: storedLocation.location.phoneNumber,
+          address: storedLocation.location.address,
+          createdAt: storedLocation.location.createdAt,
+          tiktokVideos: [storedLocation.topPost.url], // Use the topPost URL as the video
+        };
+        setLocationData(transformedLocation);
+        fetchLocationVideos(transformedLocation.id);
       } else {
-        // If no data found, use a default location but fetch videos for the actual ID
-        console.log('⚠️ No data found for ID, using default location data but fetching videos for actual ID:', id);
-        setLocationData(mockLocationData['1']);
-        // Always fetch videos for the actual location ID from the URL
-        fetchLocationVideos(id as string);
+        // Fallback to mock data if not found in stored locations
+        console.log('⚠️ Location not found in stored data, using mock data as fallback');
+        const mockData = mockLocationData[id as string];
+        if (mockData) {
+          setLocationData(mockData);
+          fetchLocationVideos(mockData.id);
+        } else {
+          // If no mock data either, use default
+          setLocationData(mockLocationData['1']);
+          fetchLocationVideos(id as string);
+        }
       }
     } else {
       // If no ID provided, use default location
@@ -216,7 +247,7 @@ export default function Location() {
   };
 
   const openDirections = () => {
-    if (locationData) {
+    if (locationData && locationData.address) {
       const address = encodeURIComponent(locationData.address);
       
       if (Platform.OS === 'ios') {
@@ -322,12 +353,7 @@ export default function Location() {
         {/* Hero Section */}
         <View style={[styles.heroSection, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.heroContent}>
-            <Text style={[styles.locationName, { color: theme.colors.text }]}>{locationData.name}</Text>
-            <Text style={[styles.category, { color: theme.colors.primary }]}>{locationData.category}</Text>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={[styles.rating, { color: theme.colors.text }]}>{locationData.rating}</Text>
-            </View>
+            <Text style={[styles.locationName, { color: theme.colors.text }]}>{locationData.title}</Text>
           </View>
         </View>
 
@@ -348,17 +374,17 @@ export default function Location() {
           
           <View style={styles.contactItem}>
             <Ionicons name="time" size={20} color={theme.colors.primary} />
-            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.hours}</Text>
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>Mon-Fri: 9AM-6PM</Text>
           </View>
           
           <View style={styles.contactItem}>
             <Ionicons name="call" size={20} color={theme.colors.primary} />
-            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.phone}</Text>
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.phoneNumber || 'Not available'}</Text>
           </View>
           
           <View style={styles.contactItem}>
             <Ionicons name="globe" size={20} color={theme.colors.primary} />
-            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.website}</Text>
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.websiteUrl || 'Not available'}</Text>
           </View>
           
           {/* Directions Button */}
@@ -520,7 +546,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 12,
   },
   backButton: {
     padding: 8,
@@ -538,7 +564,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroSection: {
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#835858',
   },
@@ -548,7 +574,7 @@ const styles = StyleSheet.create({
   locationName: {
     fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 0,
   },
   category: {
     fontSize: 16,
