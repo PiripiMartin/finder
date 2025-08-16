@@ -17,6 +17,11 @@ interface SavedLocation {
     emoji: string;
     latitude: number | null;
     longitude: number | null;
+    isValidLocation: number;
+    websiteUrl: string | null;
+    phoneNumber: string | null;
+    address: string | null;
+    createdAt: string;
   };
   topPost: {
     id: number;
