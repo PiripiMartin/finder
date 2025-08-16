@@ -6,11 +6,11 @@ files:
 hooks:
 # Install:
   AfterInstall:
-    - location: scripts/after_install.sh
+    - location: scripts/install.sh
       timeout: 300
-      runas: root
+      runas: ec2-user
   ApplicationStart:
-    - location: scripts/application_start.sh
+    - location: scripts/start.sh
       timeout: 300
-      runas: root
+      runas: ec2-user
 # ValidateService:
