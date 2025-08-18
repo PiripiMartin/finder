@@ -178,6 +178,37 @@ export async function getProfileData(req: BunRequest): Promise<Response> {
 }
 
 
+export async function deleteUserAccount(req: BunRequest): Promise<Response> {
+    
+    // Check user is authed
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", {status: 401});
+    }
+    const maybeUserId = await verifySessionToken(sessionToken);
 
+    if (!maybeUserId) {
+        return new Response("Invalid session token", {status: 401});
+    }
+
+    // Send delete request to the DB
+    await db.execute(
+        "DELETE FROM users WHERE id = ?;",
+        [maybeUserId]
+    );
+
+    // Verify deletion
+    const [verifyRows, _] = await db.execute(
+        "SELECT COUNT(*) as count FROM users WHERE id = ?;",
+        [maybeUserId]
+    ) as [any[], any];
+
+    const deleted = (verifyRows?.[0]?.count ?? 0) === 0;
+
+    return new Response(
+        JSON.stringify({ deleted }),
+        { status: deleted ? 200 : 500, headers: { "Content-Type": "application/json" } }
+    );
+}
 
 
