@@ -3,7 +3,7 @@ import mysql from "mysql2/promise";
 
 // Generate connection from environment variables
 // TODO: Change to a connection pool when scaling out
-export const db = await mysql.createConnection({
+export const db = mysql.createPool({
     host: env.DBHOST,
     user: env.DBUSERNAME,
     password: env.DBPASSWORD,
