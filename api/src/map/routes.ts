@@ -1,4 +1,5 @@
 import type { BunRequest } from "bun";
+import { db } from "../database";
 import { verifySessionToken } from "../user/session";
 import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, getSavedLocationsWithTopPost } from "./queries";
 
@@ -113,3 +114,23 @@ export async function getSavedAndRecommendedLocations(req: BunRequest): Promise<
     );
 }
 
+export async function blockLocation(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", {status: 401});
+    }
+    const accountId = await verifySessionToken(sessionToken);
+    if (accountId == null) {
+        return new Response("Invalid session token", {status: 401});
+    }
+
+    const id: number = parseInt((req.params as any).id);
+    if (!id) {
+        return new Response("Missing map point id", {status: 400});
+    }
+
+    // Update the map point to be unrecommendable
+    await db.execute("UPDATE map_points SET recommendable = FALSE WHERE id = ?", [id]);
+    
+    return new Response(null, {status: 200});
+}
