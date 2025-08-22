@@ -23,6 +23,8 @@ interface GeminiResponse {
     }>;
 }
 
+// TODO: Create a type for the Google places text search response format
+
 
 export async function getTikTokEmbedInfo(vidUrl: string): Promise<EmbedResponse | null> {
 
