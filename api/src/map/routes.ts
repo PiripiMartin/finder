@@ -134,3 +134,31 @@ export async function blockLocation(req: BunRequest): Promise<Response> {
     
     return new Response(null, {status: 200});
 }
+
+export async function getGuestRecommendations(req: BunRequest): Promise<Response> {
+
+    // NOTE: we're not checking for authentication here, since it's for non-authenticated 'guest users'
+
+
+    // Get the provided coordinates
+    const url = new URL(req.url);
+    if (!url.searchParams.has("lat") || !url.searchParams.has("lon")) {
+        return new Response("Missing coordinates", {status: 400});
+    }
+
+    const latitude = parseFloat(url.searchParams.get("lat") || "0");
+    const longitude = parseFloat(url.searchParams.get("lon") || "0");
+
+    // If the account ID is -1, then there will be no match for saved posts, and everything will be recommendable
+    const accountId = -1;
+    const recommendedLocations = await getRecommendedLocationsWithTopPost(accountId, latitude, longitude);
+
+
+    return new Response(
+        JSON.stringify(recommendedLocations),
+        {status: 200, headers: {'Content-Type': 'application/json'}}
+    );
+}
+
+
+
