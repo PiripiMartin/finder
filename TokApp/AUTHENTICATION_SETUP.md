@@ -1,6 +1,6 @@
 # Authentication System Setup
 
-This document explains how to set up and use the authentication system in your TokApp.
+This document explains how to set up and use the authentication system in your lai.
 
 ## Overview
 

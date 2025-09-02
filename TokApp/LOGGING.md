@@ -2,7 +2,7 @@
 
 ## Overview
 
-The TokApp now includes a comprehensive logging system that provides detailed visibility into the create account functionality and other authentication processes. This system helps with debugging, monitoring user interactions, and tracking API calls.
+The lai now includes a comprehensive logging system that provides detailed visibility into the create account functionality and other authentication processes. This system helps with debugging, monitoring user interactions, and tracking API calls.
 
 ## Logger Utility
 

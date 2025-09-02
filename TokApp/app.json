@@ -1,26 +1,44 @@
 {
   "expo": {
-    "name": "TokApp",
-    "slug": "TokApp",
-    "version": "1.0.0",
+    "name": "lai",
+    "slug": "lai",
+    "owner": "buffalodawg",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tokapp",
+    "scheme": "lai",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "buildNumber": "11",
       "infoPlist": {
         "CFBundleURLTypes": [
           {
             "CFBundleURLName": "TikTok Share",
-            "CFBundleURLSchemes": ["tokapp"]
+            "CFBundleURLSchemes": [
+              "dew"
+            ]
+          },
+          {
+            "CFBundleURLName": "TikTok Share",
+            "CFBundleURLSchemes": [
+              "dew"
+            ]
           }
         ],
-        "LSApplicationQueriesSchemes": ["tiktok"]
-      }
+        "LSApplicationQueriesSchemes": [
+          "tiktok",
+          "tiktok"
+        ],
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "This app needs your location to show nearby places on the map."
+      },
+      "bundleIdentifier": "com.piripimartin.dew"
     },
     "android": {
+      "package": "com.yourcompany.dew",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFF0F0"
@@ -32,10 +50,13 @@
           "autoVerify": true,
           "data": [
             {
-              "scheme": "tokapp"
+              "scheme": "lai"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -58,6 +79,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d09519d6-87e9-469e-a58d-0f8bcc78a51f"
+      }
     }
   }
 }

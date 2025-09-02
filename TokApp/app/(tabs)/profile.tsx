@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -14,7 +14,7 @@ interface ProfileData {
 
 export default function Profile() {
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
-  const { logout, sessionToken } = useAuth();
+  const { sessionToken, isGuest, logout } = useAuth();
   const router = useRouter();
   
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -71,11 +71,44 @@ export default function Profile() {
     }
   };
 
-  // Refresh profile data
-  const handleRefresh = () => {
-    console.log('🔄 [Profile] Refreshing profile data...');
-    fetchProfileData();
+  // Delete account
+  const handleDeleteAccount = async () => {
+    try {
+      console.log('👤 [Profile] Deleting account...');
+      const apiUrl = `${API_CONFIG.BASE_URL}/delete-account`;
+      console.log('🌐 [Profile] DELETE URL:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        },
+      });
+
+      console.log('📥 [Profile] Delete Response:', {
+        status: response.status,
+        ok: response.ok,
+        timestamp: new Date().toISOString()
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Redirect to login after successful deletion
+      router.replace('/auth/login');
+    } catch (error) {
+      console.error('👤 [Profile] Error deleting account:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete account');
+    }
   };
+
+  const handleLogout = () => {
+    logout();
+    router.replace('/auth/login');
+  };
+
 
   useEffect(() => {
     console.log('👤 [Profile] Page loaded, fetching profile data...');
@@ -98,6 +131,33 @@ export default function Profile() {
     );
   }
 
+  // Show guest message if user is not authenticated
+  if (isGuest) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.guestContainer}>
+          <Ionicons name="person-outline" size={80} color={theme.colors.textSecondary} />
+          <Text style={[styles.guestTitle, { color: theme.colors.text }]}>Login to Access Profile</Text>
+          <Text style={[styles.guestSubtitle, { color: theme.colors.textSecondary }]}>
+            Create an account or sign in to access your profile, saved locations, and preferences.
+          </Text>
+          <TouchableOpacity
+            style={[styles.loginButton, { backgroundColor: theme.colors.primary }]}
+            onPress={() => router.push('/auth/login')}
+          >
+            <Text style={[styles.loginButtonText, { color: theme.colors.surface }]}>Login</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.createAccountButton, { borderColor: theme.colors.primary }]}
+            onPress={() => router.push('/auth/create-account')}
+          >
+            <Text style={[styles.createAccountButtonText, { color: theme.colors.primary }]}>Create Account</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   if (error) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -107,7 +167,7 @@ export default function Profile() {
           <Text style={[styles.errorSubtext, { color: theme.colors.textSecondary }]}>{error}</Text>
           <TouchableOpacity 
             style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
-            onPress={handleRefresh}
+            onPress={fetchProfileData}
           >
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
@@ -120,14 +180,6 @@ export default function Profile() {
     <ScrollView 
       style={[styles.container, { backgroundColor: theme.colors.background }]} 
       showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={isLoading}
-          onRefresh={handleRefresh}
-          colors={[theme.colors.primary]}
-          tintColor={theme.colors.primary}
-        />
-      }
     >
       {/* Header with Avatar */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
@@ -146,7 +198,7 @@ export default function Profile() {
         
         {!profileData && (
           <Text style={[styles.bio, { color: theme.colors.textSecondary, marginTop: 8 }]}>
-            Tap refresh to load your profile
+            Loading profile...
           </Text>
         )}
         
@@ -163,73 +215,52 @@ export default function Profile() {
             </Text>
           </View>
         )}
-
-        {/* Edit Profile Button - Placeholder for future functionality */}
-        <TouchableOpacity 
-          style={[styles.editProfileButton, { backgroundColor: theme.colors.primary, opacity: 0.6 }]}
-          disabled={true}
-        >
-          <Text style={styles.editProfileText}>Edit Profile (Coming Soon)</Text>
-        </TouchableOpacity>
         
-        {/* Refresh Button */}
-        <TouchableOpacity 
-          style={[styles.refreshButton, { backgroundColor: theme.colors.primary }]}
-          onPress={handleRefresh}
-        >
-          <Ionicons name="refresh" size={20} color="#FFF0F0" />
-        </TouchableOpacity>
       </View>
 
       {/* Profile Sections */}
       <View style={styles.sectionsContainer}>
 
-        {/* Settings */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Settings</Text>
+        {/* Theme Toggle Section */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Appearance</Text>
           <View style={styles.settingsList}>
-            <View style={styles.settingItem}>
-              <Ionicons name="moon" size={20} color={theme.colors.text} />
-              <Text style={[styles.settingText, { color: theme.colors.text }]}>Dark Mode</Text>
+            <View style={[styles.settingItem, { backgroundColor: theme.colors.background }]}>
+              <View style={styles.settingLeft}>
+                <Ionicons name="moon" size={20} color={theme.colors.textSecondary} />
+                <Text style={[styles.settingText, { color: theme.colors.text }]}>Dark Mode</Text>
+              </View>
               <Switch
                 value={isDarkMode}
                 onValueChange={toggleDarkMode}
                 trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                thumbColor={isDarkMode ? '#FFF0F0' : '#f4f3f4'}
+                thumbColor={isDarkMode ? theme.colors.surface : theme.colors.surface}
               />
             </View>
           </View>
         </View>
 
-        {/* Spacing between settings and logout */}
-        <View style={styles.spacer} />
+        {/* Logout Section */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Account</Text>
+          <View style={styles.settingsList}>
+            <TouchableOpacity 
+              style={[styles.logoutButton, { backgroundColor: theme.colors.primary }]}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out" size={20} color={theme.colors.surface} />
+              <Text style={[styles.logoutButtonText, { color: theme.colors.surface }]}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        {/* Logout Button */}
+        {/* Delete Account */}
         <TouchableOpacity 
-          style={[styles.logoutButton, { backgroundColor: '#B14D4D' }]}
-          onPress={() => {
-            Alert.alert(
-              'Logout',
-              'Are you sure you want to logout?',
-              [
-                {
-                  text: 'Cancel',
-                  style: 'cancel',
-                },
-                {
-                  text: 'Logout',
-                  style: 'destructive',
-                  onPress: async () => {
-                    await logout();
-                    router.replace('/auth/login');
-                  },
-                },
-              ]
-            );
-          }}
+          style={[styles.deleteButton, { backgroundColor: '#B14D4D' }]}
+          onPress={handleDeleteAccount}
         >
-          <Ionicons name="log-out-outline" size={20} color="#FFF0F0" />
-          <Text style={styles.logoutText}>Logout</Text>
+          <Ionicons name="trash-outline" size={20} color="#FFF0F0" />
+          <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -285,25 +316,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  editProfileButton: {
-    backgroundColor: '#4E8886',
-    paddingHorizontal: 24,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  editProfileText: {
-    color: '#FFF0F0',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  refreshButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 12,
-  },
   sectionsContainer: {
     padding: 20,
   },
@@ -328,21 +340,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#B14D4D',
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 20,
-    gap: 8,
-  },
-  logoutText: {
-    color: '#FFF0F0',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   spacer: {
     height: 20,
   },
@@ -352,7 +349,7 @@ const styles = StyleSheet.create({
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between', // Added to align switch to the right
+    justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderRadius: 8,
@@ -362,6 +359,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     marginLeft: 12,
+  },
+  settingLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    gap: 8,
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
@@ -395,6 +410,66 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: '#FFF0F0',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    gap: 8,
+  },
+  deleteText: {
+    color: '#FFF0F0',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  guestContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 60,
+  },
+  guestTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  guestSubtitle: {
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
+    opacity: 0.8,
+    lineHeight: 22,
+  },
+  loginButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 24,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  createAccountButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 16,
+    minWidth: 120,
+    alignItems: 'center',
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
+  createAccountButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },
