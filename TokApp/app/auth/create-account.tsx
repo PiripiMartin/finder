@@ -23,7 +23,7 @@ export default function CreateAccountScreen() {
   const [isLoading, setIsLoading] = useState(false);
   
   const router = useRouter();
-  const { createAccount } = useAuth();
+  const { createAccount, guestLogin } = useAuth();
   const { theme } = useTheme();
 
   // Log component mount
@@ -134,50 +134,38 @@ export default function CreateAccountScreen() {
   };
 
   const handleCreateAccount = async () => {
-    logger.userAction('CreateAccount', 'Create account button pressed');
-    
     if (!validateForm()) {
-      logger.warn('CreateAccount', 'Form validation failed, aborting account creation');
       return;
     }
 
-    logger.info('CreateAccount', 'Starting account creation process');
-    logger.debug('CreateAccount', 'Account details', {
-      username: username.trim(),
-      email: email.trim(),
-      passwordLength: password.length,
-      timestamp: new Date().toISOString()
-    });
-
-    logger.debug('CreateAccount', 'Setting loading state to true');
     setIsLoading(true);
-    
     try {
-      logger.info('CreateAccount', 'Calling createAccount API');
-      const startTime = Date.now();
-      const success = await createAccount(username.trim(), password, email.trim());
-      const endTime = Date.now();
-      
-      logger.info('CreateAccount', 'API call completed', { duration: endTime - startTime });
+      console.log('🔐 [CreateAccount] Starting account creation for username:', username, 'email:', email);
+      const success = await createAccount(username.trim(), password.trim(), email.trim());
+      console.log('✅ [CreateAccount] Account creation result:', success);
       
       if (success) {
-        logger.info('CreateAccount', 'Account creation successful, navigating to tabs');
+        console.log('🚀 [CreateAccount] Account creation successful, redirecting to main app');
         // Navigation will be handled by the auth context
         router.replace('/(tabs)');
       } else {
-        logger.warn('CreateAccount', 'Account creation failed - API returned false');
-        Alert.alert('Account Creation Failed', 'Username or email may already exist or an error occurred');
+        console.log('❌ [CreateAccount] Account creation failed, showing error alert');
+        Alert.alert('Account Creation Failed', 'Please try again with different credentials');
       }
     } catch (error) {
-      logger.error('CreateAccount', 'Error during account creation', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        timestamp: new Date().toISOString()
-      });
-      Alert.alert('Error', 'An error occurred while creating your account');
+      console.error('💥 [CreateAccount] Account creation error:', error);
+      Alert.alert('Error', 'An error occurred during account creation');
     } finally {
-      logger.debug('CreateAccount', 'Account creation process completed, setting loading to false');
       setIsLoading(false);
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    try {
+      await guestLogin();
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred while entering guest mode');
     }
   };
 
@@ -222,7 +210,7 @@ export default function CreateAccountScreen() {
       color: theme.colors.text,
     },
     createButton: {
-      backgroundColor: '#34C759',
+      backgroundColor: theme.colors.primary,
       borderRadius: 8,
       paddingVertical: 16,
       alignItems: 'center',
@@ -230,7 +218,7 @@ export default function CreateAccountScreen() {
       marginBottom: 20,
     },
     createButtonText: {
-      color: '#FFF0F0',
+      color: theme.colors.surface,
       fontSize: 18,
       fontWeight: '600',
     },
@@ -243,7 +231,21 @@ export default function CreateAccountScreen() {
       fontSize: 16,
     },
     disabledButton: {
-      backgroundColor: '#835858',
+      backgroundColor: theme.colors.textSecondary,
+      opacity: 0.6,
+    },
+    guestButton: {
+      backgroundColor: theme.colors.textSecondary,
+      borderRadius: 8,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginTop: 10,
+      marginBottom: 20,
+    },
+    guestButtonText: {
+      color: theme.colors.surface,
+      fontSize: 18,
+      fontWeight: '600',
     },
   });
 
@@ -324,6 +326,15 @@ export default function CreateAccountScreen() {
         >
           <Text style={styles.loginText}>
             Already have an account? Login
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.guestButton}
+          onPress={handleGuestLogin}
+        >
+          <Text style={styles.guestButtonText}>
+            Continue as Guest
           </Text>
         </TouchableOpacity>
       </ScrollView>

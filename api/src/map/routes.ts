@@ -151,7 +151,7 @@ export async function getGuestRecommendations(req: BunRequest): Promise<Response
 
     // If the account ID is -1, then there will be no match for saved posts, and everything will be recommendable
     const accountId = -1;
-    const recommendedLocations = await getRecommendedLocationsWithTopPost(accountId, latitude, longitude);
+    const recommendedLocations = await getRecommendedLocationsWithTopPost(accountId, latitude, longitude, 10, 20, { includeUnrecommendable: true });
 
 
     return new Response(
@@ -159,6 +159,7 @@ export async function getGuestRecommendations(req: BunRequest): Promise<Response
         {status: 200, headers: {'Content-Type': 'application/json'}}
     );
 }
+
 
 
 

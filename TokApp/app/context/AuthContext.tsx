@@ -5,10 +5,12 @@ import { logger } from '../utils/logger';
 
 interface AuthContextType {
   isAuthenticated: boolean;
+  isGuest: boolean;
   sessionToken: string | null;
   isLoading: boolean;
   login: (username: string, password: string, coordinates?: { latitude: number; longitude: number }) => Promise<boolean>;
   createAccount: (username: string, password: string, email: string) => Promise<boolean>;
+  guestLogin: () => Promise<void>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
 }
@@ -25,10 +27,26 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const SESSION_TOKEN_KEY = 'session_token';
+
+  const guestLogin = async () => {
+    logger.info('AuthContext', 'Starting guest login');
+    try {
+      setIsGuest(true);
+      setIsAuthenticated(false);
+      setSessionToken(null);
+      logger.info('AuthContext', 'Guest login completed successfully');
+    } catch (error) {
+      logger.error('AuthContext', 'Guest login error', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+  };
 
   const checkAuthStatus = async () => {
     logger.info('AuthContext', 'Checking authentication status');
@@ -48,25 +66,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           logger.info('AuthContext', 'Token validation successful, user authenticated');
           setSessionToken(token);
           setIsAuthenticated(true);
+          setIsGuest(false);
         } else {
           logger.warn('AuthContext', 'Token validation failed, removing invalid token');
           // Token is invalid, remove it
           await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
           setSessionToken(null);
           setIsAuthenticated(false);
+          setIsGuest(true); // Set guest mode when token is invalid
         }
       } else {
-        logger.debug('AuthContext', 'No stored session token found');
+        logger.debug('AuthContext', 'No stored session token found, setting guest mode');
+        setIsGuest(true); // Set guest mode when no token exists
+        setIsAuthenticated(false);
+        setSessionToken(null);
       }
     } catch (error) {
       logger.error('AuthContext', 'Error checking auth status', {
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined
       });
-      // On error, assume not authenticated
+      // On error, assume not authenticated and set guest mode
       await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
       setSessionToken(null);
       setIsAuthenticated(false);
+      setIsGuest(true);
     } finally {
       logger.debug('AuthContext', 'Auth status check completed, setting loading to false');
       setIsLoading(false);
@@ -109,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.ok) {
         const data = await response.json();
+        logger.info('AuthContext', 'Login API response received:', data);
         const token = data.sessionToken;
         
         if (token) {
@@ -116,10 +141,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await AsyncStorage.setItem(SESSION_TOKEN_KEY, token);
           setSessionToken(token);
           setIsAuthenticated(true);
+          setIsGuest(false); // Clear guest mode when login is successful
           logger.info('AuthContext', 'Login completed successfully');
           return true;
         } else {
-          logger.warn('AuthContext', 'Login succeeded but no session token received');
+          logger.warn('AuthContext', 'Login succeeded but no session token received. Response data:', data);
+          // Check if token might be in a different field
+          const possibleTokenFields = ['token', 'accessToken', 'authToken', 'jwt', 'bearer'];
+          for (const field of possibleTokenFields) {
+            if (data[field]) {
+              logger.info('AuthContext', `Found token in field '${field}':`, data[field]);
+              await AsyncStorage.setItem(SESSION_TOKEN_KEY, data[field]);
+              setSessionToken(data[field]);
+              setIsAuthenticated(true);
+              setIsGuest(false);
+              logger.info('AuthContext', 'Login completed successfully using alternative token field');
+              return true;
+            }
+          }
         }
       } else {
         const errorText = await response.text();
@@ -169,6 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.ok) {
         const data = await response.json();
+        logger.info('AuthContext', 'Account creation API response received:', data);
         logger.info('AuthContext', 'Account creation successful', {
           ...data,
           sessionToken: data.sessionToken ? '[PRESENT]' : '[MISSING]'
@@ -184,11 +224,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           logger.info('AuthContext', 'Updating authentication state');
           setSessionToken(token);
           setIsAuthenticated(true);
+          setIsGuest(false); // Clear guest mode when account creation is successful
           logger.info('AuthContext', 'Authentication state updated successfully');
           
           return true;
         } else {
-          logger.error('AuthContext', 'Account creation succeeded but no session token received');
+          logger.error('AuthContext', 'Account creation succeeded but no session token received. Response data:', data);
+          // Check if token might be in a different field
+          const possibleTokenFields = ['token', 'accessToken', 'authToken', 'jwt', 'bearer'];
+          for (const field of possibleTokenFields) {
+            if (data[field]) {
+              logger.info('AuthContext', `Found token in field '${field}':`, data[field]);
+              await AsyncStorage.setItem(SESSION_TOKEN_KEY, data[field]);
+              setSessionToken(data[field]);
+              setIsAuthenticated(true);
+              setIsGuest(false);
+              logger.info('AuthContext', 'Account creation completed successfully using alternative token field');
+              return true;
+            }
+          }
           return false;
         }
       } else {
@@ -222,6 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
       setSessionToken(null);
       setIsAuthenticated(false);
+      setIsGuest(false);
       logger.info('AuthContext', 'Logout completed successfully');
     } catch (error) {
       logger.error('AuthContext', 'Logout error', {
@@ -238,10 +293,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value: AuthContextType = {
     isAuthenticated,
+    isGuest,
     sessionToken,
     isLoading,
     login,
     createAccount,
+    guestLogin,
     logout,
     checkAuthStatus,
   };

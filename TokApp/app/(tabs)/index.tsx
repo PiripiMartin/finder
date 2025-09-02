@@ -6,12 +6,12 @@ import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, Touchable
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { getApiUrl, getMapPointsUrl } from '../config/api';
+import { getApiUrl, getGuestPostsUrl, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
 import { MapPoint } from '../mapData';
-import { DeepLinkHandler } from '../utils/deepLinkHandler';
+
 import { videoUrls } from '../videoData';
 
 // Function to calculate distance between two coordinates in meters
@@ -63,8 +63,8 @@ export default function Index() {
   const [videoPosition, setVideoPosition] = useState({ x: 0, y: 0 });
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
-  const { sessionToken, logout } = useAuth();
-  const { setSavedLocations: setContextSavedLocations, setRecommendedLocations: setContextRecommendedLocations } = useLocationContext();
+  const { sessionToken, isGuest, logout } = useAuth();
+  const { setSavedLocations: setContextSavedLocations, setRecommendedLocations: setContextRecommendedLocations, blockedLocationIds } = useLocationContext();
   const insets = useSafeAreaInsets();
 
   // Filter state
@@ -157,7 +157,26 @@ export default function Index() {
       }
       
       // Build the API URL with coordinates
-      const apiUrl = `${getApiUrl('MAP_POINTS')}?lat=${userLocation.latitude}&lon=${userLocation.longitude}`;
+      let apiUrl: string;
+      let headers: any;
+      
+      if (isGuest) {
+        // Use guest API with current coordinates
+        apiUrl = getGuestPostsUrl(userLocation.latitude, userLocation.longitude);
+        headers = {
+          'Content-Type': 'application/json',
+        };
+        console.log('👤 [fetchMapPoints] Using guest API with coordinates:', { lat: userLocation.latitude, lon: userLocation.longitude });
+      } else {
+        // Use authenticated API
+        apiUrl = `${getApiUrl('MAP_POINTS')}?lat=${userLocation.latitude}&lon=${userLocation.longitude}`;
+        headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        };
+        console.log('🔐 [fetchMapPoints] Using authenticated API');
+      }
+      
       console.log('Fetching map points from:', apiUrl);
       
       // Create a timeout promise
@@ -168,10 +187,7 @@ export default function Index() {
       // Fetch map points from API
       const fetchPromise = fetch(apiUrl, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken || ''}`,
-        },
+        headers,
       });
       
       // Race between fetch and timeout
@@ -184,9 +200,69 @@ export default function Index() {
       const data = await response.json();
       console.log('API response data:', data);
       
+      // Handle different API response formats for guest vs authenticated
+      let savedLocationsData: any[] = [];
+      let recommendedLocations: any[] = [];
+      
+      if (isGuest) {
+        console.log('👤 [fetchMapPoints] Processing guest API response');
+        // Guest API might return data in a different format
+        if (Array.isArray(data)) {
+          // If guest API returns an array directly
+          recommendedLocations = data;
+          console.log('👤 [fetchMapPoints] Guest API returned array with', data.length, 'items');
+        } else if (data.recommendedLocations) {
+          // If guest API returns object with recommendedLocations
+          recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+          console.log('👤 [fetchMapPoints] Guest API returned object with recommendedLocations:', recommendedLocations.length);
+        } else {
+          console.log('👤 [fetchMapPoints] Guest API returned unexpected format:', data);
+          // Try to extract any array from the response
+          Object.keys(data).forEach(key => {
+            if (Array.isArray(data[key])) {
+              recommendedLocations = data[key];
+              console.log('👤 [fetchMapPoints] Found array in key:', key, 'with', data[key].length, 'items');
+            }
+          });
+        }
+        
+        // Ensure we have some data for guest users, even if API returns empty
+        if (recommendedLocations.length === 0) {
+          console.log('👤 [fetchMapPoints] Guest API returned empty data, using fallback locations');
+          recommendedLocations = [
+            {
+              location: {
+                id: "guest-1",
+                title: "Welcome to lai!",
+                description: "Explore the map to discover amazing places",
+                emoji: "🗺️",
+                latitude: userLocation.latitude,
+                longitude: userLocation.longitude,
+                isValidLocation: 1,
+                websiteUrl: null,
+                phoneNumber: null,
+                address: null,
+                createdAt: new Date().toISOString(),
+              },
+              topPost: {
+                id: 0,
+                url: "",
+                postedBy: 0,
+                mapPointId: 0,
+                postedAt: new Date().toISOString(),
+              }
+            }
+          ];
+        }
+      } else {
+        // Authenticated API format
+        savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
+        recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+      }
+      
       // Safely extract and validate the data
-      const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
-      const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+      // const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
+      // const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
       
       // Update saved locations state
       setSavedLocations(savedLocationsData);
@@ -261,11 +337,14 @@ export default function Index() {
       setMapPoints(transformedMapPoints);
       setError(null); // Clear any previous errors
       setLastRefresh(Date.now()); // Update last refresh timestamp
+      setIsLoading(false); // Clear loading state after successful fetch
       console.log('🎉 [fetchMapPoints] Successfully fetched data from API, total points:', transformedMapPoints.length);
       console.log('📱 [fetchMapPoints] State updated with map points:', transformedMapPoints);
       
     } catch (err) {
       console.error('Error fetching map points:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch map points');
+      setIsLoading(false); // Clear loading state on error
       
       // Use fallback data if API fails
       const fallbackData = {
@@ -367,110 +446,40 @@ export default function Index() {
 
   // Load map points when user location is available
   useEffect(() => {
+    console.log('📍 [Map] useEffect triggered - userLocation:', userLocation, 'isGuest:', isGuest);
     if (userLocation) {
+      console.log('📍 [Map] User location available, calling fetchMapPoints');
       fetchMapPoints();
+      
+      // Safety check: ensure loading state is cleared for guest users after a timeout
+      if (isGuest) {
+        const safetyTimer = setTimeout(() => {
+          if (isLoading) {
+            console.log('⚠️ [Map] Safety timeout reached, clearing loading state for guest user');
+            setIsLoading(false);
+          }
+        }, 10000); // 10 second safety timeout
+        
+        return () => clearTimeout(safetyTimer);
+      }
+    } else {
+      console.log('📍 [Map] No user location available yet');
     }
   }, [userLocation]);
 
-  // Function to manually refresh data (bypasses interval check)
-  const handleRefresh = async () => {
-    try {
-      console.log('🔄 [handleRefresh] Manual refresh requested');
-      setIsLoading(true);
-      setError(null);
-      
-      // Check if we have user location before making the API call
-      if (!userLocation) {
-        console.log('No user location available, skipping API call');
-        setIsLoading(false);
-        return;
-      }
-      
-      // Build the API URL with coordinates
-      const apiUrl = `${getApiUrl('MAP_POINTS')}?lat=${userLocation.latitude}&lon=${userLocation.longitude}`;
-      console.log('Manual refresh - Fetching map points from:', apiUrl);
-      
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), 5000); // 5 second timeout
+  // Filter out blocked locations from map points
+  useEffect(() => {
+    if (blockedLocationIds.length > 0) {
+      console.log(`🗑️ [Map] Filtering out ${blockedLocationIds.length} blocked locations:`, blockedLocationIds);
+      setMapPoints(prev => {
+        const newMapPoints = prev.filter(point => !blockedLocationIds.includes(point.id));
+        console.log(`🗑️ [Map] Filtered mapPoints from ${prev.length} to ${newMapPoints.length}`);
+        return newMapPoints;
       });
-      
-      // Fetch map points from API
-      const fetchPromise = fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken || ''}`,
-        },
-      });
-      
-      // Race between fetch and timeout
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Manual refresh - API response data:', data);
-      
-      // Safely extract and validate the data
-      const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
-      const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
-      
-      // Update saved locations state
-      setSavedLocations(savedLocationsData);
-      // Also update the context for sharing with other components
-      setContextSavedLocations(savedLocationsData);
-      setContextRecommendedLocations(recommendedLocations);
-      
-      // Debug saved locations structure
-      if (savedLocationsData.length > 0) {
-        console.log('🔍 [Manual Refresh] First saved location structure:', savedLocationsData[0]);
-        console.log('🔍 [Manual Refresh] Saved location IDs:', savedLocationsData.map((s: any) => s.location?.id));
-      }
-      
-      // Combine saved and recommended locations
-      const allLocations = [...savedLocationsData, ...recommendedLocations];
-      
-      
-      
-      // Transform locations to MapPoint format with error handling
-      const transformedMapPoints: MapPoint[] = allLocations.map((item: any) => {
-        // Validate required fields
-        if (!item.location || !item.location.id || !item.location.latitude || !item.location.longitude) {
-          console.warn('Invalid location data:', item);
-          return null;
-        }
-        
-        return {
-          id: String(item.location.id), // Ensure ID is a string
-          title: item.location.title || 'Unknown Location',
-          description: item.location.description || '',
-          emoji: item.location.emoji || '📍',
-          latitude: Number(item.location.latitude),
-          longitude: Number(item.location.longitude),
-          isValidLocation: Number(item.location.isValidLocation) || 0,
-          websiteUrl: item.location.websiteUrl || null,
-          phoneNumber: item.location.phoneNumber || null,
-          address: item.location.address || null,
-          createdAt: item.location.createdAt || new Date().toISOString(),
-          videoUrl: item.topPost?.url || '',
-        };
-      }).filter(Boolean) as MapPoint[]; // Remove null entries
-      
-      setMapPoints(transformedMapPoints);
-      setError(null); // Clear any previous errors
-      setLastRefresh(Date.now()); // Update last refresh timestamp
-      console.log('Manual refresh - Successfully fetched data from API, total points:', transformedMapPoints.length);
-      
-    } catch (err) {
-      console.error('Manual refresh - Error fetching map points:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [blockedLocationIds]);
+
+
 
   // Helper function to get label for emoji
   const getEmojiLabel = (emoji: string): string => {
@@ -624,64 +633,67 @@ export default function Index() {
   }, [filteredMapPoints]);
   
   const handleMarkerPress = (pointId: string, event: any) => {
-    console.log('Marker pressed:', pointId);
-    console.log('Current selectedMarkerId:', selectedMarkerId);
+    console.log('📍 [Map] Marker pressed:', pointId);
     
-    // Find the selected point
     const selectedPoint = mapPoints.find(point => point.id === pointId);
-    if (!selectedPoint) return;
-    
-    console.log('Setting selectedMarkerId to:', pointId);
+    if (!selectedPoint) {
+      console.log('❌ [Map] Selected point not found in mapPoints');
+      return;
+    }
+
     setSelectedMarkerId(pointId);
     
-    // 🚀 PERFORMANCE OPTIMIZATION: Start fetching videos immediately when marker is pressed
-    console.log('🚀 [handleMarkerPress] Starting video pre-fetch for location:', pointId);
-    fetchLocationVideos(pointId);
-    
-    // Use the videoUrl from the API response if available, otherwise fall back to videoData
-    let videoUrl = selectedPoint.videoUrl;
-    
-    if (!videoUrl) {
-      // Fallback to static video data if no videoUrl in API response
-      const fallbackVideo = videoUrls[pointId];
-      if (fallbackVideo) {
-        videoUrl = fallbackVideo;
-      }
-    }
-    
-    if (videoUrl) {
-      setSelectedVideo(videoUrl);
-      setIsVideoVisible(true);
+    // For authenticated users, show video overlay
+    if (sessionToken && !isGuest) {
+      // Use the videoUrl from the API response if available, otherwise fall back to videoData
+      let videoUrl = selectedPoint.videoUrl;
       
-      // Pan camera to the clicked marker - position it in the top middle of the screen
-      if (selectedPoint && mapRef.current) {
-        // Calculate the offset to position the marker in the top middle
-        const screenHeight = Dimensions.get('window').height;
-        const screenWidth = Dimensions.get('window').width;
-        
-        // Calculate the latitude offset to move the marker to the top third of the screen
-        // Subtract the offset to move the marker up on the screen
-        const latitudeOffset = 0.003; // Reduced offset to move it lower down
-        
-        mapRef.current.animateToRegion({
-          latitude: selectedPoint.latitude - latitudeOffset,
-          longitude: selectedPoint.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        }, 1000);
+      if (!videoUrl) {
+        // Fallback to static video data if no videoUrl in API response
+        const fallbackVideo = videoUrls[pointId];
+        if (fallbackVideo) {
+          videoUrl = fallbackVideo;
+        }
       }
       
-      // Get marker position for video placement
-      const { pageX, pageY } = event.nativeEvent;
-      setVideoPosition({ x: pageX, y: pageY });
-      
-      // Animate video fade in
-      fadeAnim.setValue(0);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
+      if (videoUrl) {
+        setSelectedVideo(videoUrl);
+        setIsVideoVisible(true);
+        
+        // Pan camera to the clicked marker - position it in the top middle of the screen
+        if (selectedPoint && mapRef.current) {
+          // Calculate the offset to position the marker in the top middle
+          const screenHeight = Dimensions.get('window').height;
+          const screenWidth = Dimensions.get('window').width;
+          
+          // Calculate the latitude offset to move the marker to the top third of the screen
+          // Subtract the offset to move the marker up on the screen
+          const latitudeOffset = 0.003; // Reduced offset to move it lower down
+          
+          mapRef.current.animateToRegion({
+            latitude: selectedPoint.latitude - latitudeOffset,
+            longitude: selectedPoint.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }, 1000);
+        }
+        
+        // Get marker position for video placement
+        const { pageX, pageY } = event.nativeEvent;
+        setVideoPosition({ x: pageX, y: pageY });
+        
+        // Animate video fade in
+        fadeAnim.setValue(0);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else {
+      // For guest users, just navigate to the location page without showing videos
+      console.log('👤 [Map] Guest user navigating to location page');
+      router.push(`/_location?id=${pointId}`);
     }
   };
 
@@ -700,28 +712,70 @@ export default function Index() {
     buttonAnim.stopAnimation();
   };
 
+  const handleLogout = () => {
+    logout();
+    router.push('/auth/login');
+  };
+
   useEffect(() => {
-    (async () => {
-      // Request location permissions
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        return;
+    // Add a small delay to ensure component is fully mounted
+    const timer = setTimeout(async () => {
+      try {
+        // Check if location services are enabled first
+        const isLocationEnabled = await Location.hasServicesEnabledAsync();
+        if (!isLocationEnabled) {
+          console.log('Location services disabled, using default location');
+          const defaultRegion: Region = {
+            latitude: -37.8136,
+            longitude: 144.9631,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          };
+          setUserLocation(defaultRegion);
+          return;
+        }
+
+        // Request location permissions with proper error handling
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.log('Location permission denied, using default location');
+          const defaultRegion: Region = {
+            latitude: -37.8136,
+            longitude: 144.9631,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          };
+          setUserLocation(defaultRegion);
+          return;
+        }
+        
+        // Get current location with iOS-friendly settings
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced, // Better iOS compatibility
+        });
+        
+        const region: Region = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        };
+        
+        setUserLocation(region);
+      } catch (error) {
+        console.error('Error getting location:', error);
+        // Always set a default location to prevent crashes
+        const defaultRegion: Region = {
+          latitude: -37.8136,
+          longitude: 144.9631,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        };
+        setUserLocation(defaultRegion);
       }
-      
-      // Get current location
-      let location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      
-      const region: Region = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.01, // Closer zoom for user location
-        longitudeDelta: 0.01,
-      };
-      
-      setUserLocation(region);
-    })();
+    }, 100); // 100ms delay to ensure component is mounted
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -737,10 +791,9 @@ export default function Index() {
           latitudeDelta: 0.0922,
           longitudeDelta: 0.0421,
         }}
-        region={userLocation || undefined}
         showsUserLocation={true}
         showsMyLocationButton={false}
-        followsUserLocation={true}
+        followsUserLocation={false}
         moveOnMarkerPress={false}
       >
         {/* Loading indicator */}
@@ -754,9 +807,6 @@ export default function Index() {
         {error && (
           <View style={styles.errorOverlay}>
             <Text style={styles.errorText}>Error: {error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={fetchMapPoints}>
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -866,61 +916,43 @@ export default function Index() {
         <Ionicons name="navigate" size={28} color="#4E8886" />
       </TouchableOpacity>
 
-      {/* Refresh Button - Top Right */}
-      <TouchableOpacity 
-        style={[
-          styles.refreshButton,
-          {
-            top: insets.top + 20,
-            right: insets.right + 20,
-          }
-        ]}
-        onPress={handleRefresh}
-        disabled={isLoading}
-      >
-        <Ionicons 
-          name="refresh" 
-          size={24} 
-          color={isLoading ? "#999" : "#4E8886"} 
-        />
-      </TouchableOpacity>
+      {/* Guest Login Button - Top Right (only show when in guest mode) */}
+      {isGuest && (
+        <TouchableOpacity 
+          style={[
+            styles.guestLoginButton,
+            {
+              top: insets.top + 30,
+              right: insets.right + 30,
+            }
+          ]}
+          onPress={() => router.push('/auth/login')}
+        >
+          <Ionicons name="log-in" size={20} color="#4E8886" />
+          <Text style={styles.guestLoginButtonText}>Login</Text>
+        </TouchableOpacity>
+      )}
 
-      {/* Test Deep Link Button - Top Center */}
-      <TouchableOpacity 
-        style={[
-          styles.testButton,
-          {
-            top: insets.top + 20,
-            left: '50%',
-            marginLeft: -20, // Center the button
-          }
-        ]}
-        onPress={() => {
-          const testUrl = "tokapp://share/123456789";
-          console.log('Testing deep link:', testUrl);
-          DeepLinkHandler.handleTikTokShare(testUrl);
-        }}
-      >
-        <Ionicons name="link" size={24} color="#4E8886" />
-      </TouchableOpacity>
 
-      {/* Clear Token Button - Top Center Right */}
-      <TouchableOpacity 
-        style={[
-          styles.clearButton,
-          {
-            top: insets.top + 20,
-            left: '50%',
-            marginLeft: 20, // Position to the right of test button
-          }
-        ]}
-        onPress={() => {
-          logout();
-          console.log('Session token cleared');
-        }}
-      >
-        <Ionicons name="log-out" size={24} color="#FF3B30" />
-      </TouchableOpacity>
+
+      {/* Logout Button - Top Right (only show when authenticated) */}
+      {!isGuest && sessionToken && (
+        <TouchableOpacity 
+          style={[
+            styles.logoutButton,
+            {
+              top: insets.top + 30,
+              right: insets.right + 30,
+            }
+          ]}
+          onPress={handleLogout}
+        >
+          <Ionicons name="log-out" size={20} color="#4E8886" />
+          <Text style={styles.logoutButtonText}>Logout</Text>
+        </TouchableOpacity>
+      )}
+
+
 
       {/* Filter Buttons - Bottom */}
       <View style={[
@@ -979,8 +1011,8 @@ export default function Index() {
         </ScrollView>
       </View>
 
-      {/* Picture-in-Picture Video */}
-      {isVideoVisible && selectedVideo && (
+      {/* Picture-in-Picture Video - Only show for authenticated users */}
+      {isVideoVisible && selectedVideo && sessionToken && !isGuest ? (
         <Animated.View 
           style={[
             styles.videoOverlay, 
@@ -1082,7 +1114,7 @@ export default function Index() {
             />
           </View>
         </Animated.View>
-      )}
+      ) : null}
 
       
     </View>
@@ -1208,48 +1240,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  refreshButton: {
-    position: 'absolute',
-    backgroundColor: '#FFF0F0',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  testButton: {
-    position: 'absolute',
-    backgroundColor: '#FFF0F0',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  clearButton: {
-    position: 'absolute',
-    backgroundColor: '#FFF0F0',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
+
   filterContainer: {
     position: 'absolute',
     flexDirection: 'row',
@@ -1285,7 +1276,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     zIndex: 100,
   },
   loadingText: {
@@ -1305,17 +1296,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: 20,
   },
-  retryButton: {
-            backgroundColor: '#4E8886',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#FFF0F0',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+
   customLabel: {
     position: 'absolute',
     backgroundColor: '#FFF0F0',
@@ -1344,4 +1325,45 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 10,
   },
+  guestLoginButton: {
+    position: 'absolute',
+    backgroundColor: '#FFF0F0',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+    gap: 6,
+  },
+  guestLoginButtonText: {
+    color: '#4E8886',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  logoutButton: {
+    position: 'absolute',
+    backgroundColor: '#FFF0F0',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+    gap: 6,
+  },
+  logoutButtonText: {
+    color: '#4E8886',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
 });

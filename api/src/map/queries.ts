@@ -82,8 +82,12 @@ export async function getRecommendedLocationsWithTopPost(
     latitude: number, 
     longitude: number, 
     radiusKm: number = 10,
-    limit: number = 20
+    limit: number = 20,
+    opts?: { includeUnrecommendable?: boolean }
 ): Promise<LocationAndPost[]> {
+    const includeUnrecommendable = Boolean(opts?.includeUnrecommendable);
+    const recommendableCondition = includeUnrecommendable ? "1 = 1" : "mp.recommendable = TRUE";
+
     const query = `
         SELECT DISTINCT
             mp.id,
@@ -119,8 +123,10 @@ export async function getRecommendedLocationsWithTopPost(
             FROM posts 
             WHERE posted_by = ?
         )
-        -- Only include recommendable locations
-        AND mp.recommendable = TRUE
+        -- Only include recommendable locations unless explicitly overridden (e.g., guests)
+        AND ${recommendableCondition}
+        -- Only include locations that have at least one post
+        AND p.id IS NOT NULL
         ORDER BY distance_km ASC, mp.created_at DESC
         LIMIT ${Number(limit)}
     `;
@@ -136,7 +142,7 @@ export async function getRecommendedLocationsWithTopPost(
     const results = toCamelCase(rows) as any[];
     
     // Transform to LocationAndPost format
-    // Note: We don't need to filter by postId anymore since we added "AND p.id IS NOT NULL" in the SQL
+    // Note: We filter by p.id NOT NULL in the SQL, so posts are guaranteed
     return results.map(row => ({
         location: {
             id: row.id,
