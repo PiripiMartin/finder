@@ -159,10 +159,37 @@ export async function searchGooglePlaces(searchQuery: string): Promise<PlacesTex
     }
 }
 
+/**
+ * Fetches the details for a given Google Place ID, should only be called for *new* locations.
+ * @param placeId 
+ * @returns a PlacesDetailsResponse, or null if the request fails
+ */
 export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDetailsResponse | null> {
 
-    
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) {
+        throw new Error("GOOGLE_PLACES_API_KEY is not set");
+    }
 
+    const placesEndpoint = `https://places.googleapis.com/v1/places/${placeId}`;
+    
+    try {
+        const response = await fetch(placesEndpoint, {
+            method: "GET",
+            headers: {
+                "X-Goog-Api-Key": apiKey,
+                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.websiteUri",
+            },
+        });
+        if (!response.ok) {
+            throw new Error(`Google Places API request failed: ${response.status}`);
+        }
+        
+        const result = await response.json() as PlacesDetailsResponse;
+        return result;
+    } catch (error) {
+        //console.error("Failed to fetch from Google Places API:", error);
+    }
     return null;
 }
 
