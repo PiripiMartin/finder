@@ -1,6 +1,6 @@
 # Authentication API Integration
 
-This document describes the changes made to integrate the TokApp with the local API server for authentication functionality.
+This document describes the changes made to integrate the lai with the local API server for authentication functionality.
 
 ## Changes Made
 

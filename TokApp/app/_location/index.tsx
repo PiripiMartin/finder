@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Dimensions, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
 import { API_CONFIG, getMapPointsUrl } from '../config/api';
@@ -85,7 +85,7 @@ export default function Location() {
   const { id, needsCoordinates } = useLocalSearchParams();
   const { theme } = useTheme();
   const { sessionToken } = useAuth();
-  const { findLocationById } = useLocationContext();
+  const { findLocationById, removeLocation, addBlockedLocation } = useLocationContext();
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [videos, setVideos] = useState<VideoPost[]>([]);
@@ -95,6 +95,8 @@ export default function Location() {
   const [selectedCoords, setSelectedCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isSubmittingCoords, setIsSubmittingCoords] = useState(false);
   const [submitCoordsError, setSubmitCoordsError] = useState<string | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [isBlockingLocation, setIsBlockingLocation] = useState(false);
 
   // Fetch videos for the current location
   const fetchLocationVideos = async (locationId: string) => {
@@ -262,6 +264,70 @@ export default function Location() {
     }
   };
 
+  const handleReportLocation = () => {
+    setShowReportModal(true);
+  };
+
+  const handleBlockLocation = async () => {
+    if (!locationData || !sessionToken) return;
+    
+    try {
+      setIsBlockingLocation(true);
+      
+      const url = `https://ptvalert.xyz/api/map/${locationData.id}/block`;
+      console.log('🚫 [Location] Blocking location:', url);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      console.log('✅ [Location] Location blocked successfully');
+      
+      // Remove the blocked location from local state to hide it from the map
+      if (removeLocation) {
+        removeLocation(locationData.id);
+      }
+      
+      // Add location to blocked list
+      if (addBlockedLocation) {
+        console.log(`🔔 [Location] Adding location ${locationData.id} to blocked list`);
+        addBlockedLocation(locationData.id);
+      } else {
+        console.log(`⚠️ [Location] addBlockedLocation function not available`);
+      }
+      
+      // Show success message and go back
+      Alert.alert(
+        'Location Blocked',
+        'This location has been blocked and will no longer appear on the map.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back()
+          }
+        ]
+      );
+      
+    } catch (error) {
+      console.error('❌ [Location] Failed to block location:', error);
+      Alert.alert(
+        'Error',
+        'Failed to block location. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsBlockingLocation(false);
+    }
+  };
+
   if (!locationData) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -397,88 +463,116 @@ export default function Location() {
           </TouchableOpacity>
         </View>
 
-        {/* TikTok Videos Section */}
+        {/* Action Buttons Section */}
         <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>TikTok Videos</Text>
-          <View style={styles.videoGrid}>
-            {isLoadingVideos ? (
-              <View style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, justifyContent: 'center', alignItems: 'center' }]}>
-                <Ionicons name="refresh" size={24} color={theme.colors.primary} />
-                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading videos...</Text>
-              </View>
-            ) : videosError ? (
-              <View style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, justifyContent: 'center', alignItems: 'center' }]}>
-                <Ionicons name="alert-circle" size={24} color="#ff6b6b" />
-                <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>Failed to load videos</Text>
-                <TouchableOpacity 
-                  style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
-                  onPress={() => locationData && fetchLocationVideos(locationData.id)}
-                >
-                  <Text style={styles.retryButtonText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : videos.length === 0 ? (
-              <View style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, justifyContent: 'center', alignItems: 'center' }]}>
-                <Ionicons name="videocam-off" size={24} color={theme.colors.textSecondary} />
-                <Text style={[styles.noVideosText, { color: theme.colors.textSecondary }]}>No videos available</Text>
-              </View>
-            ) : (
-              videos.map((video, index) => (
-                <TouchableOpacity 
-                  key={video.id} 
-                  style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
-                  onPress={() => handleVideoPress(video.url)}
-                >
-                  <View style={styles.videoThumbnail}>
-                    <WebView
-                      source={{
-                        html: `
-                          <!DOCTYPE html>
-                          <html>
-                          <head>
-                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                            <style>
-                              body { 
-                                margin: 0; 
-                                padding: 0; 
-                                background: #000; 
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                height: 100vh;
-                              }
-                              iframe { 
-                                border: none; 
-                                display: block;
-                                width: 100%;
-                                height: 100%;
-                              }
-                            </style>
-                          </head>
-                          <body>
-                            <iframe 
-                              src="${video.url}" 
-                              allow="fullscreen" 
-                              title="TikTok Video">
-                            </iframe>
-                          </body>
-                          </html>
-                        `
-                      }}
-                      style={styles.videoThumbnail}
-                      allowsInlineMediaPlayback={true}
-                      mediaPlaybackRequiresUserAction={false}
-                      javaScriptEnabled={true}
-                      domStorageEnabled={true}
-                      scrollEnabled={false}
-                      bounces={false}
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Actions</Text>
+          
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: '#ff6b6b' }]}
+              onPress={handleReportLocation}
+            >
+              <Ionicons name="flag" size={20} color="#FFF0F0" />
+              <Text style={styles.actionButtonText}>Report</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: '#6c5ce7' }]}
+              onPress={handleBlockLocation}
+              disabled={isBlockingLocation}
+            >
+              <Ionicons name="ban" size={20} color="#FFF0F0" />
+              <Text style={styles.actionButtonText}>
+                {isBlockingLocation ? 'Blocking...' : 'Block Location'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
+
+        {/* TikTok Videos Section - Only show for authenticated users */}
+        {sessionToken && (
+          <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>TikTok Videos</Text>
+            <View style={styles.videoGrid}>
+              {isLoadingVideos ? (
+                <View style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, justifyContent: 'center', alignItems: 'center' }]}>
+                  <Ionicons name="refresh" size={24} color={theme.colors.primary} />
+                  <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading videos...</Text>
+                </View>
+              ) : videosError ? (
+                <View style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, justifyContent: 'center', alignItems: 'center' }]}>
+                  <Ionicons name="alert-circle" size={24} color="#ff6b6b" />
+                  <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>Failed to load videos</Text>
+                  <TouchableOpacity 
+                    style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+                    onPress={() => locationData && fetchLocationVideos(locationData.id)}
+                  >
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : videos.length === 0 ? (
+                <View style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, justifyContent: 'center', alignItems: 'center' }]}>
+                  <Ionicons name="videocam-off" size={24} color={theme.colors.textSecondary} />
+                  <Text style={[styles.noVideosText, { color: theme.colors.textSecondary }]}>No videos available</Text>
+                </View>
+              ) : (
+                videos.map((video, index) => (
+                  <TouchableOpacity 
+                    key={video.id} 
+                    style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
+                    onPress={() => handleVideoPress(video.url)}
+                  >
+                    <View style={styles.videoThumbnail}>
+                      <WebView
+                        source={{
+                          html: `
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                              <style>
+                                body { 
+                                  margin: 0; 
+                                  padding: 0; 
+                                  background: #000; 
+                                  display: flex;
+                                  justify-content: center;
+                                  align-items: center;
+                                  height: 100vh;
+                                }
+                                iframe { 
+                                  border: none; 
+                                  display: block;
+                                  width: 100%;
+                                  height: 100%;
+                                }
+                              </style>
+                            </head>
+                            <body>
+                              <iframe 
+                                src="${video.url}" 
+                                allow="fullscreen" 
+                                title="TikTok Video">
+                              </iframe>
+                            </body>
+                            </html>
+                          `
+                        }}
+                        style={styles.videoThumbnail}
+                        allowsInlineMediaPlayback={true}
+                        mediaPlaybackRequiresUserAction={false}
+                        javaScriptEnabled={true}
+                        domStorageEnabled={true}
+                        scrollEnabled={false}
+                        bounces={false}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       {/* Full Screen Video Modal */}
@@ -533,6 +627,29 @@ export default function Location() {
           </View>
         </View>
       )}
+
+      {/* Report Location Modal */}
+      <Modal
+        visible={showReportModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Report Submitted</Text>
+            <Text style={[styles.modalText, { color: theme.colors.textSecondary }]}>
+              Thanks, we'll acknowledge the report.
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
+              onPress={() => setShowReportModal(false)}
+            >
+              <Text style={[styles.modalButtonText, { color: '#FFF0F0' }]}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -735,5 +852,76 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 10,
     textAlign: 'center',
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    gap: 8,
+  },
+  actionButtonText: {
+    color: '#FFF0F0',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  modalText: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 10,
+  },
+  modalButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  loginPromptTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  loginPromptSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  loginPromptButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 10,
+  },
+  loginPromptButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

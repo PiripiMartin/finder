@@ -9,9 +9,9 @@ export interface TikTokShareData {
 export class DeepLinkHandler {
   static parseTikTokShare(url: string): TikTokShareData | null {
     try {
-      // Handle tokapp:// scheme (for testing)
-      if (url.startsWith('tokapp://')) {
-        const path = url.replace('tokapp://', '');
+      // Handle lai:// scheme (for testing)
+if (url.startsWith('lai://')) {
+  const path = url.replace('lai://', '');
         
         if (path.startsWith('share/')) {
           const shareData = path.replace('share/', '');
@@ -82,6 +82,6 @@ export class DeepLinkHandler {
 
   // This is just for testing - you can remove it in production
   static generateTestUrl(videoId: string): string {
-    return `tokapp://share/${videoId}`;
+    return `lai://share/${videoId}`;
   }
 }

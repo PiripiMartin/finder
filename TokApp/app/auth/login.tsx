@@ -21,7 +21,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, guestLogin } = useAuth();
   const { theme } = useTheme();
 
   const handleLogin = async () => {
@@ -32,23 +32,39 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
+      console.log('🔐 [Login] Starting login process for username:', username);
       // Try to get current location, fall back to default coordinates
       let coordinates = await getCurrentLocation();
       if (!coordinates) {
         coordinates = getDefaultCoordinates();
       }
       
+      console.log('📍 [Login] Using coordinates:', coordinates);
       const success = await login(username.trim(), password.trim(), coordinates);
+      console.log('✅ [Login] Login result:', success);
+      
       if (success) {
+        console.log('🚀 [Login] Login successful, redirecting to main app');
         // Navigation will be handled by the auth context
         router.replace('/(tabs)');
       } else {
+        console.log('❌ [Login] Login failed, showing error alert');
         Alert.alert('Login Failed', 'Invalid username or password');
       }
     } catch (error) {
+      console.error('💥 [Login] Login error:', error);
       Alert.alert('Error', 'An error occurred during login');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    try {
+      await guestLogin();
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred while entering guest mode');
     }
   };
 
@@ -100,7 +116,7 @@ export default function LoginScreen() {
       marginBottom: 20,
     },
     loginButtonText: {
-      color: '#FFF0F0',
+      color: theme.colors.surface,
       fontSize: 18,
       fontWeight: '600',
     },
@@ -113,7 +129,21 @@ export default function LoginScreen() {
       fontSize: 16,
     },
     disabledButton: {
-      backgroundColor: '#835858',
+      backgroundColor: theme.colors.textSecondary,
+      opacity: 0.6,
+    },
+    guestButton: {
+      backgroundColor: theme.colors.textSecondary,
+      borderRadius: 8,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginTop: 20,
+      marginBottom: 20,
+    },
+    guestButtonText: {
+      color: theme.colors.surface,
+      fontSize: 18,
+      fontWeight: '600',
     },
   });
 
@@ -167,6 +197,16 @@ export default function LoginScreen() {
         >
           <Text style={styles.createAccountText}>
             Don't have an account? Create one
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.guestButton}
+          onPress={handleGuestLogin}
+          disabled={isLoading}
+        >
+          <Text style={styles.guestButtonText}>
+            {isLoading ? 'Entering guest mode...' : 'Continue as Guest'}
           </Text>
         </TouchableOpacity>
       </ScrollView>

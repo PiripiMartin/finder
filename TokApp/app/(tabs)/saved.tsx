@@ -35,7 +35,7 @@ interface SavedLocation {
 export default function Saved() {
   const router = useRouter();
   const { theme } = useTheme();
-  const { sessionToken } = useAuth();
+  const { sessionToken, isGuest } = useAuth();
   
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<SavedLocation[]>([]);
@@ -145,11 +145,7 @@ export default function Saved() {
     }
   };
 
-  // Refresh saved locations
-  const handleRefresh = () => {
-    console.log('🔄 [Saved] Refreshing saved locations...');
-    fetchSavedLocations();
-  };
+
 
   useEffect(() => {
     console.log('📚 [Saved] Page loaded, fetching saved locations...');
@@ -170,6 +166,36 @@ export default function Saved() {
     );
   }
 
+  // Show guest message if user is not authenticated
+  if (isGuest) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
+        </View>
+        <View style={styles.guestContainer}>
+          <Ionicons name="bookmark-outline" size={80} color={theme.colors.textSecondary} />
+          <Text style={[styles.guestTitle, { color: theme.colors.text }]}>Login to Save Locations</Text>
+          <Text style={[styles.guestSubtitle, { color: theme.colors.textSecondary }]}>
+            Create an account or sign in to save your favorite places and access them from anywhere.
+          </Text>
+          <TouchableOpacity
+            style={[styles.loginButton, { backgroundColor: theme.colors.primary }]}
+            onPress={() => router.push('/auth/login')}
+          >
+            <Text style={[styles.loginButtonText, { color: theme.colors.surface }]}>Login</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.createAccountButton, { borderColor: theme.colors.primary }]}
+            onPress={() => router.push('/auth/create-account')}
+          >
+            <Text style={[styles.createAccountButtonText, { color: theme.colors.primary }]}>Create Account</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   if (error) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -180,12 +206,7 @@ export default function Saved() {
           <Ionicons name="alert-circle" size={48} color="#ff6b6b" />
           <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>Failed to load saved locations</Text>
           <Text style={[styles.errorSubtext, { color: theme.colors.textSecondary }]}>{error}</Text>
-          <TouchableOpacity 
-            style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
-            onPress={handleRefresh}
-          >
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
+
         </View>
       </View>
     );
@@ -196,12 +217,6 @@ export default function Saved() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
-        <TouchableOpacity 
-          style={[styles.refreshButton, { backgroundColor: theme.colors.primary }]}
-          onPress={handleRefresh}
-        >
-          <Ionicons name="refresh" size={20} color="#FFF0F0" />
-        </TouchableOpacity>
       </View>
 
       {/* Emoji Filter Bar */}
@@ -304,13 +319,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
-  refreshButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
   scrollView: {
     flex: 1,
   },
@@ -341,17 +350,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.8,
   },
-  retryButton: {
-    marginTop: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#FFF0F0',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -447,5 +446,51 @@ const styles = StyleSheet.create({
   },
   alertIcon: {
     marginRight: 4,
+  },
+  guestContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 60,
+  },
+  guestTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  guestSubtitle: {
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
+    opacity: 0.8,
+    lineHeight: 22,
+  },
+  loginButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 24,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  createAccountButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 16,
+    minWidth: 120,
+    alignItems: 'center',
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
+  createAccountButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 
