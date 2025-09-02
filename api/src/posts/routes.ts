@@ -36,20 +36,19 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Error extracing location name from TikTok.", {status: 500});
     }
 
-    // NOTE: here is where we'll send a different response (maybe a special code?) to initiate the manual
-    //       post definition system.
     const placesResult = await searchGooglePlaces(possiblePlaceName);
     if (!placesResult) {
         return new Response("Error searching Google Places.", {status: 500});
     }
 
-    // TODO: Update this to a proper typed response (not snake_case!)
-    const placeId = placesResult.results[0].place_id;
+    const placeId = placesResult.places[0]?.id;
     if (!placeId) {
+        // NOTE: here is where we'll send a different response (maybe a special code?) to initiate the manual
+        //       post definition system.
         return new Response("Error finding place ID.", {status: 500});
     }
 
-    // TODO: Extract information 
+    
 
 
     // TODO: Update returned response

@@ -23,7 +23,31 @@ interface GeminiResponse {
     }>;
 }
 
-// TODO: Create a type for the Google places text search response format
+// Google Places Search API response structure (Essentials only SKU)
+// Completely free: no quota
+interface PlacesTextSearchResponse {
+    places: Array<{
+        id: string;
+    }>;
+}
+
+// Google Places Details API response structure (Enterprise SKU)
+// 1000 free calls per month, only called for *new* locations
+interface PlacesDetailsResponse {
+    place: {
+        id: string,
+        displayName: {
+            text: string
+        },
+        nationalPhoneNumber: string,
+        websiteUri: string,
+        location: {
+            latitude: number,
+            longitude: number
+        },
+        formattedAddress: string
+    };
+}
 
 
 export async function getTikTokEmbedInfo(vidUrl: string): Promise<EmbedResponse | null> {
@@ -103,7 +127,7 @@ export async function extractPossibleLocationName(embedInfo: EmbedResponse): Pro
     }
 }
 
-export async function searchGooglePlaces(searchQuery: string): Promise<any | null> {
+export async function searchGooglePlaces(searchQuery: string): Promise<PlacesTextSearchResponse | null> {
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
         throw new Error("GOOGLE_PLACES_API_KEY is not set");
@@ -116,7 +140,7 @@ export async function searchGooglePlaces(searchQuery: string): Promise<any | nul
             method: "POST",
             headers: {
                 "X-Goog-Api-Key": apiKey,
-                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress",
+                "X-Goog-FieldMask": "places.id", // NOTE: We're making sure we only trigger the Essentials only SKU
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
@@ -127,7 +151,7 @@ export async function searchGooglePlaces(searchQuery: string): Promise<any | nul
             throw new Error(`Google Places API request failed: ${response.status}`);
         }
         
-        const result = await response.json();
+        const result = await response.json() as PlacesTextSearchResponse;
         return result;
     } catch (error) {
         console.error("Failed to fetch from Google Places API:", error);
@@ -135,5 +159,10 @@ export async function searchGooglePlaces(searchQuery: string): Promise<any | nul
     }
 }
 
+export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDetailsResponse | null> {
 
+    
+
+    return null;
+}
 
