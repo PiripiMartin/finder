@@ -11,7 +11,7 @@ class ShareViewController: UIViewController {
     private let containerView = UIView()
     private let statusLabel = UILabel()
     private let activityIndicator = UIActivityIndicatorView(style: .large)
-    private let progressView = UIProgressView(progressViewStyle: .default)
+    private let closingIndicator = UIActivityIndicatorView(style: .medium)
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -21,22 +21,23 @@ class ShareViewController: UIViewController {
     }
     
     private func setupUI() {
-        // Set up the main view
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.4)
+        // Set up the main view - clear background (no overlay)
+        view.backgroundColor = .clear
         
-        // Container view (white card)
-        containerView.backgroundColor = .white
-        containerView.layer.cornerRadius = 16
+        // Container view (app theme color bottom sheet)
+        containerView.backgroundColor = UIColor(red: 1.0, green: 0.941, blue: 0.941, alpha: 1.0) // #FFF0F0
+        containerView.layer.cornerRadius = 20
+        containerView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner] // Only top corners
         containerView.layer.shadowColor = UIColor.black.cgColor
-        containerView.layer.shadowOffset = CGSize(width: 0, height: 4)
-        containerView.layer.shadowOpacity = 0.3
-        containerView.layer.shadowRadius = 8
+        containerView.layer.shadowOffset = CGSize(width: 0, height: -2)
+        containerView.layer.shadowOpacity = 0.1
+        containerView.layer.shadowRadius = 10
         containerView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(containerView)
         
         // Status label
         statusLabel.text = "Saving..."
-        statusLabel.font = UIFont.systemFont(ofSize: 18, weight: .medium)
+        statusLabel.font = UIFont.systemFont(ofSize: 20, weight: .medium)
         statusLabel.textColor = .darkGray
         statusLabel.textAlignment = .center
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -47,35 +48,33 @@ class ShareViewController: UIViewController {
         activityIndicator.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(activityIndicator)
         
-        // Progress view (initially hidden)
-        progressView.progressTintColor = .systemBlue
-        progressView.trackTintColor = .lightGray
-        progressView.alpha = 0
-        progressView.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(progressView)
+        // Closing indicator (initially hidden)
+        closingIndicator.color = .darkGray
+        closingIndicator.alpha = 0
+        closingIndicator.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(closingIndicator)
         
-        // Constraints
+        // Constraints for bottom sheet layout
         NSLayoutConstraint.activate([
-            // Container view - centered and sized
-            containerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            containerView.widthAnchor.constraint(equalToConstant: 280),
-            containerView.heightAnchor.constraint(equalToConstant: 120),
+            // Container view - bottom half of screen
+            containerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            containerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            containerView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            containerView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.5),
             
-            // Status label
+            // Status label - positioned in upper part of bottom sheet
             statusLabel.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-            statusLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 20),
-            statusLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
-            statusLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
+            statusLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 60),
+            statusLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 40),
+            statusLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -40),
             
             // Activity indicator
             activityIndicator.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-            activityIndicator.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 20),
+            activityIndicator.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 30),
             
-            // Progress view
-            progressView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
-            progressView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
-            progressView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 30),
+            // Closing indicator
+            closingIndicator.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            closingIndicator.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 20),
         ])
         
         // Start the activity indicator
@@ -204,15 +203,15 @@ class ShareViewController: UIViewController {
             saveVideoToAPI(data: data, sessionToken: token)
         } else {
             logger.error("❌ No session token found - user must be logged in to share content")
-            showError(message: "Please log in to the app first")
+            showError(message: "You must log in to the app first to share content")
             return
         }
     }
 
     private func saveVideoToAPI(data: [String: Any], sessionToken: String) {
-        logger.info("🌐 Making POST request to save-video endpoint")
+        logger.info("🌐 Making POST request to post endpoint")
         
-        guard let url = URL(string: "https://ptvalert.xyz/api/save-video") else {
+        guard let url = URL(string: "https://ptvalert.xyz/api/post") else {
             logger.error("❌ Invalid API URL")
             showError(message: "Configuration error")
             return
@@ -275,6 +274,9 @@ class ShareViewController: UIViewController {
         if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
             logger.info("✅ Video saved successfully to backend")
             showSuccess()
+        } else if httpResponse.statusCode == 422 {
+            logger.info("⚠️ Video saved but location not found (422)")
+            showSuccessWithWarning(message: "We couldn't find the location from TikTok video, but we still saved it for you")
         } else {
             logger.error("❌ API request failed with status: \(httpResponse.statusCode)")
             var errorMessage = "Server error"
@@ -297,20 +299,59 @@ class ShareViewController: UIViewController {
         activityIndicator.stopAnimating()
         activityIndicator.alpha = 0
         
-        // Show and animate progress bar
-        progressView.alpha = 1
-        progressView.progress = 0
-        
-        // Update status after short delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        // Show the success message for 1 second
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            // Then show closing state
             self.statusLabel.text = "Closing..."
             
-            // Animate progress bar
-            UIView.animate(withDuration: 1.0, animations: {
-                self.progressView.progress = 1.0
-            }) { _ in
-                // Close after animation completes
+            // Show circular closing indicator
+            self.closingIndicator.alpha = 1
+            self.closingIndicator.startAnimating()
+            
+            // Close after 0.5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.completeRequest()
+            }
+        }
+    }
+    
+    private func showSuccessWithWarning(message: String) {
+        logger.info("⚠️ Showing success with warning: \(message)")
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.activityIndicator.stopAnimating() // Stop main spinner
+            self.statusLabel.text = "Saved!"
+            self.statusLabel.textColor = .systemOrange // Orange color for warning
+            
+            // Create and show warning message label
+            let warningLabel = UILabel()
+            warningLabel.text = message
+            warningLabel.font = UIFont.systemFont(ofSize: 12)
+            warningLabel.textColor = .systemOrange
+            warningLabel.textAlignment = .center
+            warningLabel.numberOfLines = 0
+            warningLabel.translatesAutoresizingMaskIntoConstraints = false
+            self.containerView.addSubview(warningLabel)
+            
+            // Position warning label below status label
+            NSLayoutConstraint.activate([
+                warningLabel.centerXAnchor.constraint(equalTo: self.containerView.centerXAnchor),
+                warningLabel.topAnchor.constraint(equalTo: self.statusLabel.bottomAnchor, constant: 10),
+                warningLabel.leadingAnchor.constraint(equalTo: self.containerView.leadingAnchor, constant: 20),
+                warningLabel.trailingAnchor.constraint(equalTo: self.containerView.trailingAnchor, constant: -20),
+            ])
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { // Display warning for 2 seconds
+                self.statusLabel.text = "Closing..."
+                self.statusLabel.textColor = .darkGray
+                warningLabel.isHidden = true // Hide warning message
+                self.closingIndicator.alpha = 1
+                self.closingIndicator.startAnimating()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    self.completeRequest()
+                }
             }
         }
     }
@@ -318,24 +359,57 @@ class ShareViewController: UIViewController {
     private func showError(message: String) {
         logger.error("❌ Showing error: \(message)")
         
-        // Update UI to show error
-        statusLabel.text = "Error: \(message)"
-        statusLabel.textColor = .systemRed
-        activityIndicator.stopAnimating()
-        activityIndicator.alpha = 0
-        
-        // Show progress bar and auto-close after 2 seconds
-        progressView.alpha = 1
-        progressView.progress = 0
-        progressView.progressTintColor = .systemRed
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.statusLabel.text = "Closing..."
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.activityIndicator.stopAnimating() // Stop main spinner
             
-            UIView.animate(withDuration: 1.0, animations: {
-                self.progressView.progress = 1.0
-            }) { _ in
-                self.completeRequest()
+            // Check if this is a login error vs other errors
+            if message.contains("log in") {
+                // Show login-specific message
+                self.statusLabel.text = message // Show the actual login message
+                self.statusLabel.textColor = .systemRed
+                self.statusLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium) // Smaller for longer text
+                
+                // No contact info for login errors - user just needs to log in
+            } else {
+                // Show generic error for API/server errors
+                self.statusLabel.text = "Saving post failed"
+                self.statusLabel.textColor = .systemRed
+                self.statusLabel.font = UIFont.systemFont(ofSize: 18, weight: .medium)
+                
+                // Add contact info label for server errors
+                let contactLabel = UILabel()
+                contactLabel.text = "Contact lai.contact.help@gmail.com if this keeps happening"
+                contactLabel.font = UIFont.systemFont(ofSize: 12, weight: .regular)
+                contactLabel.textColor = .systemRed
+                contactLabel.textAlignment = .center
+                contactLabel.numberOfLines = 0
+                contactLabel.translatesAutoresizingMaskIntoConstraints = false
+                self.containerView.addSubview(contactLabel)
+                
+                // Position contact label below main status
+                NSLayoutConstraint.activate([
+                    contactLabel.leadingAnchor.constraint(equalTo: self.containerView.leadingAnchor, constant: 20),
+                    contactLabel.trailingAnchor.constraint(equalTo: self.containerView.trailingAnchor, constant: -20),
+                    contactLabel.topAnchor.constraint(equalTo: self.statusLabel.bottomAnchor, constant: 10),
+                ])
+            }
+            
+            // Show the error message for 2 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                // Then show closing state
+                self.statusLabel.text = "Closing..."
+                self.statusLabel.textColor = .darkGray // Reset color for closing message
+                self.statusLabel.font = UIFont.systemFont(ofSize: 20, weight: .medium) // Reset font size
+                
+                // Show circular closing indicator
+                self.closingIndicator.alpha = 1
+                self.closingIndicator.startAnimating()
+                
+                // Close after 0.5 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.completeRequest()
+                }
             }
         }
     }

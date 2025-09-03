@@ -76,10 +76,11 @@ export default function Index() {
   // API state
   const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
   const [savedLocations, setSavedLocations] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(0);
   const REFRESH_INTERVAL = 10000; // 10 seconds in milliseconds
+  
+
 
   // Shake animation refs for each marker
   const shakeAnims = useRef<{ [key: string]: Animated.Value }>({}).current;
@@ -148,13 +149,11 @@ export default function Index() {
         return;
       }
       
-      setIsLoading(true);
       setError(null);
       
       // Check if we have user location before making the API call
       if (!userLocation) {
         console.log('No user location available, skipping API call');
-        setIsLoading(false);
         return;
       }
       
@@ -339,14 +338,12 @@ export default function Index() {
       setMapPoints(transformedMapPoints);
       setError(null); // Clear any previous errors
       setLastRefresh(Date.now()); // Update last refresh timestamp
-      setIsLoading(false); // Clear loading state after successful fetch
       console.log('🎉 [fetchMapPoints] Successfully fetched data from API, total points:', transformedMapPoints.length);
       console.log('📱 [fetchMapPoints] State updated with map points:', transformedMapPoints);
       
     } catch (err) {
       console.error('Error fetching map points:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch map points');
-      setIsLoading(false); // Clear loading state on error
       
       // Use fallback data if API fails
       const fallbackData = {
@@ -440,9 +437,6 @@ export default function Index() {
       
       setMapPoints(fallbackMapPoints);
       setError('Using offline data - network unavailable');
-      
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -452,22 +446,12 @@ export default function Index() {
     if (userLocation) {
       console.log('📍 [Map] User location available, calling fetchMapPoints');
       fetchMapPoints();
-      
-      // Safety check: ensure loading state is cleared for guest users after a timeout
-      if (isGuest) {
-        const safetyTimer = setTimeout(() => {
-          if (isLoading) {
-            console.log('⚠️ [Map] Safety timeout reached, clearing loading state for guest user');
-            setIsLoading(false);
-          }
-        }, 10000); // 10 second safety timeout
-        
-        return () => clearTimeout(safetyTimer);
-      }
     } else {
       console.log('📍 [Map] No user location available yet');
     }
   }, [userLocation]);
+  
+
 
   // Filter out blocked locations from map points
   useEffect(() => {
@@ -774,6 +758,9 @@ export default function Index() {
           longitudeDelta: 0.0421,
         };
         setUserLocation(defaultRegion);
+      } finally {
+        // Ensure loading is cleared even if location setup fails
+
       }
     }, 100); // 100ms delay to ensure component is mounted
 
@@ -798,12 +785,7 @@ export default function Index() {
         followsUserLocation={false}
         moveOnMarkerPress={false}
       >
-        {/* Loading indicator */}
-        {isLoading && (
-          <View style={styles.loadingOverlay}>
-            <Text style={styles.loadingText}>Loading locations...</Text>
-          </View>
-        )}
+
         
         {/* Error indicator */}
         {error && (
@@ -1309,17 +1291,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     
   },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    zIndex: 100,
-  },
-  loadingText: {
-    fontSize: 18,
-    color: '#333',
-  },
+
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
