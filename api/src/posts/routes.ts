@@ -3,7 +3,7 @@ import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
 import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces } from "./get-location";
 import { db } from "../database";
-import { type CreateLocationRequest, createLocation } from "./queries";
+import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord } from "./queries";
 
 
 interface NewPostRequest {
@@ -18,7 +18,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
     if (!sessionToken) {
         return new Response("Missing session token", {status: 401});
     }
-    if ((await verifySessionToken(sessionToken)) == null) {
+    const userId = await verifySessionToken(sessionToken);
+    if (userId == null) {
         return new Response("Invalid session token", {status: 401});
     }
 
@@ -48,19 +49,48 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     const placeId = placesResult.places[0]?.id;
     if (!placeId) {
-        // NOTE: here is where we'll send a different response (maybe a special code?) to initiate the manual
-        //       post definition system.
-        return new Response("Error finding place ID.", {status: 500});
+        // Location could not be automatically identified - prompt user to manually select location
+        return new Response(
+            JSON.stringify({
+                error: "LOCATION_NOT_FOUND",
+                message: "Location could not be automatically identified. Please manually select the location on the map.",
+                requiresManualLocation: true,
+                embedInfo: {
+                    title: embedInfo.title,
+                    authorName: embedInfo.authorName,
+                    thumbnailUrl: embedInfo.thumbnailUrl
+                }
+            }),
+            {status: 422, headers: {'Content-Type': 'application/json'}}
+        );
     }
 
     // Check if a location with this Google Place ID already exists
     const [rows, _] = await db.execute("SELECT id FROM map_points WHERE google_place_id = ?", [placeId]) as [any[], any];
     if (rows.length > 0) {
+        const existingLocationId = rows[0].id;
 
         // Save post to existing location
+        const postData: CreatePostRequest = {
+            url: data.url,
+            postedBy: userId,
+            mapPointId: existingLocationId
+        };
 
-        // TODO: Update returned response
-        return new Response();
+        const newPost = await createPostRecord(postData);
+        if (!newPost) {
+            return new Response("Error creating post for existing location.", {status: 500});
+        }
+
+        return new Response(
+            JSON.stringify({
+                success: true,
+                message: "Post created successfully for existing location",
+                post: newPost,
+                locationId: existingLocationId
+            }),
+            {status: 201, headers: {'Content-Type': 'application/json'}}
+        );
     }
 
     // If the location doesn't exist, we need to create it - first get the details
@@ -94,10 +124,27 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Error creating new location.", {status: 500});
     }
 
-    // TODO: Determine what we want to return here...
+    // Create the post for the new location
+    const postData: CreatePostRequest = {
+        url: data.url,
+        postedBy: userId,
+        mapPointId: newLocation.id
+    };
 
-    // TODO: Update returned response
-    return new Response()
+    const newPost = await createPostRecord(postData);
+    if (!newPost) {
+        return new Response("Error creating post for new location.", {status: 500});
+    }
+
+    return new Response(
+        JSON.stringify({
+            success: true,
+            message: "Post and location created successfully",
+            post: newPost,
+            location: newLocation
+        }),
+        {status: 201, headers: {'Content-Type': 'application/json'}}
+    );
 }
 
 

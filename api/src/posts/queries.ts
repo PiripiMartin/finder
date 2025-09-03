@@ -1,5 +1,6 @@
 import { db, toCamelCase } from "../database";
 import type { MapPoint } from "../map/types";
+import type { Post } from "./types";
 
 
 export interface CreateLocationRequest {
@@ -22,12 +23,44 @@ export async function createLocation(location: CreateLocationRequest): Promise<M
         INSERT INTO map_points (google_place_id, title, description, emoji, location, recommendable, website_url, phone_number, address)
         VALUES (?, ?, ?, ?, POINT(?, ?), ?, ?, ?, ?)
     `;
-    const [result, _] = await db.execute(query, [location.googlePlaceId, location.title, location.description, location.emoji, location.latitude, location.longitude, location.recommendable, location.websiteUrl, location.phoneNumber, location.address]) as [any[], any];
+    await db.execute(query, [location.googlePlaceId, location.title, location.description, location.emoji, location.latitude, location.longitude, location.recommendable, location.websiteUrl, location.phoneNumber, location.address]);
 
-    if (result.length === 0) {
+    // Get the inserted ID
+    const [idRows, _] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
+    const locationId = idRows[0].id;
+
+    // Fetch the created location to return it
+    const [locations, __] = await db.execute("SELECT * FROM map_points WHERE id = ?", [locationId]) as [any[], any];
+    if (locations.length === 0) {
         return null;
     }
 
-    return toCamelCase(result[0]) as MapPoint;
+    return toCamelCase(locations[0]) as MapPoint;
+}
+
+export interface CreatePostRequest {
+    url: string,
+    postedBy: number,
+    mapPointId: number
+}
+
+export async function createPost(post: CreatePostRequest): Promise<Post | null> {
+    const query = `
+        INSERT INTO posts (url, posted_by, map_point_id)
+        VALUES (?, ?, ?)
+    `;
+    await db.execute(query, [post.url, post.postedBy, post.mapPointId]);
+
+    // Get the inserted ID
+    const [idRows, _] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
+    const postId = idRows[0].id;
+
+    // Fetch the created post to return it
+    const [posts, __] = await db.execute("SELECT * FROM posts WHERE id = ?", [postId]) as [any[], any];
+    if (posts.length === 0) {
+        return null;
+    }
+
+    return toCamelCase(posts[0]) as Post;
 }
 

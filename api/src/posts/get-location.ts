@@ -181,7 +181,7 @@ export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDeta
             method: "GET",
             headers: {
                 "X-Goog-Api-Key": apiKey,
-                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.websiteUri",
+                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.websiteUri,places.generativeSummary",
             },
         });
         if (!response.ok) {
