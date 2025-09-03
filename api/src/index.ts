@@ -1,6 +1,7 @@
 import { createPost } from "./posts/routes";
 import { blockLocation, getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations } from "./map/routes";
 import { login, validateSessionToken, signup, getProfileData, deleteUserAccount } from "./user/routes";
+import { refresh } from "./utils";
 
 
 Bun.serve({
@@ -22,6 +23,9 @@ Bun.serve({
 
         // Post management routes
         "/api/post": {POST: createPost},
+
+        // Misc routes
+        "/api/refresh": {GET: refresh},
     }
 });
 

@@ -35,8 +35,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Error fetching TikTok embed information", {status: 500});
     }
 
-    console.log("Embed info:");
-    console.log(embedInfo);
+    //console.log("Embed info:");
+    //console.log(embedInfo);
 
     // Extract possible location name using LLM API
     const possiblePlaceName = await extractPossibleLocationName(embedInfo);
@@ -44,8 +44,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Error extracing location name from TikTok.", {status: 500});
     }
 
-    console.log("Possible place name:");
-    console.log(possiblePlaceName);
+    //console.log("Possible place name:");
+    //console.log(possiblePlaceName);
 
     // Text search Google Places with LLM output
     const placesResult = await searchGooglePlaces(possiblePlaceName);
@@ -53,13 +53,13 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Error searching Google Places.", {status: 500});
     }
 
-    console.log("Places result:");
-    console.log(placesResult);
+    //console.log("Places result:");
+    //console.log(placesResult);
 
-    const placeId = placesResult.places[0]?.id;
+    const placeId = placesResult?.places[0]?.id;
     if (!placeId) {
 
-        console.log("No place ID found. Requesting manual location.");
+        //console.log("No place ID found. Requesting manual location.");
 
         // Location could not be automatically identified - prompt user to manually select location
         return new Response(
@@ -77,13 +77,11 @@ export async function createPost(req: BunRequest): Promise<Response> {
         );
     }
 
-    console.log("Place ID:");
-    console.log(placeId);
 
     // Check if a location with this Google Place ID already exists
     const [rows, _] = await db.execute("SELECT id FROM map_points WHERE google_place_id = ?", [placeId]) as [any[], any];
     if (rows.length > 0) {
-        console.log("Location already exists.");
+        //console.log("Location already exists.");
         const existingLocationId = rows[0].id;
 
         // Save post to existing location
@@ -116,8 +114,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Error fetching Google Place details.", {status: 500});
     }
 
-    console.log("Place details:");
-    console.log(placeDetails);
+    //console.log("Place details:");
+    //console.log(placeDetails);
 
     // Generate description and emoji using Gemini API
     const locationDetails = await generateLocationDetails(placeDetails, embedInfo);
@@ -125,8 +123,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Error generating location description and emoji.", {status: 500});
     }
 
-    console.log("Location details:");
-    console.log(locationDetails);
+    //console.log("Location details:");
+    //console.log(locationDetails);
 
     // Create new location
     const location: CreateLocationRequest = {

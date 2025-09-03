@@ -28,3 +28,6 @@ export async function checkedExtractBody(
 }
 
 
+export function refresh(_req: BunRequest): Response {
+    return new Response("", {status: 401});
+}
