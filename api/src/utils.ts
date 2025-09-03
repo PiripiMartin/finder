@@ -28,6 +28,34 @@ export async function checkedExtractBody(
 }
 
 
+// In-memory toggle for the refresh endpoint status
+const REFRESH_TOGGLE_UUID = "f2d2a8f0-5c5b-4e9e-9f0b-1234567890ab"; // Hardcoded protection UUID
+let shouldReturnUnauthorizedForRefresh = false;
+
 export function refresh(_req: BunRequest): Response {
-    return new Response("", {status: 200});
+    return new Response("", {status: shouldReturnUnauthorizedForRefresh ? 401 : 200});
+}
+
+/**
+ * Protected endpoint to toggle the refresh status between 200 and 401.
+ * Protection: requires matching UUID via query param `key` or header `X-Toggle-Key`.
+ */
+export function toggleRefreshStatus(req: BunRequest): Response {
+    const url = new URL(req.url);
+    const keyFromQuery = url.searchParams.get("key");
+    const keyFromHeader = req.headers.get("X-Toggle-Key") || req.headers.get("x-toggle-key");
+    const providedKey = keyFromQuery || keyFromHeader;
+
+    if (providedKey !== REFRESH_TOGGLE_UUID) {
+        return new Response("Unauthorized", {status: 401});
+    }
+
+    shouldReturnUnauthorizedForRefresh = !shouldReturnUnauthorizedForRefresh;
+
+    return new Response(
+        JSON.stringify({
+            refreshStatus: shouldReturnUnauthorizedForRefresh ? 401 : 200
+        }),
+        {status: 200, headers: {"Content-Type": "application/json"}}
+    );
 }
