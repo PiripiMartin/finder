@@ -15,9 +15,9 @@
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLName": "TikTok Share",
+            "CFBundleURLName": "App Scheme",
             "CFBundleURLSchemes": [
-              "dew"
+              "lai"
             ]
           },
           {
@@ -55,6 +55,50 @@
           ],
           "category": [
             "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "SEND",
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ],
+          "category": [
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "SEND",
+          "data": [
+            {
+              "mimeType": "text/*"
+            }
+          ],
+          "category": [
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "SEND",
+          "data": [
+            {
+              "mimeType": "image/*"
+            }
+          ],
+          "category": [
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "SEND",
+          "data": [
+            {
+              "mimeType": "video/*"
+            }
+          ],
+          "category": [
             "DEFAULT"
           ]
         }

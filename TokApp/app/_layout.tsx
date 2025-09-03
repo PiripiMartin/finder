@@ -4,6 +4,7 @@ import { Linking, LogBox } from 'react-native';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
 import { LocationProvider } from './context/LocationContext';
+import { ShareProvider } from './context/ShareContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { DeepLinkHandler } from './utils/deepLinkHandler';
 
@@ -53,11 +54,13 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <LocationProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="_location" />
-              <Stack.Screen name="auth" />
-            </Stack>
+            <ShareProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="_location" />
+                <Stack.Screen name="auth" />
+              </Stack>
+            </ShareProvider>
           </LocationProvider>
         </AuthProvider>
       </ThemeProvider>

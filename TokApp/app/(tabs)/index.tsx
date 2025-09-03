@@ -9,6 +9,7 @@ import { WebView } from 'react-native-webview';
 import { getApiUrl, getGuestPostsUrl, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
+import { useShare } from '../context/ShareContext';
 import { useTheme } from '../context/ThemeContext';
 import { MapPoint } from '../mapData';
 
@@ -65,6 +66,7 @@ export default function Index() {
   const { theme } = useTheme();
   const { sessionToken, isGuest, logout } = useAuth();
   const { setSavedLocations: setContextSavedLocations, setRecommendedLocations: setContextRecommendedLocations, blockedLocationIds } = useLocationContext();
+  const { sharedContent, clearSharedContent } = useShare();
   const insets = useSafeAreaInsets();
 
   // Filter state
@@ -1116,6 +1118,41 @@ export default function Index() {
         </Animated.View>
       ) : null}
 
+      {/* Shared Content Notification */}
+      {sharedContent && (
+        <View style={[
+          styles.sharedContentNotification,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.primary,
+            top: insets.top + 60,
+          }
+        ]}>
+          <View style={styles.sharedContentHeader}>
+            <Ionicons 
+              name={sharedContent.isTikTokUrl ? "logo-tiktok" : "share"} 
+              size={20} 
+              color={theme.colors.primary} 
+            />
+            <Text style={[styles.sharedContentTitle, { color: theme.colors.text }]}>
+              {sharedContent.isTikTokUrl ? 'TikTok Shared!' : 'Content Shared!'}
+            </Text>
+            <TouchableOpacity onPress={clearSharedContent} style={styles.dismissButton}>
+              <Ionicons name="close" size={16} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.sharedContentSubtitle, { color: theme.colors.textSecondary }]}>
+            {sharedContent.isTikTokUrl 
+              ? 'Tap a location marker to add this TikTok video' 
+              : 'Tap a location marker to add this content'}
+          </Text>
+          {sharedContent.url && (
+            <Text style={[styles.sharedContentUrl, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+              {sharedContent.url}
+            </Text>
+          )}
+        </View>
+      )}
       
     </View>
   );
@@ -1364,6 +1401,42 @@ const styles = StyleSheet.create({
     color: '#4E8886',
     fontSize: 14,
     fontWeight: '600',
+  },
+  sharedContentNotification: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  sharedContentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sharedContentTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+    flex: 1,
+  },
+  dismissButton: {
+    padding: 4,
+  },
+  sharedContentSubtitle: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  sharedContentUrl: {
+    fontSize: 12,
+    fontFamily: 'monospace',
   },
 
 });
