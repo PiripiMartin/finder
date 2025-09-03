@@ -1,3 +1,4 @@
+import { createPost } from "./posts/routes";
 import { blockLocation, getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations } from "./map/routes";
 import { login, validateSessionToken, signup, getProfileData, deleteUserAccount } from "./user/routes";
 
@@ -19,6 +20,8 @@ Bun.serve({
         "/api/map/:id/posts": {GET: getPostsForLocation},
         "/api/map/:id/block": {POST: blockLocation},
 
+        // Post management routes
+        "/api/post": {POST: createPost},
     }
 });
 

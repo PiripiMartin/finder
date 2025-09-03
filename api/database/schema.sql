@@ -24,11 +24,12 @@ CREATE TABLE IF NOT EXISTS user_sessions(
 
 CREATE TABLE IF NOT EXISTS map_points (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    google_place_id VARCHAR(255) UNIQUE, /* NOTE: UNIQUE still allows multiple nulls */
     title VARCHAR(100) NOT NULL,
     description TEXT,
     emoji VARCHAR(16) NOT NULL,
     location POINT NOT NULL,
-    is_valid_location BOOLEAN NOT NULL,
+    --is_valid_location BOOLEAN NOT NULL,
     recommendable BOOLEAN NOT NULL DEFAULT FALSE,
 
     /* Extra business information */
@@ -45,9 +46,9 @@ CREATE TABLE IF NOT EXISTS map_points (
 CREATE TABLE IF NOT EXISTS posts (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     url VARCHAR(2048) NOT NULL,
-    posted_by INT,
+    posted_by INT NULL,
     map_point_id INT NOT NULL,
-    FOREIGN KEY (posted_by) REFERENCES users(id),
+    FOREIGN KEY (posted_by) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE,
 
     posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
