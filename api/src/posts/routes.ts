@@ -78,6 +78,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     const placeId = placesResult.places[0]!.id;
 
+    // Create embeddable TikTok URL
+    const embedUrl = `https://www.tiktok.com/player/v1/${embedInfo.embedProductId}?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
 
     // Check if a location with this Google Place ID already exists
     const [rows, _] = await db.execute("SELECT id FROM map_points WHERE google_place_id = ?", [placeId]) as [any[], any];
@@ -87,7 +89,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
         // Save post to existing location
         const postData: CreatePostRequest = {
-            url: data.url,
+            url: embedUrl,
             postedBy: userId,
             mapPointId: existingLocationId
         };
@@ -146,8 +148,6 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Error creating new location.", {status: 500});
     }
 
-    // Create embeddable TikTok URL
-    const embedUrl = `https://www.tiktok.com/player/v1/${embedInfo.embedProductId}?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
 
     // Create the post for the new location
     const postData: CreatePostRequest = {
