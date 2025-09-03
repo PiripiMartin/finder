@@ -56,9 +56,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
     //console.log("Places result:");
     //console.log(placesResult);
 
-    const placeId = placesResult?.places[0]?.id;
-    if (!placeId) {
-
+    // Check if places array exists and has at least one result
+    if (!placesResult?.places || placesResult.places.length === 0) {
         //console.log("No place ID found. Requesting manual location.");
 
         // Location could not be automatically identified - prompt user to manually select location
@@ -76,6 +75,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
             {status: 422, headers: {'Content-Type': 'application/json'}}
         );
     }
+
+    const placeId = placesResult.places[0]!.id;
 
 
     // Check if a location with this Google Place ID already exists
