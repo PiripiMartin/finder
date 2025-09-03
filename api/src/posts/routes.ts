@@ -1,8 +1,9 @@
 import type { BunRequest } from "bun";
 import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
-import { extractPossibleLocationName, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces } from "./get-location";
+import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces } from "./get-location";
 import { db } from "../database";
+import { type CreateLocationRequest, createLocation } from "./queries";
 
 
 interface NewPostRequest {
@@ -67,6 +68,33 @@ export async function createPost(req: BunRequest): Promise<Response> {
     if (!placeDetails) {
         return new Response("Error fetching Google Place details.", {status: 500});
     }
+
+    // Generate description and emoji using Gemini API
+    const locationDetails = await generateLocationDetails(placeDetails);
+    if (!locationDetails) {
+        return new Response("Error generating location description and emoji.", {status: 500});
+    }
+
+    // Create new location
+    const location: CreateLocationRequest = {
+        googlePlaceId: placeId,
+        title: placeDetails.place.displayName.text,
+        description: locationDetails.description,
+        emoji: locationDetails.emoji,
+        latitude: placeDetails.place.location.latitude,
+        longitude: placeDetails.place.location.longitude,
+        recommendable: false, // Always starts as false
+        websiteUrl: placeDetails.place.websiteUri,
+        phoneNumber: placeDetails.place.nationalPhoneNumber,
+        address: placeDetails.place.formattedAddress,
+    };
+
+    const newLocation = await createLocation(location);
+    if (!newLocation) {
+        return new Response("Error creating new location.", {status: 500});
+    }
+
+    // TODO: Determine what we want to return here...
 
     // TODO: Update returned response
     return new Response()

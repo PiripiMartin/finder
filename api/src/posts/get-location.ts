@@ -45,7 +45,10 @@ interface PlacesDetailsResponse {
             latitude: number,
             longitude: number
         },
-        formattedAddress: string
+        formattedAddress: string,
+        generativeSummary: {
+            overview: string
+        }
     };
 }
 
@@ -193,3 +196,76 @@ export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDeta
     return null;
 }
 
+export async function generateLocationDetails(placeDetails: PlacesDetailsResponse): Promise<{ description: string, emoji: string } | null> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is not set");
+    }
+
+    const prompt = `You are a location expert. Based on the following place information, generate a brief description (2-4 words) and a relevant emoji for this location.
+        Place Name: ${placeDetails.place.displayName.text}
+        Address: ${placeDetails.place.formattedAddress}
+        Overview: ${placeDetails.place.generativeSummary?.overview || 'No overview available'}
+        
+        Requirements:
+        1. Description should be 2-4 words that capture the essence of the place (e.g., "Cake and strawberry matcha", "Japanese-inspired cafe", "Cozy coffee shop")
+        2. Choose ONE emoji that best represents the place type or vibe (e.g., 🍰 for bakery, 🍵 for tea/cafe, ☕ for coffee, 🍕 for pizza, etc.)
+        3. Be concise and accurate
+        
+        Respond in this exact JSON format:
+        {
+          "description": "your brief description here",
+          "emoji": "your emoji here"
+        }`;
+
+    try {
+        const response = await fetch(AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "X-goog-api-key": apiKey,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ]
+            })
+        });
+
+        if (!response.ok) {
+            console.error(`Gemini API request failed: ${response.status}`);
+            return null;
+        }
+
+        const result = await response.json() as GeminiResponse;
+        const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!generatedText) {
+            return null;
+        }
+
+        // Parse the JSON response
+        try {
+            const parsed = JSON.parse(generatedText.trim());
+            if (parsed.description && parsed.emoji) {
+                return {
+                    description: parsed.description,
+                    emoji: parsed.emoji
+                };
+            }
+        } catch (parseError) {
+            console.error("Failed to parse Gemini API JSON response:", parseError);
+        }
+
+        return null;
+    } catch (error) {
+        console.error("Failed to generate location details:", error);
+        return null;
+    }
+}

@@ -51,6 +51,7 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
     return results.map(row => ({
         location: {
             id: row.id,
+            googlePlaceId: row.googlePlaceId,
             title: row.title,
             description: row.description,
             emoji: row.emoji,
@@ -146,6 +147,7 @@ export async function getRecommendedLocationsWithTopPost(
     return results.map(row => ({
         location: {
             id: row.id,
+            googlePlaceId: row.googlePlaceId,
             title: row.title,
             description: row.description,
             emoji: row.emoji,
