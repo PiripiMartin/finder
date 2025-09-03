@@ -10,6 +10,7 @@ class ShareViewController: UIViewController {
     // UI Elements
     private let containerView = UIView()
     private let statusLabel = UILabel()
+    private let brandLabel = UILabel() // "lai" branding
     private let activityIndicator = UIActivityIndicatorView(style: .large)
     private let closingIndicator = UIActivityIndicatorView(style: .medium)
     
@@ -43,6 +44,14 @@ class ShareViewController: UIViewController {
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(statusLabel)
         
+        // Brand label ("lai")
+        brandLabel.text = "lai"
+        brandLabel.font = UIFont.systemFont(ofSize: 40, weight: .bold) // Bigger letters
+        brandLabel.textColor = UIColor(red: 0.4, green: 0.3, blue: 0.2, alpha: 1.0) // Brown text color
+        brandLabel.textAlignment = .center
+        brandLabel.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(brandLabel)
+        
         // Activity indicator
         activityIndicator.color = .systemBlue
         activityIndicator.translatesAutoresizingMaskIntoConstraints = false
@@ -68,13 +77,17 @@ class ShareViewController: UIViewController {
             statusLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 40),
             statusLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -40),
             
-            // Activity indicator
+            // Activity indicator - positioned below status label
             activityIndicator.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
             activityIndicator.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 30),
             
-            // Closing indicator
+            // Closing indicator - positioned below status label (same position as activity indicator)
             closingIndicator.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-            closingIndicator.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 20),
+            closingIndicator.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 30),
+            
+            // Brand label - positioned below activity indicator
+            brandLabel.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            brandLabel.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 25),
         ])
         
         // Start the activity indicator
@@ -95,7 +108,7 @@ class ShareViewController: UIViewController {
         
         let group = DispatchGroup()
         var sharedData: [String: Any] = [:]
-
+        
         for (index, attachment) in attachments.enumerated() {
             logger.info("🔍 Processing attachment \(index + 1)/\(attachments.count)")
             group.enter()
@@ -157,7 +170,7 @@ class ShareViewController: UIViewController {
             self.sendDataToMainApp(data: sharedData)
         }
     }
-
+    
     private func extractURL(from text: String) -> String? {
         logger.debug("🔍 Extracting URL from text")
         let urlRegex = try! NSRegularExpression(pattern: "(https?://[^\\s]+)", options: [])
@@ -173,7 +186,7 @@ class ShareViewController: UIViewController {
         logger.debug("❌ No URL found in text")
         return nil
     }
-
+    
     private func sendDataToMainApp(data: [String: Any]) {
         logger.info("📤 Sending data to backend API")
         logger.info("📊 Data to send: \(data)")
@@ -295,12 +308,12 @@ class ShareViewController: UIViewController {
         logger.info("✅ Showing success state")
         
         // Update UI to show success
-        statusLabel.text = "Saved!"
+        statusLabel.text = "Saved! Find in your saved tab"
         activityIndicator.stopAnimating()
         activityIndicator.alpha = 0
         
         // Show the success message for 1 second
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             // Then show closing state
             self.statusLabel.text = "Closing..."
             

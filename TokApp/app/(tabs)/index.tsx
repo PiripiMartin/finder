@@ -1,16 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import Tutorial from '../components/Tutorial';
 import { getApiUrl, getGuestPostsUrl, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useShare } from '../context/ShareContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTutorial } from '../context/TutorialContext';
 import { MapPoint } from '../mapData';
 
 import { videoUrls } from '../videoData';
@@ -65,8 +67,10 @@ export default function Index() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
   const { sessionToken, isGuest, logout } = useAuth();
-  const { setSavedLocations: setContextSavedLocations, setRecommendedLocations: setContextRecommendedLocations, blockedLocationIds } = useLocationContext();
+  const { setSavedLocations: setContextSavedLocations, setRecommendedLocations: setContextRecommendedLocations, blockedLocationIds, registerRefreshCallback } = useLocationContext();
   const { sharedContent, clearSharedContent } = useShare();
+  const { shouldShowTutorial, completeTutorial, tutorialFeatureEnabled } = useTutorial();
+  const [showManualTutorial, setShowManualTutorial] = useState(false);
   const insets = useSafeAreaInsets();
 
   // Filter state
@@ -140,7 +144,7 @@ export default function Index() {
   };
 
   // Fetch map points from API
-  const fetchMapPoints = async () => {
+  const fetchMapPoints = useCallback(async () => {
     try {
       // Check if enough time has passed since last refresh
       const now = Date.now();
@@ -438,7 +442,7 @@ export default function Index() {
       setMapPoints(fallbackMapPoints);
       setError('Using offline data - network unavailable');
     }
-  };
+  }, [userLocation, isGuest, sessionToken]);
 
   // Load map points when user location is available
   useEffect(() => {
@@ -450,6 +454,18 @@ export default function Index() {
       console.log('📍 [Map] No user location available yet');
     }
   }, [userLocation]);
+
+  // Register refresh callback with LocationContext
+  useEffect(() => {
+    const unregister = registerRefreshCallback(() => {
+      console.log('🔄 [Map] Refresh triggered by LocationContext');
+      if (userLocation) {
+        fetchMapPoints();
+      }
+    });
+
+    return unregister;
+  }, [registerRefreshCallback, userLocation, fetchMapPoints]);
   
 
 
@@ -767,6 +783,20 @@ export default function Index() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Show tutorial overlay if needed (automatic or manual) and feature is enabled
+  if (tutorialFeatureEnabled && (shouldShowTutorial || showManualTutorial)) {
+    return (
+      <Tutorial 
+        onComplete={() => {
+          if (shouldShowTutorial) {
+            completeTutorial();
+          }
+          setShowManualTutorial(false);
+        }} 
+      />
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Full-screen map */}
@@ -899,6 +929,25 @@ export default function Index() {
       >
         <Ionicons name="navigate" size={28} color="#4E8886" />
       </TouchableOpacity>
+
+      {/* Tutorial Button - Below Location Button (only if feature enabled) */}
+      {tutorialFeatureEnabled && (
+        <TouchableOpacity 
+          style={[
+            styles.tutorialButton,
+            {
+              top: insets.top + 90, // 60px below location button (30 + 60)
+              left: insets.left + 30,
+            }
+          ]}
+          onPress={() => {
+            console.log('🎓 [Tutorial] Manual tutorial opened');
+            setShowManualTutorial(true);
+          }}
+        >
+          <Ionicons name="help-circle-outline" size={28} color="#4E8886" />
+        </TouchableOpacity>
+      )}
 
       {/* Guest Login Button - Top Right (only show when in guest mode) */}
       {isGuest && (
@@ -1246,6 +1295,20 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   locationButton: {
+    position: 'absolute',
+    backgroundColor: '#FFF0F0',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  tutorialButton: {
     position: 'absolute',
     backgroundColor: '#FFF0F0',
     borderRadius: 25,

@@ -1,18 +1,19 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTutorial } from '../context/TutorialContext';
 import { getCurrentLocation, getDefaultCoordinates } from '../utils/location';
 
 export default function LoginScreen() {
@@ -23,6 +24,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login, guestLogin } = useAuth();
   const { theme } = useTheme();
+  const { recheckTutorialAfterLogin } = useTutorial();
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -44,8 +46,9 @@ export default function LoginScreen() {
       console.log('✅ [Login] Login result:', success);
       
       if (success) {
-        console.log('🚀 [Login] Login successful, redirecting to main app');
-        // Navigation will be handled by the auth context
+        console.log('🚀 [Login] Login successful, rechecking tutorial state');
+        // Re-check tutorial state after successful login
+        await recheckTutorialAfterLogin();
         router.replace('/(tabs)');
       } else {
         console.log('❌ [Login] Login failed, showing error alert');
