@@ -23,7 +23,7 @@ export async function createLocation(location: CreateLocationRequest): Promise<M
         INSERT INTO map_points (google_place_id, title, description, emoji, location, recommendable, website_url, phone_number, address)
         VALUES (?, ?, ?, ?, POINT(?, ?), ?, ?, ?, ?)
     `;
-    await db.execute(query, [location.googlePlaceId, location.title, location.description, location.emoji, location.latitude, location.longitude, location.recommendable, location.websiteUrl, location.phoneNumber, location.address]);
+    await db.execute(query, [location.googlePlaceId, location.title, location.description, location.emoji, location.longitude, location.latitude, location.recommendable, location.websiteUrl, location.phoneNumber, location.address]);
 
     // Get the inserted ID
     const [idRows, _] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];

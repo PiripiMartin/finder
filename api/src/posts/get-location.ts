@@ -10,6 +10,7 @@ interface EmbedResponse {
     authorName: string,
     html: string,
     thumbnailUrl: string,
+    embedProductId: string,
 };
 
 // Gemini API response structure
@@ -34,22 +35,20 @@ interface PlacesTextSearchResponse {
 // Google Places Details API response structure (Enterprise SKU)
 // 1000 free calls per month, only called for *new* locations
 interface PlacesDetailsResponse {
-    place: {
-        id: string,
-        displayName: {
-            text: string
-        },
-        nationalPhoneNumber: string,
-        websiteUri: string,
-        location: {
-            latitude: number,
-            longitude: number
-        },
-        formattedAddress: string,
-        generativeSummary: {
-            overview: string
-        }
-    };
+    id: string,
+    displayName: {
+        text: string
+    },
+    nationalPhoneNumber: string,
+    websiteUri: string,
+    location: {
+        latitude: number,
+        longitude: number
+    },
+    formattedAddress: string,
+    generativeSummary: {
+        overview: string
+    }
 }
 
 
@@ -151,6 +150,8 @@ export async function searchGooglePlaces(searchQuery: string): Promise<PlacesTex
             })
         });
         if (!response.ok) {
+            //console.log("Error text:");
+            //console.log(await response.text());
             throw new Error(`Google Places API request failed: ${response.status}`);
         }
         
@@ -181,42 +182,61 @@ export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDeta
             method: "GET",
             headers: {
                 "X-Goog-Api-Key": apiKey,
-                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.websiteUri,places.generativeSummary",
+                "X-Goog-FieldMask": "id,displayName,formattedAddress,location,nationalPhoneNumber,websiteUri,generativeSummary",
             },
         });
         if (!response.ok) {
+            //console.log("Error text:");
+            //console.log(await response.text());
+
             throw new Error(`Google Places API request failed: ${response.status}`);
         }
         
         const result = await response.json() as PlacesDetailsResponse;
         return result;
     } catch (error) {
-        //console.error("Failed to fetch from Google Places API:", error);
+        console.error("Failed to fetch from Google Places API:", error);
     }
     return null;
 }
 
-export async function generateLocationDetails(placeDetails: PlacesDetailsResponse): Promise<{ description: string, emoji: string } | null> {
+export async function generateLocationDetails(placeDetails: PlacesDetailsResponse, embedInfo: EmbedResponse): Promise<{ description: string, emoji: string } | null> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not set");
     }
 
-    const prompt = `You are a location expert. Based on the following place information, generate a brief description (2-4 words) and a relevant emoji for this location.
-        Place Name: ${placeDetails.place.displayName.text}
-        Address: ${placeDetails.place.formattedAddress}
-        Overview: ${placeDetails.place.generativeSummary?.overview || 'No overview available'}
-        
-        Requirements:
-        1. Description should be 2-4 words that capture the essence of the place (e.g., "Cake and strawberry matcha", "Japanese-inspired cafe", "Cozy coffee shop")
-        2. Choose ONE emoji that best represents the place type or vibe (e.g., 🍰 for bakery, 🍵 for tea/cafe, ☕ for coffee, 🍕 for pizza, etc.)
-        3. Be concise and accurate
-        
-        Respond in this exact JSON format:
-        {
-          "description": "your brief description here",
-          "emoji": "your emoji here"
-        }`;
+    //console.log("Generating location details with TikTok context:");
+    //console.log("Video title:", embedInfo.title);
+    //console.log("Video author:", embedInfo.authorName);
+
+    const prompt = `You are a location expert. Based on the following place information and TikTok video context, generate a brief description and a relevant emoji for this location.
+
+Place Name: ${placeDetails.displayName.text}
+Address: ${placeDetails.formattedAddress}
+Overview: ${placeDetails.generativeSummary?.overview || 'No overview available'}
+
+TikTok Video Context:
+Title: ${embedInfo.title}
+Author: ${embedInfo.authorName}
+
+Requirements:
+1. Description should be 2-4 words that capture what makes this place special based on the TikTok video
+2. Focus on the specific food, drink, or experience featured in the video
+3. Description must NOT contain any punctuation (no commas, periods, apostrophes, hyphens, etc.)
+4. Choose ONE emoji that best represents the featured item or experience
+5. Be concise and accurate to what was shown in the video
+
+Examples of good descriptions based on video content:
+- "Cake and strawberry matcha" (if video shows these specific items)
+- "Japanese inspired cafe" (if video shows the cafe atmosphere)
+- "Cozy coffee shop" (if video emphasizes the cozy vibe)
+- "Fresh seafood restaurant" (if video shows fresh seafood)
+- "Vintage clothing store" (if video shows vintage items)
+
+CRITICAL: Respond with ONLY the description and emoji separated by a comma and space. No other text, no quotes, no punctuation in the description.
+
+Format: description, emoji`;
 
     try {
         const response = await fetch(AI_ENDPOINT, {
@@ -250,20 +270,32 @@ export async function generateLocationDetails(placeDetails: PlacesDetailsRespons
             return null;
         }
 
-        // Parse the JSON response
-        try {
-            const parsed = JSON.parse(generatedText.trim());
-            if (parsed.description && parsed.emoji) {
-                return {
-                    description: parsed.description,
-                    emoji: parsed.emoji
-                };
-            }
-        } catch (parseError) {
-            console.error("Failed to parse Gemini API JSON response:", parseError);
+        // Parse the comma-separated response
+        const trimmedText = generatedText.trim();
+        //console.log("Gemini response text:", trimmedText);
+        
+        const commaIndex = trimmedText.lastIndexOf(', ');
+        
+        if (commaIndex === -1) {
+            console.error("Failed to parse Gemini API response: no comma found");
+            return null;
         }
-
-        return null;
+        
+        const description = trimmedText.substring(0, commaIndex).trim();
+        const emoji = trimmedText.substring(commaIndex + 2).trim();
+        
+        //console.log("Parsed description:", description);
+        //console.log("Parsed emoji:", emoji);
+        
+        if (!description || !emoji) {
+            console.error("Failed to parse Gemini API response: missing description or emoji");
+            return null;
+        }
+        
+        return {
+            description: description,
+            emoji: emoji
+        };
     } catch (error) {
         console.error("Failed to generate location details:", error);
         return null;
