@@ -29,26 +29,38 @@ export function ShareProvider({ children }: { children: React.ReactNode }) {
 
     // Check for data from share extension
     const checkShareExtensionData = async () => {
+      console.log('🔍 [ShareContext] Checking for share extension data...');
       try {
         if (Platform.OS === 'ios' && ShareExtensionBridge) {
+          console.log('📱 [ShareContext] iOS detected, using native bridge');
           // Use native bridge to get data from UserDefaults
           const sharedData = await ShareExtensionBridge.getSharedData();
-          if (sharedData && typeof sharedData === 'object') {
-            console.log('📤 [ShareContext] Found share extension data:', sharedData);
+          console.log('🔍 [ShareContext] Native bridge returned:', sharedData);
+          
+          if (sharedData && typeof sharedData === 'object' && sharedData !== null) {
+            console.log('✅ [ShareContext] Found share extension data via native bridge:', sharedData);
             handleSharedContent(sharedData);
+            return; // Exit early if we found data
+          } else {
+            console.log('❌ [ShareContext] No data from native bridge');
           }
+        } else {
+          console.log('🤖 [ShareContext] Not iOS or no native bridge available');
         }
         
         // Fallback to AsyncStorage for Android or if native bridge fails
+        console.log('💾 [ShareContext] Checking AsyncStorage for shared data...');
         const sharedDataStr = await AsyncStorage.getItem('SharedExtensionData');
         if (sharedDataStr) {
           const sharedData = JSON.parse(sharedDataStr);
-          console.log('📤 [ShareContext] Found share extension data (AsyncStorage):', sharedData);
+          console.log('✅ [ShareContext] Found share extension data (AsyncStorage):', sharedData);
           await AsyncStorage.removeItem('SharedExtensionData');
           handleSharedContent(sharedData);
+        } else {
+          console.log('❌ [ShareContext] No data in AsyncStorage');
         }
       } catch (error) {
-        console.error('Error checking share extension data:', error);
+        console.error('❌ [ShareContext] Error checking share extension data:', error);
       }
     };
 
@@ -57,6 +69,7 @@ export function ShareProvider({ children }: { children: React.ReactNode }) {
     
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === 'active') {
+        console.log('📱 [ShareContext] App became active, checking for shared content');
         checkShareExtensionData();
       }
     };
@@ -72,41 +85,54 @@ export function ShareProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleSharedContent = async (content: any) => {
+    console.log('🚀 [ShareContext] Starting to handle shared content');
     setIsProcessingShare(true);
     
     try {
-      console.log('🔄 [ShareContext] Processing shared content:', content);
+      console.log('🔄 [ShareContext] Processing shared content:', JSON.stringify(content, null, 2));
       
       // Extract URL from different possible formats
       let sharedUrl = null;
       let sharedText = null;
       
+      console.log('🔍 [ShareContext] Analyzing content format...');
+      
       if (content.data) {
+        console.log('📦 [ShareContext] Content has data field');
         // react-native-share-menu format
         if (typeof content.data === 'string') {
+          console.log('📝 [ShareContext] Data is string type');
           if (content.data.includes('http')) {
+            console.log('🔗 [ShareContext] Data contains HTTP URL');
             const urlMatch = content.data.match(/(https?:\/\/[^\s]+)/);
             if (urlMatch) {
               sharedUrl = urlMatch[1];
               sharedText = content.data;
+              console.log('✅ [ShareContext] Extracted URL from data:', sharedUrl);
             }
           } else {
             sharedText = content.data;
+            console.log('📝 [ShareContext] Data is plain text:', sharedText.substring(0, 100) + '...');
           }
         } else {
           sharedUrl = content.data;
+          console.log('🔗 [ShareContext] Data is direct URL:', sharedUrl);
         }
       } else if (content.url) {
         sharedUrl = content.url;
+        console.log('🔗 [ShareContext] Using content.url:', sharedUrl);
       } else if (content.text && content.text.includes('http')) {
+        console.log('📝 [ShareContext] Content has text with HTTP');
         // Extract URL from text
         const urlMatch = content.text.match(/(https?:\/\/[^\s]+)/);
         if (urlMatch) {
           sharedUrl = urlMatch[1];
           sharedText = content.text;
+          console.log('✅ [ShareContext] Extracted URL from text:', sharedUrl);
         }
       } else if (content.text) {
         sharedText = content.text;
+        console.log('📝 [ShareContext] Content is plain text:', sharedText.substring(0, 100) + '...');
       }
       
       // Check if it's a TikTok URL
@@ -116,6 +142,14 @@ export function ShareProvider({ children }: { children: React.ReactNode }) {
         sharedUrl.includes('vt.tiktok.com')
       );
       
+      if (isTikTokUrl) {
+        console.log('🎵 [ShareContext] TikTok URL detected!');
+      } else if (sharedUrl) {
+        console.log('🔗 [ShareContext] Regular URL detected');
+      } else {
+        console.log('📝 [ShareContext] Text content only');
+      }
+      
       const processedContent = {
         ...content,
         url: sharedUrl,
@@ -124,18 +158,26 @@ export function ShareProvider({ children }: { children: React.ReactNode }) {
         timestamp: Date.now()
       };
       
+      console.log('📦 [ShareContext] Processed content object:', JSON.stringify(processedContent, null, 2));
       setSharedContent(processedContent);
+      console.log('💾 [ShareContext] Shared content state updated');
       
       // Show confirmation to user
+      const alertTitle = 'Content Shared';
+      const alertMessage = isTikTokUrl 
+        ? 'TikTok video received! You can now add it to a location on the map.'
+        : 'Content received! You can now use it in the app.';
+      
+      console.log('🚨 [ShareContext] Showing alert:', alertTitle, '-', alertMessage);
+      
       Alert.alert(
-        'Content Shared',
-        isTikTokUrl 
-          ? 'TikTok video received! You can now add it to a location on the map.'
-          : 'Content received! You can now use it in the app.',
+        alertTitle,
+        alertMessage,
         [
           {
             text: 'OK',
             onPress: () => {
+              console.log('👆 [ShareContext] User tapped OK, navigating to map');
               // Navigate to the map view
               router.replace('/(tabs)');
             }
@@ -143,7 +185,7 @@ export function ShareProvider({ children }: { children: React.ReactNode }) {
         ]
       );
       
-      console.log('✅ [ShareContext] Shared content processed:', processedContent);
+      console.log('✅ [ShareContext] Shared content processed successfully:', processedContent);
       
     } catch (error) {
       console.error('❌ [ShareContext] Error processing shared content:', error);
