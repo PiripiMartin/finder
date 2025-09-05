@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
-import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces } from "./get-location";
+import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, createManualLocationResponse } from "./get-location";
 import { db } from "../database";
 import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord } from "./queries";
 
@@ -41,7 +41,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
     // Extract possible location name using LLM API
     const possiblePlaceName = await extractPossibleLocationName(embedInfo);
     if (!possiblePlaceName) {
-        return new Response("Error extracing location name from TikTok.", {status: 500});
+        return createManualLocationResponse(embedInfo);
     }
 
     //console.log("Possible place name:");
@@ -61,19 +61,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
         //console.log("No place ID found. Requesting manual location.");
 
         // Location could not be automatically identified - prompt user to manually select location
-        return new Response(
-            JSON.stringify({
-                error: "LOCATION_NOT_FOUND",
-                message: "Location could not be automatically identified. Please manually select the location on the map.",
-                requiresManualLocation: true,
-                embedInfo: {
-                    title: embedInfo.title,
-                    authorName: embedInfo.authorName,
-                    thumbnailUrl: embedInfo.thumbnailUrl
-                }
-            }),
-            {status: 422, headers: {'Content-Type': 'application/json'}}
-        );
+        return createManualLocationResponse(embedInfo);
     }
 
     const placeId = placesResult.places[0]!.id;

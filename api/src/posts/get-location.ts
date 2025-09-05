@@ -89,6 +89,8 @@ export async function extractPossibleLocationName(embedInfo: EmbedResponse): Pro
     3. Include any location hints (city, neighborhood, etc.) if mentioned
     4. Be formatted as a simple text string suitable for Google Places API
 
+    IMPORTANT: If you cannot find a good search query, return an empty string and nothing else.
+
     Return ONLY the search query text, nothing else.`;
 
     const response = await fetch(AI_ENDPOINT, {
@@ -117,10 +119,16 @@ export async function extractPossibleLocationName(embedInfo: EmbedResponse): Pro
     try {
         const result = await response.json() as GeminiResponse;
         const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        // When the LLM is unsure about the result, return null
+        if (generatedText === "") {
+            return null;
+        }
         
         if (generatedText) {
             return generatedText.trim();
         }
+
         
         return null;
     } catch (error) {
@@ -200,6 +208,26 @@ export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDeta
     return null;
 }
 
+/**
+ * Creates a standardized response for when manual location definition is required.
+ * This is used when the LLM can't extract a location name or when Google Places search returns no results.
+ */
+export function createManualLocationResponse(embedInfo: EmbedResponse): Response {
+    return new Response(
+        JSON.stringify({
+            error: "LOCATION_NOT_FOUND",
+            message: "Location could not be automatically identified. Please manually select the location on the map.",
+            requiresManualLocation: true,
+            embedInfo: {
+                title: embedInfo.title,
+                authorName: embedInfo.authorName,
+                thumbnailUrl: embedInfo.thumbnailUrl
+            }
+        }),
+        {status: 422, headers: {'Content-Type': 'application/json'}}
+    );
+}
+
 export async function generateLocationDetails(placeDetails: PlacesDetailsResponse, embedInfo: EmbedResponse): Promise<{ description: string, emoji: string } | null> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -227,12 +255,13 @@ Requirements:
 4. Choose ONE emoji that best represents the featured item or experience
 5. Be concise and accurate to what was shown in the video
 
-Examples of good descriptions based on video content:
-- "Cake and strawberry matcha" (if video shows these specific items)
-- "Japanese inspired cafe" (if video shows the cafe atmosphere)
-- "Cozy coffee shop" (if video emphasizes the cozy vibe)
-- "Fresh seafood restaurant" (if video shows fresh seafood)
-- "Vintage clothing store" (if video shows vintage items)
+Examples of good responses are:
+- "Cake and strawberry matcha, 🍰" (if video shows these specific items)
+- "Authentic matcha, 🍵" (if video shows the matcha)
+- "Japanese inspired cafe, ☕️" (if video shows the cafe atmosphere)
+- "Cozy coffee shop, ☕️" (if video emphasizes the cozy vibe)
+- "Fresh seafood restaurant, 🦞" (if video shows fresh seafood)
+- "Vintage clothing store, 🎩" (if video shows vintage items)
 
 CRITICAL: Respond with ONLY the description and emoji separated by a comma and space. No other text, no quotes, no punctuation in the description.
 
