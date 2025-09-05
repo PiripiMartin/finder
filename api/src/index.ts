@@ -23,7 +23,7 @@ Bun.serve({
         "/api/map/guest-posts": {GET: getGuestRecommendations},
         "/api/map/saved": {GET: getSavedLocations},
         "/api/map/:id/posts": {GET: getPostsForLocation},
-        "/api/map/:id/block": {POST: blockLocation},
+        //"/api/map/:id/block": {POST: blockLocation},
 
         // Post management routes
         "/api/post": {POST: createPost},
