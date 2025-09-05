@@ -2,7 +2,11 @@ import { createPost } from "./posts/routes";
 import { blockLocation, getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations } from "./map/routes";
 import { login, validateSessionToken, signup, getProfileData, deleteUserAccount } from "./user/routes";
 import { refresh, toggleRefreshStatus } from "./utils";
+import { startSessionCleanupTask } from "./background-tasks";
 
+
+// Start background tasks
+startSessionCleanupTask();
 
 Bun.serve({
     port: 8000,

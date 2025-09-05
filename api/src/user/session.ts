@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { db } from "../database";
 
-const SESSION_LENGTH = 7; // Days
+const SESSION_LENGTH = 30; // Days (1 month)
 const DAYS_TO_MS = 86400000;
 
 export async function generateSessionToken(accountId: number): Promise<string> {
@@ -37,5 +37,18 @@ export async function verifySessionToken(token: string): Promise<number | null> 
     }
 
     return results[0].user_id as number;
+}
+
+/**
+ * Deletes all expired user sessions from the database.
+ * This function should be called periodically to clean up old sessions.
+ */
+export async function cleanupExpiredSessions(): Promise<number> {
+    const [result, _] = await db.execute(
+        "DELETE FROM user_sessions WHERE expires_at < NOW()"
+    ) as [any, any];
+    
+    // Return the number of deleted sessions
+    return result.affectedRows || 0;
 }
 
