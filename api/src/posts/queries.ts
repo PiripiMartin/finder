@@ -3,6 +3,35 @@ import type { MapPoint } from "../map/types";
 import type { Post } from "./types";
 
 
+export interface PostSaveAttempt {
+    id: number;
+    requestId: string | null;
+    url: string | null;
+    sessionToken: string | null;
+    userId: number | null;
+    createdAt: Date;
+}
+
+export interface CreatePostSaveAttemptInput {
+    requestId?: string | null;
+    url?: string | null;
+    sessionToken?: string | null;
+    userId?: number | null;
+}
+
+export async function createPostSaveAttempt(input: CreatePostSaveAttemptInput): Promise<PostSaveAttempt> {
+    const query = `
+        INSERT INTO post_save_attempts (request_id, url, session_token, user_id)
+        VALUES (?, ?, ?, ?)
+    `;
+    await db.execute(query, [input.requestId || null, input.url || null, input.sessionToken || null, input.userId ?? null]);
+
+    const [idRows, _] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
+    const attemptId = idRows[0].id;
+    const [rows, __] = await db.execute("SELECT * FROM post_save_attempts WHERE id = ?", [attemptId]) as [any[], any];
+    return toCamelCase(rows[0]) as PostSaveAttempt;
+}
+
 export interface CreateLocationRequest {
     googlePlaceId: string | null,
     title: string,

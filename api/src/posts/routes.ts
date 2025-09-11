@@ -3,7 +3,7 @@ import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
 import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, createManualLocationResponse } from "./get-location";
 import { db } from "../database";
-import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord } from "./queries";
+import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt } from "./queries";
 
 
 interface NewPostRequest {
@@ -12,9 +12,18 @@ interface NewPostRequest {
 
 
 export async function createPost(req: BunRequest): Promise<Response> {
-    
-    // First, check user has a valid session
-    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    // Extract basic info ASAP
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1] || null;
+    const data: NewPostRequest | null = await checkedExtractBody(req, ["url"]);
+
+    // Create an early attempt record (before auth and location resolution)
+    await createPostSaveAttempt({
+        requestId: crypto.randomUUID(),
+        url: data?.url ?? null,
+        sessionToken,
+    });
+
+    // Now check user has a valid session
     if (!sessionToken) {
         return new Response("Missing session token", {status: 401});
     }
@@ -22,9 +31,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
     if (userId == null) {
         return new Response("Invalid session token", {status: 401});
     }
+    // We can optionally record userId in the initial log if desired in future
 
-    // Extract post link from request body
-    const data: NewPostRequest = await checkedExtractBody(req, ["url"]);
     if (!data) {
         return new Response("Malformed body", {status: 400});
     }

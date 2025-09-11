@@ -55,5 +55,20 @@ CREATE TABLE IF NOT EXISTS posts (
 );
 
 
+/*
+ Track attempts to save a post as early as possible in the flow, before
+ user auth and location resolution, to measure success rates and errors.
+*/
+CREATE TABLE IF NOT EXISTS post_save_attempts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    request_id CHAR(36) NULL,
+    url VARCHAR(2048) NULL,
+    session_token CHAR(36) NULL,
+    user_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+
 
 
