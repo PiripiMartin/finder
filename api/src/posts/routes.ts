@@ -3,7 +3,7 @@ import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
 import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, createManualLocationResponse } from "./get-location";
 import { db } from "../database";
-import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt } from "./queries";
+import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, getOrCreateFallbackLocationId, fallbackPoint } from "./queries";
 
 
 interface NewPostRequest {
@@ -37,10 +37,35 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Malformed body", {status: 400});
     }
 
-    // Get TikTok embed info
+    // Get TikTok embed info (best-effort; fallback if it fails)
     const embedInfo = await getTikTokEmbedInfo(data.url);
+    const createFallback = async (urlForPost: string) => {
+        const fallbackLocationId = await getOrCreateFallbackLocationId();
+        const postData: CreatePostRequest = {
+            url: urlForPost,
+            postedBy: userId,
+            mapPointId: fallbackLocationId,
+        };
+        const newPost = await createPostRecord(postData);
+        if (!newPost) {
+            return new Response("Error creating post for fallback location.", {status: 500});
+        }
+        return new Response(
+            JSON.stringify({
+                success: true,
+                message: `Post created and attributed to fallback location: ${fallbackPoint}`,
+                post: newPost,
+                locationId: fallbackLocationId,
+                isFallbackLocation: true,
+            }),
+            // NOTE: We return a 422 because we need a unique code to indicate a valid location was not found/created
+            //       Eventually this will be used to signal the frontend to manually create a pin on the map.
+            { status: 422, headers: { 'Content-Type': 'application/json' } }
+
+        );
+    };
     if (!embedInfo) {
-        return new Response("Error fetching TikTok embed information", {status: 500});
+        return await createFallback(data.url);
     }
 
     //console.log("Embed info:");
@@ -58,7 +83,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
     // Text search Google Places with LLM output
     const placesResult = await searchGooglePlaces(possiblePlaceName);
     if (!placesResult) {
-        return new Response("Error searching Google Places.", {status: 500});
+        return await createFallback(data.url);
     }
 
     //console.log("Places result:");
@@ -66,10 +91,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     // Check if places array exists and has at least one result
     if (!placesResult?.places || placesResult.places.length === 0) {
-        //console.log("No place ID found. Requesting manual location.");
-
-        // Location could not be automatically identified - prompt user to manually select location
-        return createManualLocationResponse(embedInfo);
+        return await createFallback(data.url);
     }
 
     const placeId = placesResult.places[0]!.id;
@@ -110,7 +132,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
     // If the location doesn't exist, we need to create it - first get the details
     const placeDetails = await getGooglePlaceDetails(placeId);
     if (!placeDetails) {
-        return new Response("Error fetching Google Place details.", {status: 500});
+        return await createFallback(embedUrl);
     }
 
     //console.log("Place details:");
@@ -119,7 +141,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
     // Generate description and emoji using Gemini API
     const locationDetails = await generateLocationDetails(placeDetails, embedInfo);
     if (!locationDetails) {
-        return new Response("Error generating location description and emoji.", {status: 500});
+        return await createFallback(embedUrl);
     }
 
     //console.log("Location details:");
@@ -133,6 +155,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
         emoji: locationDetails.emoji,
         latitude: placeDetails.location.latitude,
         longitude: placeDetails.location.longitude,
+        isValidLocation: true, 
         recommendable: false, // Always starts as false
         websiteUrl: placeDetails.websiteUri,
         phoneNumber: placeDetails.nationalPhoneNumber,

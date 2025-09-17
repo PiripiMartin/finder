@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS map_points (
     description TEXT,
     emoji VARCHAR(16) NOT NULL,
     location POINT NOT NULL,
-    --is_valid_location BOOLEAN NOT NULL,
+    is_valid_location BOOLEAN NOT NULL,
     recommendable BOOLEAN NOT NULL DEFAULT FALSE,
 
     /* Extra business information */
