@@ -51,12 +51,62 @@ interface PlacesDetailsResponse {
     }
 }
 
+// Extracts TikTok video ID from common URL formats
+export function extractTikTokVideoId(inputUrl: string): string | null {
+    try {
+        // Examples: https://www.tiktok.com/@user/video/1234567890
+        //           https://www.tiktok.com/video/1234567890
+        //           https://m.tiktok.com/v/1234567890.html
+        //           https://vm.tiktok.com/xxxxxx (may require redirect resolution; not handled here)
+        const patterns: RegExp[] = [
+            /\/video\/(\d+)/,
+            /\/v\/(\d+)\.html/
+        ];
+        for (const pattern of patterns) {
+            const match = inputUrl.match(pattern);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+        // Some share links include item_id or share_item_id
+        const urlObj = new URL(inputUrl);
+        const itemId = urlObj.searchParams.get("item_id") || urlObj.searchParams.get("share_item_id");
+        if (itemId && /^\d+$/.test(itemId)) {
+            return itemId;
+        }
+    } catch {
+        // ignore
+    }
+    return null;
+}
+
+// Builds the standard TikTok player embed URL for a video id
+export function buildTikTokEmbedUrl(videoId: string): string {
+    return `https://www.tiktok.com/player/v1/${videoId}?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
+}
 
 export async function getTikTokEmbedInfo(vidUrl: string): Promise<EmbedResponse | null> {
 
-    const ttEmbedEndpoint = `https://www.tiktok.com/oembed?url=${vidUrl}`;
+    const ttEmbedEndpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(vidUrl)}`;
 
-    const embedResponse = await fetch(ttEmbedEndpoint);
+    const doFetch = async (): Promise<Response> => {
+        return await fetch(ttEmbedEndpoint, {
+            headers: {
+                // Some endpoints are stricter without a browser-like UA
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+                "Accept": "application/json"
+            }
+        });
+    };
+
+    let embedResponse = await doFetch();
+
+    // Simple retry on transient errors
+    if (embedResponse.status === 429 || (embedResponse.status >= 500 && embedResponse.status <= 599)) {
+        await new Promise((r) => setTimeout(r, 200));
+        embedResponse = await doFetch();
+    }
+
     if (embedResponse.status !== 200) {
         return null;
     }
