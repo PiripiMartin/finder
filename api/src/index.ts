@@ -1,4 +1,4 @@
-import { createPost } from "./posts/routes";
+import { createPost, deletePost } from "./posts/routes";
 import { blockLocation, getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations } from "./map/routes";
 import { login, validateSessionToken, signup, getProfileData, deleteUserAccount } from "./user/routes";
 import { refresh, toggleRefreshStatus } from "./utils";
@@ -27,6 +27,7 @@ Bun.serve({
 
         // Post management routes
         "/api/post": {POST: createPost},
+        "/api/post/:id": {DELETE: deletePost},
 
         // Misc routes
         "/api/refresh": {GET: refresh},

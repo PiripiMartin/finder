@@ -192,3 +192,46 @@ export async function createPost(req: BunRequest): Promise<Response> {
 }
 
 
+
+export async function deletePost(req: BunRequest): Promise<Response> {
+
+    // Verify authentication
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", {status: 401});
+    }
+    const userId = await verifySessionToken(sessionToken);
+    if (userId == null) {
+        return new Response("Invalid session token", {status: 401});
+    }
+
+    // Validate post id from path params
+    const postId: number = parseInt((req.params as any).id);
+    if (!postId || Number.isNaN(postId)) {
+        return new Response("Missing post id", {status: 400});
+    }
+
+    // Fetch the post to check ownership
+    const [rows, _] = await db.execute(
+        "SELECT posted_by FROM posts WHERE id = ?",
+        [postId]
+    ) as [any[], any];
+
+    if (rows.length === 0) {
+        return new Response("Post not found", {status: 404});
+    }
+
+    const ownerId = rows[0].posted_by as number | null;
+    if (ownerId == null || ownerId !== userId) {
+        return new Response("Forbidden", {status: 403});
+    }
+
+    // Delete the post
+    await db.execute("DELETE FROM posts WHERE id = ?", [postId]);
+
+    return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+}
+
