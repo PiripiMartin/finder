@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { db } from "../database";
 
-const SESSION_LENGTH = 30; // Days (1 month)
+const SESSION_LENGTH = 365; // Days (1 year)
 const DAYS_TO_MS = 86400000;
 
 export async function generateSessionToken(accountId: number): Promise<string> {
