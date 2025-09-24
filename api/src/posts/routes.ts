@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
-import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, createManualLocationResponse } from "./get-location";
+import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, createManualLocationResponse, extractTikTokVideoId, buildTikTokEmbedUrl } from "./get-location";
 import { db } from "../database";
 import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, getOrCreateFallbackLocationId, fallbackPoint } from "./queries";
 
@@ -39,6 +39,18 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     // Get TikTok embed info (best-effort; fallback if it fails)
     const embedInfo = await getTikTokEmbedInfo(data.url);
+
+    // Precompute an embed URL as early as possible
+    let embedUrl: string | null = null;
+    if (embedInfo?.embedProductId) {
+        embedUrl = buildTikTokEmbedUrl(embedInfo.embedProductId);
+    } else {
+        const videoId = extractTikTokVideoId(data.url);
+        if (videoId) {
+            embedUrl = buildTikTokEmbedUrl(videoId);
+        }
+    }
+
     const createFallback = async (urlForPost: string) => {
         const fallbackLocationId = await getOrCreateFallbackLocationId();
         const postData: CreatePostRequest = {
@@ -64,7 +76,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
         );
     };
-    if (!embedInfo) {
+    if (!embedInfo && !embedUrl) {
+        // Could not retrieve embed info nor parse video id; use the raw URL as last resort
         return await createFallback(data.url);
     }
 
@@ -72,9 +85,13 @@ export async function createPost(req: BunRequest): Promise<Response> {
     //console.log(embedInfo);
 
     // Extract possible location name using LLM API
-    const possiblePlaceName = await extractPossibleLocationName(embedInfo);
+    const possiblePlaceName = embedInfo ? await extractPossibleLocationName(embedInfo) : null;
     if (!possiblePlaceName) {
-        return createManualLocationResponse(embedInfo);
+        // If we have embed info, request manual location selection; otherwise fallback and store best embed URL
+        if (embedInfo) {
+            return createManualLocationResponse(embedInfo);
+        }
+        return await createFallback(embedUrl ?? data.url);
     }
 
     //console.log("Possible place name:");
@@ -83,7 +100,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
     // Text search Google Places with LLM output
     const placesResult = await searchGooglePlaces(possiblePlaceName);
     if (!placesResult) {
-        return await createFallback(data.url);
+        return await createFallback(embedUrl ?? data.url);
     }
 
     //console.log("Places result:");
@@ -91,13 +108,13 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     // Check if places array exists and has at least one result
     if (!placesResult?.places || placesResult.places.length === 0) {
-        return await createFallback(data.url);
+        return await createFallback(embedUrl ?? data.url);
     }
 
     const placeId = placesResult.places[0]!.id;
 
     // Create embeddable TikTok URL
-    const embedUrl = `https://www.tiktok.com/player/v1/${embedInfo.embedProductId}?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
+    embedUrl = embedUrl ?? buildTikTokEmbedUrl(embedInfo!.embedProductId);
 
     // Check if a location with this Google Place ID already exists
     const [rows, _] = await db.execute("SELECT id FROM map_points WHERE google_place_id = ?", [placeId]) as [any[], any];
@@ -107,7 +124,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
         // Save post to existing location
         const postData: CreatePostRequest = {
-            url: embedUrl,
+            url: embedUrl!,
             postedBy: userId,
             mapPointId: existingLocationId
         };
@@ -132,16 +149,16 @@ export async function createPost(req: BunRequest): Promise<Response> {
     // If the location doesn't exist, we need to create it - first get the details
     const placeDetails = await getGooglePlaceDetails(placeId);
     if (!placeDetails) {
-        return await createFallback(embedUrl);
+        return await createFallback(embedUrl ?? data.url);
     }
 
     //console.log("Place details:");
     //console.log(placeDetails);
 
     // Generate description and emoji using Gemini API
-    const locationDetails = await generateLocationDetails(placeDetails, embedInfo);
+    const locationDetails = await generateLocationDetails(placeDetails, embedInfo!);
     if (!locationDetails) {
-        return await createFallback(embedUrl);
+        return await createFallback(embedUrl ?? data.url);
     }
 
     //console.log("Location details:");
@@ -170,7 +187,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     // Create the post for the new location
     const postData: CreatePostRequest = {
-        url: embedUrl,
+        url: embedUrl!,
         postedBy: userId,
         mapPointId: newLocation.id
     };
