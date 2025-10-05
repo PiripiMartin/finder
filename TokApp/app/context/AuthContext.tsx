@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { getApiUrl } from '../config/api';
 import { logger } from '../utils/logger';
+import SharedUserDefaults from '../utils/SharedUserDefaults';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -33,6 +35,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const SESSION_TOKEN_KEY = 'session_token';
 
+  // Helper function to store session token in both AsyncStorage and shared UserDefaults
+  const storeSessionToken = async (token: string) => {
+    logger.info('AuthContext', 'Storing session token in AsyncStorage and shared UserDefaults');
+    logger.debug('AuthContext', `Platform.OS: ${Platform.OS}, SharedUserDefaults available: ${!!SharedUserDefaults}`);
+    
+    // Store in AsyncStorage (for main app)
+    await AsyncStorage.setItem(SESSION_TOKEN_KEY, token);
+    logger.info('AuthContext', 'Session token stored in AsyncStorage');
+    
+    // Store in shared UserDefaults (for share extension)
+    if (Platform.OS === 'ios') {
+      if (SharedUserDefaults) {
+        try {
+          logger.info('AuthContext', 'Attempting to store session token in shared UserDefaults...');
+          const result = await SharedUserDefaults.setSessionToken(token);
+          logger.info('AuthContext', `Session token stored in shared UserDefaults successfully: ${result}`);
+          
+          // Test reading it back immediately
+          const storedToken = await SharedUserDefaults.getSessionToken();
+          logger.info('AuthContext', `Verification - token read back from shared UserDefaults: ${storedToken ? 'SUCCESS' : 'FAILED'}`);
+          if (storedToken) {
+            logger.debug('AuthContext', `Stored token matches: ${storedToken === token}`);
+          }
+        } catch (error) {
+          logger.error('AuthContext', 'Failed to store session token in shared UserDefaults', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+          });
+        }
+      } else {
+        logger.error('AuthContext', 'SharedUserDefaults module is not available');
+      }
+    } else {
+      logger.debug('AuthContext', 'Not iOS platform, skipping shared UserDefaults storage');
+    }
+  };
+
+  // Helper function to remove session token from both locations
+  const removeSessionToken = async () => {
+    logger.info('AuthContext', 'Removing session token from all locations');
+    
+    await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
+    
+    if (Platform.OS === 'ios' && SharedUserDefaults) {
+      try {
+        await SharedUserDefaults.removeSessionToken();
+        logger.info('AuthContext', 'Session token removed from shared UserDefaults');
+      } catch (error) {
+        logger.error('AuthContext', 'Failed to remove session token from shared UserDefaults', error);
+      }
+    }
+  };
+
   const guestLogin = async () => {
     logger.info('AuthContext', 'Starting guest login');
     try {
@@ -51,7 +106,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkAuthStatus = async () => {
     logger.info('AuthContext', 'Checking authentication status');
     try {
-      const token = await AsyncStorage.getItem(SESSION_TOKEN_KEY);
+      // First check AsyncStorage
+      let token = await AsyncStorage.getItem(SESSION_TOKEN_KEY);
+      
+      // If no token in AsyncStorage and we're on iOS, also check SharedUserDefaults
+      if (!token && Platform.OS === 'ios' && SharedUserDefaults) {
+        try {
+          logger.debug('AuthContext', 'No token in AsyncStorage, checking SharedUserDefaults');
+          token = await SharedUserDefaults.getSessionToken();
+          if (token) {
+            logger.info('AuthContext', 'Found token in SharedUserDefaults, syncing to AsyncStorage');
+            // Sync the token back to AsyncStorage for consistency
+            await AsyncStorage.setItem(SESSION_TOKEN_KEY, token);
+          }
+        } catch (error) {
+          logger.warn('AuthContext', 'Failed to check SharedUserDefaults for token', error);
+        }
+      }
+      
       if (token) {
         logger.debug('AuthContext', 'Found stored session token, validating with API');
         // Validate the token with the API
@@ -64,20 +136,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (response.ok) {
           logger.info('AuthContext', 'Token validation successful, user authenticated');
+          // Ensure token is stored in both locations
+          await storeSessionToken(token);
           setSessionToken(token);
           setIsAuthenticated(true);
           setIsGuest(false);
         } else {
           logger.warn('AuthContext', 'Token validation failed, removing invalid token');
-          // Token is invalid, remove it
-          await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
+          // Token is invalid, remove it from all locations
+          await removeSessionToken();
           setSessionToken(null);
           setIsAuthenticated(false);
           setIsGuest(true); // Set guest mode when token is invalid
         }
       } else {
-        logger.debug('AuthContext', 'No stored session token found, setting guest mode');
-        setIsGuest(true); // Set guest mode when no token exists
+        logger.debug('AuthContext', 'No stored session token found in any location, user needs to log in');
+        setIsGuest(false); // User needs to authenticate, not guest mode
         setIsAuthenticated(false);
         setSessionToken(null);
       }
@@ -86,11 +160,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined
       });
-      // On error, assume not authenticated and set guest mode
-      await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
+      // On error, assume not authenticated and require login
+      await removeSessionToken();
       setSessionToken(null);
       setIsAuthenticated(false);
-      setIsGuest(true);
+      setIsGuest(false);
     } finally {
       logger.debug('AuthContext', 'Auth status check completed, setting loading to false');
       setIsLoading(false);
@@ -138,7 +212,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (token) {
           logger.info('AuthContext', 'Login successful, storing session token');
-          await AsyncStorage.setItem(SESSION_TOKEN_KEY, token);
+          await storeSessionToken(token);
           setSessionToken(token);
           setIsAuthenticated(true);
           setIsGuest(false); // Clear guest mode when login is successful
@@ -151,7 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           for (const field of possibleTokenFields) {
             if (data[field]) {
               logger.info('AuthContext', `Found token in field '${field}':`, data[field]);
-              await AsyncStorage.setItem(SESSION_TOKEN_KEY, data[field]);
+              await storeSessionToken(data[field]);
               setSessionToken(data[field]);
               setIsAuthenticated(true);
               setIsGuest(false);
@@ -217,8 +291,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const token = data.sessionToken;
         
         if (token) {
-          logger.info('AuthContext', 'Session token received, storing in AsyncStorage');
-          await AsyncStorage.setItem(SESSION_TOKEN_KEY, token);
+          logger.info('AuthContext', 'Session token received, storing in AsyncStorage and SharedUserDefaults');
+          await storeSessionToken(token);
           logger.info('AuthContext', 'Session token stored successfully');
           
           logger.info('AuthContext', 'Updating authentication state');
@@ -235,7 +309,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           for (const field of possibleTokenFields) {
             if (data[field]) {
               logger.info('AuthContext', `Found token in field '${field}':`, data[field]);
-              await AsyncStorage.setItem(SESSION_TOKEN_KEY, data[field]);
+              await storeSessionToken(data[field]);
               setSessionToken(data[field]);
               setIsAuthenticated(true);
               setIsGuest(false);
@@ -273,7 +347,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     logger.info('AuthContext', 'Starting logout process');
     try {
-      await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
+      await removeSessionToken();
       setSessionToken(null);
       setIsAuthenticated(false);
       setIsGuest(false);

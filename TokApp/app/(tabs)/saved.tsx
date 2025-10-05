@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
+import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
@@ -36,6 +37,7 @@ export default function Saved() {
   const router = useRouter();
   const { theme } = useTheme();
   const { sessionToken, isGuest } = useAuth();
+  const { registerRefreshCallback } = useLocationContext();
   
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<SavedLocation[]>([]);
@@ -46,7 +48,7 @@ export default function Saved() {
 
 
   // Fetch saved locations from API
-  const fetchSavedLocations = async () => {
+  const fetchSavedLocations = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -107,7 +109,7 @@ export default function Saved() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [sessionToken]);
 
   // Get unique emojis from saved locations
   const getUniqueEmojis = () => {
@@ -150,7 +152,17 @@ export default function Saved() {
   useEffect(() => {
     console.log('📚 [Saved] Page loaded, fetching saved locations...');
     fetchSavedLocations();
-  }, [sessionToken]);
+  }, [sessionToken, fetchSavedLocations]);
+
+  // Register refresh callback with LocationContext
+  useEffect(() => {
+    const unregister = registerRefreshCallback(() => {
+      console.log('🔄 [Saved] Refresh triggered by LocationContext');
+      fetchSavedLocations();
+    });
+
+    return unregister;
+  }, [registerRefreshCallback, fetchSavedLocations]);
 
   if (isLoading) {
     return (

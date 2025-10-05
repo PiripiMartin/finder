@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTutorial } from '../context/TutorialContext';
 import { logger } from '../utils/logger';
 
 export default function CreateAccountScreen() {
@@ -25,6 +26,7 @@ export default function CreateAccountScreen() {
   const router = useRouter();
   const { createAccount, guestLogin } = useAuth();
   const { theme } = useTheme();
+  const { recheckTutorialAfterLogin } = useTutorial();
 
   // Log component mount
   React.useEffect(() => {
@@ -145,8 +147,9 @@ export default function CreateAccountScreen() {
       console.log('✅ [CreateAccount] Account creation result:', success);
       
       if (success) {
-        console.log('🚀 [CreateAccount] Account creation successful, redirecting to main app');
-        // Navigation will be handled by the auth context
+        console.log('🚀 [CreateAccount] Account creation successful, rechecking tutorial state');
+        // Re-check tutorial state after successful account creation
+        await recheckTutorialAfterLogin();
         router.replace('/(tabs)');
       } else {
         console.log('❌ [CreateAccount] Account creation failed, showing error alert');

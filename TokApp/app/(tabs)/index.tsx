@@ -1,15 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import Tutorial from '../components/Tutorial';
 import { getApiUrl, getGuestPostsUrl, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
+import { useShare } from '../context/ShareContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTutorial } from '../context/TutorialContext';
 import { MapPoint } from '../mapData';
 
 import { videoUrls } from '../videoData';
@@ -64,7 +67,10 @@ export default function Index() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
   const { sessionToken, isGuest, logout } = useAuth();
-  const { setSavedLocations: setContextSavedLocations, setRecommendedLocations: setContextRecommendedLocations, blockedLocationIds } = useLocationContext();
+  const { setSavedLocations: setContextSavedLocations, setRecommendedLocations: setContextRecommendedLocations, blockedLocationIds, registerRefreshCallback } = useLocationContext();
+  const { sharedContent, clearSharedContent } = useShare();
+  const { shouldShowTutorial, completeTutorial, tutorialFeatureEnabled } = useTutorial();
+  const [showManualTutorial, setShowManualTutorial] = useState(false);
   const insets = useSafeAreaInsets();
 
   // Filter state
@@ -74,10 +80,11 @@ export default function Index() {
   // API state
   const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
   const [savedLocations, setSavedLocations] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(0);
   const REFRESH_INTERVAL = 10000; // 10 seconds in milliseconds
+  
+
 
   // Shake animation refs for each marker
   const shakeAnims = useRef<{ [key: string]: Animated.Value }>({}).current;
@@ -137,7 +144,7 @@ export default function Index() {
   };
 
   // Fetch map points from API
-  const fetchMapPoints = async () => {
+  const fetchMapPoints = useCallback(async () => {
     try {
       // Check if enough time has passed since last refresh
       const now = Date.now();
@@ -146,13 +153,11 @@ export default function Index() {
         return;
       }
       
-      setIsLoading(true);
       setError(null);
       
       // Check if we have user location before making the API call
       if (!userLocation) {
         console.log('No user location available, skipping API call');
-        setIsLoading(false);
         return;
       }
       
@@ -337,14 +342,12 @@ export default function Index() {
       setMapPoints(transformedMapPoints);
       setError(null); // Clear any previous errors
       setLastRefresh(Date.now()); // Update last refresh timestamp
-      setIsLoading(false); // Clear loading state after successful fetch
       console.log('🎉 [fetchMapPoints] Successfully fetched data from API, total points:', transformedMapPoints.length);
       console.log('📱 [fetchMapPoints] State updated with map points:', transformedMapPoints);
       
     } catch (err) {
       console.error('Error fetching map points:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch map points');
-      setIsLoading(false); // Clear loading state on error
       
       // Use fallback data if API fails
       const fallbackData = {
@@ -438,11 +441,8 @@ export default function Index() {
       
       setMapPoints(fallbackMapPoints);
       setError('Using offline data - network unavailable');
-      
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [userLocation, isGuest, sessionToken]);
 
   // Load map points when user location is available
   useEffect(() => {
@@ -450,22 +450,24 @@ export default function Index() {
     if (userLocation) {
       console.log('📍 [Map] User location available, calling fetchMapPoints');
       fetchMapPoints();
-      
-      // Safety check: ensure loading state is cleared for guest users after a timeout
-      if (isGuest) {
-        const safetyTimer = setTimeout(() => {
-          if (isLoading) {
-            console.log('⚠️ [Map] Safety timeout reached, clearing loading state for guest user');
-            setIsLoading(false);
-          }
-        }, 10000); // 10 second safety timeout
-        
-        return () => clearTimeout(safetyTimer);
-      }
     } else {
       console.log('📍 [Map] No user location available yet');
     }
   }, [userLocation]);
+
+  // Register refresh callback with LocationContext
+  useEffect(() => {
+    const unregister = registerRefreshCallback(() => {
+      console.log('🔄 [Map] Refresh triggered by LocationContext');
+      if (userLocation) {
+        fetchMapPoints();
+      }
+    });
+
+    return unregister;
+  }, [registerRefreshCallback, userLocation, fetchMapPoints]);
+  
+
 
   // Filter out blocked locations from map points
   useEffect(() => {
@@ -772,11 +774,28 @@ export default function Index() {
           longitudeDelta: 0.0421,
         };
         setUserLocation(defaultRegion);
+      } finally {
+        // Ensure loading is cleared even if location setup fails
+
       }
     }, 100); // 100ms delay to ensure component is mounted
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Show tutorial overlay if needed (automatic or manual) and feature is enabled
+  if (tutorialFeatureEnabled && (shouldShowTutorial || showManualTutorial)) {
+    return (
+      <Tutorial 
+        onComplete={() => {
+          if (shouldShowTutorial) {
+            completeTutorial();
+          }
+          setShowManualTutorial(false);
+        }} 
+      />
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -796,12 +815,7 @@ export default function Index() {
         followsUserLocation={false}
         moveOnMarkerPress={false}
       >
-        {/* Loading indicator */}
-        {isLoading && (
-          <View style={styles.loadingOverlay}>
-            <Text style={styles.loadingText}>Loading locations...</Text>
-          </View>
-        )}
+
         
         {/* Error indicator */}
         {error && (
@@ -915,6 +929,25 @@ export default function Index() {
       >
         <Ionicons name="navigate" size={28} color="#4E8886" />
       </TouchableOpacity>
+
+      {/* Tutorial Button - Below Location Button (only if feature enabled) */}
+      {tutorialFeatureEnabled && (
+        <TouchableOpacity 
+          style={[
+            styles.tutorialButton,
+            {
+              top: insets.top + 90, // 60px below location button (30 + 60)
+              left: insets.left + 30,
+            }
+          ]}
+          onPress={() => {
+            console.log('🎓 [Tutorial] Manual tutorial opened');
+            setShowManualTutorial(true);
+          }}
+        >
+          <Ionicons name="help-circle-outline" size={28} color="#4E8886" />
+        </TouchableOpacity>
+      )}
 
       {/* Guest Login Button - Top Right (only show when in guest mode) */}
       {isGuest && (
@@ -1116,6 +1149,41 @@ export default function Index() {
         </Animated.View>
       ) : null}
 
+      {/* Shared Content Notification */}
+      {sharedContent && (
+        <View style={[
+          styles.sharedContentNotification,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.primary,
+            top: insets.top + 60,
+          }
+        ]}>
+          <View style={styles.sharedContentHeader}>
+            <Ionicons 
+              name={sharedContent.isTikTokUrl ? "logo-tiktok" : "share"} 
+              size={20} 
+              color={theme.colors.primary} 
+            />
+            <Text style={[styles.sharedContentTitle, { color: theme.colors.text }]}>
+              {sharedContent.isTikTokUrl ? 'TikTok Shared!' : 'Content Shared!'}
+            </Text>
+            <TouchableOpacity onPress={clearSharedContent} style={styles.dismissButton}>
+              <Ionicons name="close" size={16} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.sharedContentSubtitle, { color: theme.colors.textSecondary }]}>
+            {sharedContent.isTikTokUrl 
+              ? 'Tap a location marker to add this TikTok video' 
+              : 'Tap a location marker to add this content'}
+          </Text>
+          {sharedContent.url && (
+            <Text style={[styles.sharedContentUrl, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+              {sharedContent.url}
+            </Text>
+          )}
+        </View>
+      )}
       
     </View>
   );
@@ -1240,6 +1308,20 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
+  tutorialButton: {
+    position: 'absolute',
+    backgroundColor: '#FFF0F0',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
 
   filterContainer: {
     position: 'absolute',
@@ -1272,17 +1354,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     
   },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    zIndex: 100,
-  },
-  loadingText: {
-    fontSize: 18,
-    color: '#333',
-  },
+
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -1364,6 +1436,42 @@ const styles = StyleSheet.create({
     color: '#4E8886',
     fontSize: 14,
     fontWeight: '600',
+  },
+  sharedContentNotification: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  sharedContentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sharedContentTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+    flex: 1,
+  },
+  dismissButton: {
+    padding: 4,
+  },
+  sharedContentSubtitle: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  sharedContentUrl: {
+    fontSize: 12,
+    fontFamily: 'monospace',
   },
 
 });

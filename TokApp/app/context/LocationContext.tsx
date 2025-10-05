@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useContext, useState } from 'react';
+import React, { createContext, ReactNode, useContext, useRef, useState } from 'react';
 
 export interface StoredLocation {
   location: {
@@ -33,6 +33,7 @@ interface LocationContextType {
   removeLocation: (id: string) => void;
   blockedLocationIds: string[];
   addBlockedLocation: (locationId: string) => void;
+  registerRefreshCallback: (callback: () => void) => () => void;
 }
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
@@ -53,6 +54,7 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   const [savedLocations, setSavedLocations] = useState<StoredLocation[]>([]);
   const [recommendedLocations, setRecommendedLocations] = useState<StoredLocation[]>([]);
   const [blockedLocationIds, setBlockedLocationIds] = useState<string[]>([]);
+  const refreshCallbacks = useRef<Set<() => void>>(new Set());
 
   const findLocationById = (id: string): StoredLocation | null => {
     // Search in both saved and recommended locations
@@ -61,10 +63,23 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   };
 
   const refreshLocations = () => {
-    // This function will be called to refresh all locations
-    // For now, it's a placeholder that can be implemented later
-    // to fetch fresh data from the API
-    console.log('Refreshing locations...');
+    console.log('🔄 [LocationContext] Refreshing all locations...');
+    // Call all registered refresh callbacks
+    refreshCallbacks.current.forEach(callback => {
+      try {
+        callback();
+      } catch (error) {
+        console.error('Error in refresh callback:', error);
+      }
+    });
+  };
+
+  const registerRefreshCallback = (callback: () => void): (() => void) => {
+    refreshCallbacks.current.add(callback);
+    // Return unregister function
+    return () => {
+      refreshCallbacks.current.delete(callback);
+    };
   };
 
   const removeLocation = (id: string) => {
@@ -89,6 +104,7 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     removeLocation,
     blockedLocationIds,
     addBlockedLocation,
+    registerRefreshCallback,
   };
 
   return (

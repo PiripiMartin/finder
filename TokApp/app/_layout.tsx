@@ -1,11 +1,40 @@
 import { Stack, useRouter } from "expo-router";
-import { useEffect } from 'react';
-import { Linking, LogBox } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { AppState, Linking, LogBox } from 'react-native';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
-import { LocationProvider } from './context/LocationContext';
+import { LocationProvider, useLocationContext } from './context/LocationContext';
+import { ShareProvider } from './context/ShareContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { TutorialProvider } from './context/TutorialContext';
 import { DeepLinkHandler } from './utils/deepLinkHandler';
+
+// Component to handle app state changes with access to LocationContext and AuthContext
+function AppStateHandler() {
+  const { refreshLocations } = useLocationContext();
+  const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: any) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log('🔄 [AppStateHandler] App has come to the foreground, triggering refresh');
+        refreshLocations();
+        // Note: Authentication status is already checked continuously through the AuthContext
+        // The AuthProvider automatically handles token validation on app startup
+        // Additional auth checks on foreground would be handled by individual screens as needed
+      }
+      appState.current = nextAppState;
+    };
+
+    const appStateListener = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      appStateListener.remove();
+    };
+  }, [refreshLocations]);
+
+  return null; // This component doesn't render anything
+}
 
 export default function RootLayout() {
   const router = useRouter();
@@ -48,17 +77,24 @@ export default function RootLayout() {
     };
   }, []);
 
+  // Moved app state handling to separate component that has access to LocationContext
+
   return (
     <ErrorBoundary>
       <ThemeProvider>
         <AuthProvider>
-          <LocationProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="_location" />
-              <Stack.Screen name="auth" />
-            </Stack>
-          </LocationProvider>
+          <TutorialProvider>
+            <LocationProvider>
+              <AppStateHandler />
+              <ShareProvider>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="_location" />
+                  <Stack.Screen name="auth" />
+                </Stack>
+              </ShareProvider>
+            </LocationProvider>
+          </TutorialProvider>
         </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
