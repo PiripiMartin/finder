@@ -24,7 +24,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login, guestLogin } = useAuth();
   const { theme } = useTheme();
-  const { recheckTutorialAfterLogin } = useTutorial();
+  const { recheckTutorialAfterLogin, tutorialFeatureEnabled, isLoading: tutorialLoading } = useTutorial();
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -203,15 +203,19 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.guestButton}
-          onPress={handleGuestLogin}
-          disabled={isLoading}
-        >
-          <Text style={styles.guestButtonText}>
-            {isLoading ? 'Entering guest mode...' : 'Continue as Guest'}
-          </Text>
-        </TouchableOpacity>
+        {/* Only show guest button when tutorial feature flag is NOT enabled (not 200) and not loading */}
+        {!tutorialLoading && !tutorialFeatureEnabled && (
+          <TouchableOpacity
+            style={styles.guestButton}
+            onPress={handleGuestLogin}
+            disabled={isLoading}
+          >
+            <Text style={styles.guestButtonText}>
+              {isLoading ? 'Entering guest mode...' : 'Continue as Guest'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
       </ScrollView>
     </KeyboardAvoidingView>
   );

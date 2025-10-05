@@ -9,7 +9,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { TutorialProvider } from './context/TutorialContext';
 import { DeepLinkHandler } from './utils/deepLinkHandler';
 
-// Component to handle app state changes with access to LocationContext
+// Component to handle app state changes with access to LocationContext and AuthContext
 function AppStateHandler() {
   const { refreshLocations } = useLocationContext();
   const appState = useRef(AppState.currentState);
@@ -19,6 +19,9 @@ function AppStateHandler() {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         console.log('🔄 [AppStateHandler] App has come to the foreground, triggering refresh');
         refreshLocations();
+        // Note: Authentication status is already checked continuously through the AuthContext
+        // The AuthProvider automatically handles token validation on app startup
+        // Additional auth checks on foreground would be handled by individual screens as needed
       }
       appState.current = nextAppState;
     };

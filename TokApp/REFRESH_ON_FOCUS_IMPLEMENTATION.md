@@ -81,3 +81,4 @@ LocationContext calls all registered callbacks
 Map Screen: fetchMapPoints() → API call → Update map data
 Saved Screen: fetchSavedLocations() → API call → Update saved data
 ```
+

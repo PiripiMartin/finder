@@ -4,7 +4,7 @@ import { buildApiUrl } from '../config/api';
 
 interface TutorialContextType {
   shouldShowTutorial: boolean;
-  showTutorial: () => Promise<void>;
+  showTutorial: () => void;
   completeTutorial: () => void;
   isLoading: boolean;
   tutorialFeatureEnabled: boolean;
@@ -21,9 +21,32 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [tutorialFeatureEnabled, setTutorialFeatureEnabled] = useState(false);
 
   useEffect(() => {
-    console.log('🎓 [Tutorial] TutorialProvider mounted, starting feature flag check');
-    checkFeatureFlag();
+    console.log('🎓 [Tutorial] TutorialProvider mounted, checking feature flag (but not showing tutorial)');
+    checkFeatureFlagOnly();
   }, []);
+
+  // Check feature flag but don't show tutorial automatically
+  const checkFeatureFlagOnly = async () => {
+    try {
+      console.log('🎓 [Tutorial] Checking feature flag for guest button logic');
+      const apiUrl = buildApiUrl('/refresh');
+      const response = await fetch(apiUrl);
+      console.log('🎓 [Tutorial] Response status:', response.status);
+      
+      if (response.status === 200) {
+        console.log('🎓 [Tutorial] Feature flag enabled - guest button will be hidden');
+        setTutorialFeatureEnabled(true);
+      } else {
+        console.log('🎓 [Tutorial] Feature flag disabled - guest button will be shown');
+        setTutorialFeatureEnabled(false);
+      }
+      setIsLoading(false);
+    } catch (error) {
+      console.error('🎓 [Tutorial] Error checking feature flag:', error);
+      setTutorialFeatureEnabled(false);
+      setIsLoading(false);
+    }
+  };
 
   const checkFeatureFlag = async () => {
     try {
@@ -36,9 +59,13 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       console.log('🎓 [Tutorial] Response status:', response.status);
       
       if (response.status === 200) {
-        console.log('🎓 [Tutorial] Feature flag enabled - tutorial will be available');
+        console.log('🎓 [Tutorial] Feature flag enabled - showing tutorial on login regardless of completion status');
         setTutorialFeatureEnabled(true);
-        await checkTutorialStatus();
+        
+        // Always show tutorial when feature flag is enabled, ignoring local storage
+        console.log('🎓 [Tutorial] Showing tutorial (feature flag enabled)');
+        setShouldShowTutorial(true);
+        setIsLoading(false);
       } else {
         console.log('🎓 [Tutorial] Feature flag disabled - tutorial hidden (status:', response.status, ')');
         setTutorialFeatureEnabled(false);
@@ -51,42 +78,20 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const checkTutorialStatus = async () => {
-    try {
-      const tutorialCompleted = await AsyncStorage.getItem(TUTORIAL_COMPLETED_KEY);
-      console.log('🎓 [Tutorial] Tutorial status:', tutorialCompleted ? 'completed' : 'not completed');
-      setIsLoading(false);
-    } catch (error) {
-      console.error('🎓 [Tutorial] Error checking tutorial status:', error);
-      setIsLoading(false);
-    }
-  };
-
-  const showTutorial = async () => {
+  const showTutorial = () => {
     console.log('🎓 [Tutorial] showTutorial called - tutorialFeatureEnabled:', tutorialFeatureEnabled, 'isLoading:', isLoading);
     if (!tutorialFeatureEnabled) {
       console.log('🎓 [Tutorial] Tutorial feature disabled - not showing tutorial');
       return;
     }
     
-    // Check if tutorial was already completed
-    try {
-      const tutorialCompleted = await AsyncStorage.getItem(TUTORIAL_COMPLETED_KEY);
-      if (tutorialCompleted) {
-        console.log('🎓 [Tutorial] Tutorial already completed - not showing');
-        return;
-      }
-    } catch (error) {
-      console.error('🎓 [Tutorial] Error checking tutorial completion status:', error);
-    }
-    
-    console.log('🎓 [Tutorial] Showing tutorial for user');
+    console.log('🎓 [Tutorial] Showing tutorial for user (server enabled via 200 response)');
     setShouldShowTutorial(true);
   };
 
   const completeTutorial = async () => {
     try {
-      console.log('🎓 [Tutorial] Marking tutorial as completed');
+      console.log('🎓 [Tutorial] Marking tutorial as completed (will show again on next login if feature flag enabled)');
       await AsyncStorage.setItem(TUTORIAL_COMPLETED_KEY, 'true');
       setShouldShowTutorial(false);
     } catch (error) {
@@ -101,7 +106,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setIsLoading(true);
     setTutorialFeatureEnabled(false);
     
-    // Re-check feature flag
+    // Re-check feature flag (which now includes completion check)
     await checkFeatureFlag();
   };
 

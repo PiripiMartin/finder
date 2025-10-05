@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Dimensions,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
