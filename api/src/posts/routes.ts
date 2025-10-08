@@ -1,9 +1,10 @@
 import type { BunRequest } from "bun";
 import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
-import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, createManualLocationResponse, extractTikTokVideoId, buildTikTokEmbedUrl } from "./get-location";
+import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, createManualLocationResponse, extractTikTokVideoId, buildTikTokEmbedUrl, FALLBACK_LOCATION_ID } from "./get-location";
 import { db } from "../database";
 import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, getOrCreateFallbackLocationId, fallbackPoint } from "./queries";
+import type { Post } from "./types";
 
 
 interface NewPostRequest {
@@ -57,11 +58,13 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
         // TODO
         // Attribute post to default location
+        const post = await createPostForFallbackLocation(embedUrl!, userId);
+        if (!post) return new Response("", {status: 500});
 
 
         // Still notify user the lcoation couldn't be resolve
         // (This will eventually trigger manual attribution flow)
-        return createManualLocationResponse(embedInfo);
+        return createManualLocationResponse(post);
     }
 
 
@@ -73,11 +76,13 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
         // TODO
         // Attribute post to default location
+        const post = await createPostForFallbackLocation(embedUrl!, userId);
+        if (!post) return new Response("", {status: 500});
 
 
         // Still notify user the lcoation couldn't be resolve
         // (This will eventually trigger manual attribution flow)
-        return createManualLocationResponse(embedInfo);
+        return createManualLocationResponse(post);
     }
 
 
@@ -88,18 +93,16 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
         // TODO
         // Attribute post to default location
+        const post = await createPostForFallbackLocation(embedUrl!, userId);
+        if (!post) return new Response("", {status: 500});
 
 
         // Still notify user the lcoation couldn't be resolve
         // (This will eventually trigger manual attribution flow)
-        return createManualLocationResponse(embedInfo);
+        return createManualLocationResponse(post);
     }
 
     const placeId = placesResult.places[0]!.id;
-
-    // TODO: This is likely redundant in all cases
-    // Create embeddable TikTok URL
-    //embedUrl = embedUrl ?? buildTikTokEmbedUrl(embedInfo!.embedProductId);
 
     // Check if a location with this Google Place ID already exists
     const [rows, _] = await db.execute("SELECT id FROM map_points WHERE google_place_id = ?", [placeId]) as [any[], any];
@@ -138,10 +141,12 @@ export async function createPost(req: BunRequest): Promise<Response> {
         // TODO: Potentially prompt user to manually enter information? Since we have
         //       the location resolved we can place it on the map, we just need general
         //       business info, e.g. name which the user could fill out.
+        const post = await createPostForFallbackLocation(embedUrl!, userId);
+        if (!post) return new Response("", {status: 500});
 
         console.error("Failed to resolve place details");
 
-        return createManualLocationResponse(embedInfo);
+        return createManualLocationResponse(post);
     }
 
     //console.log("Place details:");
@@ -154,10 +159,12 @@ export async function createPost(req: BunRequest): Promise<Response> {
         // TODO: Potentially prompt user to manually enter information? Since we have
         //       the location resolved we can place it on the map, we just need general
         //       business info, e.g. name which the user could fill out.
+        const post = await createPostForFallbackLocation(embedUrl!, userId);
+        if (!post) return new Response("", {status: 500});
 
         console.error("Failed to generate tagline and emoji");
 
-        return createManualLocationResponse(embedInfo);
+        return createManualLocationResponse(post);
     }
 
     //console.log("Location details:");
@@ -249,5 +256,16 @@ export async function deletePost(req: BunRequest): Promise<Response> {
         JSON.stringify({ success: true }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
+}
+
+async function createPostForFallbackLocation(embedUrl: string, userId: number): Promise<Post | null> {
+    
+    const postData: CreatePostRequest = {
+        url: embedUrl,
+        postedBy: userId,
+        mapPointId: FALLBACK_LOCATION_ID
+    };
+
+    return await createPostRecord(postData);
 }
 

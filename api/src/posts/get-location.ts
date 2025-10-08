@@ -1,4 +1,5 @@
 import { toCamelCase } from "../database";
+import type { Post } from "./types";
 
 const AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
 
@@ -250,17 +251,14 @@ export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDeta
  * Creates a standardized response for when manual location definition is required.
  * This is used when the LLM can't extract a location name or when Google Places search returns no results.
  */
-export function createManualLocationResponse(embedInfo: EmbedResponse): Response {
+export function createManualLocationResponse(post: Post): Response {
     return new Response(
         JSON.stringify({
             error: "LOCATION_NOT_FOUND",
             message: "Location could not be automatically identified. Please manually select the location on the map.",
             requiresManualLocation: true,
-            embedInfo: {
-                title: embedInfo.title,
-                authorName: embedInfo.authorName,
-                thumbnailUrl: embedInfo.thumbnailUrl
-            }
+            post: post,
+            locationId: FALLBACK_LOCATION_ID
         }),
         {status: 422, headers: {'Content-Type': 'application/json'}}
     );
