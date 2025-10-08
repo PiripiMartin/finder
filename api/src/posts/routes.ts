@@ -242,8 +242,8 @@ export async function deletePost(req: BunRequest): Promise<Response> {
         return new Response("Forbidden", {status: 403});
     }
 
-    // Delete the post
-    await db.execute("DELETE FROM posts WHERE id = ?", [postId]);
+    // Delete the post FOR THE USER ONLY!
+    await db.execute("UPDATE posts SET posted_by = NULL WHERE id = ?", [postId]);
 
     return new Response(
         JSON.stringify({ success: true }),
