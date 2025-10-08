@@ -188,3 +188,5 @@ export async function fetchPostsForLocation(locationId: number): Promise<Post[]>
 
     return results;
 }
+
+

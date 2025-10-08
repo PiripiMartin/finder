@@ -2,6 +2,8 @@ import { toCamelCase } from "../database";
 
 const AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
 
+export const FALLBACK_LOCATION_ID = 86;
+
 
 // Contains everything 'interesting' from the TikTok embed API
 interface EmbedResponse {
@@ -89,25 +91,11 @@ export async function getTikTokEmbedInfo(vidUrl: string): Promise<EmbedResponse 
 
     const ttEmbedEndpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(vidUrl)}`;
 
-    const doFetch = async (): Promise<Response> => {
-        return await fetch(ttEmbedEndpoint, {
-            headers: {
-                // Some endpoints are stricter without a browser-like UA
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-                "Accept": "application/json"
-            }
-        });
-    };
 
-    let embedResponse = await doFetch();
-
-    // Simple retry on transient errors
-    if (embedResponse.status === 429 || (embedResponse.status >= 500 && embedResponse.status <= 599)) {
-        await new Promise((r) => setTimeout(r, 200));
-        embedResponse = await doFetch();
-    }
+    let embedResponse = await fetch(ttEmbedEndpoint);
 
     if (embedResponse.status !== 200) {
+        console.error("TikTok API Failed with error: ", await embedResponse.text());
         return null;
     }
 

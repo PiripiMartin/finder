@@ -37,84 +37,69 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Malformed body", {status: 400});
     }
 
-    // Get TikTok embed info (best-effort; fallback if it fails)
+    // Get TikTok embed info
     const embedInfo = await getTikTokEmbedInfo(data.url);
+    if (!embedInfo || !embedInfo.embedProductId) {
+        return new Response("Couldn't get TikTok video ID from link.", {status: 500});
+    }
 
-    // Precompute an embed URL as early as possible
+    // Compute embed URL
     let embedUrl: string | null = null;
     if (embedInfo?.embedProductId) {
         embedUrl = buildTikTokEmbedUrl(embedInfo.embedProductId);
-    } else {
-        const videoId = extractTikTokVideoId(data.url);
-        if (videoId) {
-            embedUrl = buildTikTokEmbedUrl(videoId);
-        }
-    }
-
-    const createFallback = async (urlForPost: string) => {
-        const fallbackLocationId = await getOrCreateFallbackLocationId();
-        const postData: CreatePostRequest = {
-            url: urlForPost,
-            postedBy: userId,
-            mapPointId: fallbackLocationId,
-        };
-        const newPost = await createPostRecord(postData);
-        if (!newPost) {
-            return new Response("Error creating post for fallback location.", {status: 500});
-        }
-        return new Response(
-            JSON.stringify({
-                success: true,
-                message: `Post created and attributed to fallback location: ${fallbackPoint}`,
-                post: newPost,
-                locationId: fallbackLocationId,
-                isFallbackLocation: true,
-            }),
-            // NOTE: We return a 422 because we need a unique code to indicate a valid location was not found/created
-            //       Eventually this will be used to signal the frontend to manually create a pin on the map.
-            { status: 422, headers: { 'Content-Type': 'application/json' } }
-
-        );
-    };
-    if (!embedInfo && !embedUrl) {
-        // Could not retrieve embed info nor parse video id; use the raw URL as last resort
-        return await createFallback(data.url);
-    }
-
-    //console.log("Embed info:");
-    //console.log(embedInfo);
+    } 
 
     // Extract possible location name using LLM API
     const possiblePlaceName = embedInfo ? await extractPossibleLocationName(embedInfo) : null;
     if (!possiblePlaceName) {
-        // If we have embed info, request manual location selection; otherwise fallback and store best embed URL
-        if (embedInfo) {
-            return createManualLocationResponse(embedInfo);
-        }
-        return await createFallback(embedUrl ?? data.url);
+
+        console.error("Couldn't create a good location name");
+
+        // TODO
+        // Attribute post to default location
+
+
+        // Still notify user the lcoation couldn't be resolve
+        // (This will eventually trigger manual attribution flow)
+        return createManualLocationResponse(embedInfo);
     }
 
-    //console.log("Possible place name:");
-    //console.log(possiblePlaceName);
 
     // Text search Google Places with LLM output
     const placesResult = await searchGooglePlaces(possiblePlaceName);
     if (!placesResult) {
-        return await createFallback(embedUrl ?? data.url);
+
+        console.error("Couldn't resolve actual location.");
+
+        // TODO
+        // Attribute post to default location
+
+
+        // Still notify user the lcoation couldn't be resolve
+        // (This will eventually trigger manual attribution flow)
+        return createManualLocationResponse(embedInfo);
     }
 
-    //console.log("Places result:");
-    //console.log(placesResult);
 
     // Check if places array exists and has at least one result
     if (!placesResult?.places || placesResult.places.length === 0) {
-        return await createFallback(embedUrl ?? data.url);
+
+        console.error("Couldn't resolve actual location.");
+
+        // TODO
+        // Attribute post to default location
+
+
+        // Still notify user the lcoation couldn't be resolve
+        // (This will eventually trigger manual attribution flow)
+        return createManualLocationResponse(embedInfo);
     }
 
     const placeId = placesResult.places[0]!.id;
 
+    // TODO: This is likely redundant in all cases
     // Create embeddable TikTok URL
-    embedUrl = embedUrl ?? buildTikTokEmbedUrl(embedInfo!.embedProductId);
+    //embedUrl = embedUrl ?? buildTikTokEmbedUrl(embedInfo!.embedProductId);
 
     // Check if a location with this Google Place ID already exists
     const [rows, _] = await db.execute("SELECT id FROM map_points WHERE google_place_id = ?", [placeId]) as [any[], any];
@@ -149,7 +134,14 @@ export async function createPost(req: BunRequest): Promise<Response> {
     // If the location doesn't exist, we need to create it - first get the details
     const placeDetails = await getGooglePlaceDetails(placeId);
     if (!placeDetails) {
-        return await createFallback(embedUrl ?? data.url);
+
+        // TODO: Potentially prompt user to manually enter information? Since we have
+        //       the location resolved we can place it on the map, we just need general
+        //       business info, e.g. name which the user could fill out.
+
+        console.error("Failed to resolve place details");
+
+        return createManualLocationResponse(embedInfo);
     }
 
     //console.log("Place details:");
@@ -158,7 +150,14 @@ export async function createPost(req: BunRequest): Promise<Response> {
     // Generate description and emoji using Gemini API
     const locationDetails = await generateLocationDetails(placeDetails, embedInfo!);
     if (!locationDetails) {
-        return await createFallback(embedUrl ?? data.url);
+
+        // TODO: Potentially prompt user to manually enter information? Since we have
+        //       the location resolved we can place it on the map, we just need general
+        //       business info, e.g. name which the user could fill out.
+
+        console.error("Failed to generate tagline and emoji");
+
+        return createManualLocationResponse(embedInfo);
     }
 
     //console.log("Location details:");
