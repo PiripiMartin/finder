@@ -1,17 +1,26 @@
 import { env } from "bun";
 import mysql from "mysql2/promise";
 
-// Generate connection from environment variables
-// TODO: Change to a connection pool when scaling out
+/**
+ * The database connection pool.
+ * Uses environment variables for configuration.
+ * 
+ * @see mysql2/promise
+ */
 export const db = mysql.createPool({
-    host: env.DBHOST,
-    user: env.DBUSERNAME,
-    password: env.DBPASSWORD,
-    database: env.DATABASE,
+    host: env.DB_HOST,
+    user: env.DB_USERNAME,
+    password: env.DB_PASSWORD,
+    database: env.DB_NAME,
+    //connectionLimit: 10, // Default is 10, adjust as needed
 });
 
-
-// Utility function for mapping names between DB and API server
+/**
+ * Recursively converts all keys in an object or an array of objects from snake_case to camelCase.
+ *
+ * @param data - The input object or array of objects with snake_case keys.
+ * @returns The transformed object or array of objects with camelCase keys.
+ */
 export function toCamelCase<T extends Record<string, any>>(data: T | T[]): T | T[] {
   
     const camelize = (obj: Record<string, any>) => {
@@ -20,7 +29,7 @@ export function toCamelCase<T extends Record<string, any>>(data: T | T[]): T | T
             const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
             newObj[camelKey] = obj[key];
         }
-      return newObj as T;
+        return newObj as T;
     };
 
     if (Array.isArray(data)) {
@@ -28,9 +37,3 @@ export function toCamelCase<T extends Record<string, any>>(data: T | T[]): T | T
     }
     return camelize(data);
 }
-
-
-
-
-
-

@@ -2,16 +2,20 @@ import { db, toCamelCase } from "../database";
 import type { MapPoint } from "./types";
 import type { Post } from "../posts/types";
 
-
+/**
+ * Represents a location with its top post.
+ */
 export interface LocationAndPost {
     location: MapPoint;
     topPost: Post;
-} 
-
+}
 
 /**
- * Fetches saved locations for a user (locations where they've posted) with their top post (most recent)
- * These are locations the user has personally posted to and should NOT appear in recommendations
+ * Fetches saved locations for a user (locations where they've posted) along with their most recent post.
+ * These are locations the user has personally posted to and should not appear in recommendations.
+ *
+ * @param userId - The ID of the user whose saved locations are to be fetched.
+ * @returns A promise that resolves to an array of saved locations with their top posts.
  */
 export async function getSavedLocationsWithTopPost(userId: number): Promise<LocationAndPost[]> {
     const query = `
@@ -33,6 +37,7 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             p.posted_at as post_posted_at
         FROM map_points mp
         INNER JOIN (
+            -- Find the most recent post for each location by the user
             SELECT DISTINCT
                 map_point_id,
                 FIRST_VALUE(id) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as id,
@@ -45,7 +50,7 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
         ORDER BY p.posted_at DESC
     `;
 
-    const [rows, _] = await db.execute(query, [userId]) as [any[], any];
+    const [rows] = await db.execute(query, [userId]) as [any[], any];
     const results = toCamelCase(rows) as any[];
     
     return results.map(row => ({
@@ -75,8 +80,16 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
 }
 
 /**
- * Fetches recommended locations near user coordinates with their top post (most recent)
- * Excludes any locations where the user has posted (these are returned as saved locations)
+ * Fetches recommended locations near a user's coordinates with their most recent post.
+ * Excludes locations where the user has already posted.
+ *
+ * @param accountId - The ID of the user.
+ * @param latitude - The latitude of the user's location.
+ * @param longitude - The longitude of the user's location.
+ * @param radiusKm - The search radius in kilometers (default: 10).
+ * @param limit - The maximum number of recommendations to return (default: 20).
+ * @param opts - Optional parameters, including whether to include unrecommendable locations.
+ * @returns A promise that resolves to an array of recommended locations with their top posts.
  */
 export async function getRecommendedLocationsWithTopPost(
     accountId: number,
@@ -86,7 +99,7 @@ export async function getRecommendedLocationsWithTopPost(
     limit: number = 20,
     opts?: { includeUnrecommendable?: boolean }
 ): Promise<LocationAndPost[]> {
-    const includeUnrecommendable = Boolean(opts?.includeUnrecommendable);
+    const includeUnrecommendable = opts?.includeUnrecommendable ?? false;
     const recommendableCondition = includeUnrecommendable ? "1 = 1" : "mp.recommendable = TRUE";
 
     const query = `
@@ -109,6 +122,7 @@ export async function getRecommendedLocationsWithTopPost(
             ST_Distance_Sphere(mp.location, POINT(?, ?)) / 1000 as distance_km
         FROM map_points mp
         LEFT JOIN (
+            -- Find the most recent post for each location
             SELECT
                 map_point_id,
                 FIRST_VALUE(id) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as id,
@@ -118,32 +132,33 @@ export async function getRecommendedLocationsWithTopPost(
             FROM posts
         ) p ON mp.id = p.map_point_id
         WHERE ST_Distance_Sphere(mp.location, POINT(?, ?)) <= ? * 1000
-        -- Exclude locations where the current user has posted (these are saved locations)
+        -- Exclude locations where the current user has posted
         AND mp.id NOT IN (
             SELECT DISTINCT map_point_id 
             FROM posts 
             WHERE posted_by = ?
         )
-        -- Only include recommendable locations unless explicitly overridden (e.g., guests)
+        -- Only include recommendable locations unless explicitly overridden
         AND ${recommendableCondition}
         -- Only include locations that have at least one post
         AND p.id IS NOT NULL
         ORDER BY distance_km ASC, mp.created_at DESC
-        LIMIT ${Number(limit)}
+        LIMIT ?
     `;
 
-    const [rows, _] = await db.execute(query, [
-        Number(longitude),
-        Number(latitude),
-        Number(longitude),
-        Number(latitude),
-        Number(radiusKm),
-        Number(accountId)
-    ]) as [any[], any];
+    const params = [
+        longitude,
+        latitude,
+        longitude,
+        latitude,
+        radiusKm,
+        accountId,
+        limit
+    ];
+
+    const [rows] = await db.execute(query, params) as [any[], any];
     const results = toCamelCase(rows) as any[];
     
-    // Transform to LocationAndPost format
-    // Note: We filter by p.id NOT NULL in the SQL, so posts are guaranteed
     return results.map(row => ({
         location: {
             id: row.id,
@@ -170,7 +185,12 @@ export async function getRecommendedLocationsWithTopPost(
     }));
 }
 
-
+/**
+ * Fetches all posts for a specific location.
+ *
+ * @param locationId - The ID of the location.
+ * @returns A promise that resolves to an array of posts for the given location.
+ */
 export async function fetchPostsForLocation(locationId: number): Promise<Post[]> {
     const query = `
         SELECT 
@@ -183,10 +203,6 @@ export async function fetchPostsForLocation(locationId: number): Promise<Post[]>
         WHERE map_point_id = ?
     `;
 
-    const [rows, _] = await db.execute(query, [locationId]) as [any[], any];
-    const results = toCamelCase(rows) as Post[];
-
-    return results;
+    const [rows] = await db.execute(query, [locationId]) as [any[], any];
+    return toCamelCase(rows) as Post[];
 }
-
-

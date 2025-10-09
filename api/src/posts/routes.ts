@@ -1,10 +1,9 @@
 import type { BunRequest } from "bun";
 import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
-import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, createManualLocationResponse, extractTikTokVideoId, buildTikTokEmbedUrl, FALLBACK_LOCATION_ID } from "./get-location";
+import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, buildTikTokEmbedUrl } from "./get-location";
 import { db } from "../database";
-import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, getOrCreateFallbackLocationId, fallbackPoint } from "./queries";
-import type { Post } from "./types";
+import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, createInvalidLocation } from "./queries";
 
 
 interface NewPostRequest {
@@ -53,56 +52,68 @@ export async function createPost(req: BunRequest): Promise<Response> {
     // Extract possible location name using LLM API
     const possiblePlaceName = embedInfo ? await extractPossibleLocationName(embedInfo) : null;
     if (!possiblePlaceName) {
-
         console.error("Couldn't create a good location name");
-
-        // TODO
-        // Attribute post to default location
-        const post = await createPostForFallbackLocation(embedUrl!, userId);
-        if (!post) return new Response("", {status: 500});
-
-
-        // Still notify user the lcoation couldn't be resolve
-        // (This will eventually trigger manual attribution flow)
-        return createManualLocationResponse(post);
+        const invalidLocation = await createInvalidLocation(embedInfo);
+        if (!invalidLocation) {
+            return new Response("Failed to create invalid location.", { status: 500 });
+        }
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        return new Response(
+            JSON.stringify({
+                success: true,
+                message: "Post created with invalid location",
+                post: post,
+                location: invalidLocation,
+            }),
+            { status: 201, headers: { "Content-Type": "application/json" } }
+        );
     }
 
 
     // Text search Google Places with LLM output
     const placesResult = await searchGooglePlaces(possiblePlaceName);
     if (!placesResult) {
-
         console.error("Couldn't resolve actual location.");
-
-        // TODO
-        // Attribute post to default location
-        const post = await createPostForFallbackLocation(embedUrl!, userId);
-        if (!post) return new Response("", {status: 500});
-
-
-        // Still notify user the lcoation couldn't be resolve
-        // (This will eventually trigger manual attribution flow)
-        return createManualLocationResponse(post);
+        const invalidLocation = await createInvalidLocation(embedInfo);
+        if (!invalidLocation) {
+            return new Response("Failed to create invalid location.", { status: 500 });
+        }
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        return new Response(
+            JSON.stringify({
+                success: true,
+                message: "Post created with invalid location",
+                post: post,
+                location: invalidLocation,
+            }),
+            { status: 201, headers: { "Content-Type": "application/json" } }
+        );
     }
 
 
-    // Check if places array exists and has at least one result
-    if (!placesResult?.places || placesResult.places.length === 0) {
-
+    if (!placesResult.places || placesResult.places.length === 0) {
         console.error("Couldn't resolve actual location.");
-
-        // TODO
-        // Attribute post to default location
-        const post = await createPostForFallbackLocation(embedUrl!, userId);
-        if (!post) return new Response("", {status: 500});
-
-
-        // Still notify user the lcoation couldn't be resolve
-        // (This will eventually trigger manual attribution flow)
-        return createManualLocationResponse(post);
+        const invalidLocation = await createInvalidLocation(embedInfo);
+        if (!invalidLocation) {
+            return new Response("Failed to create invalid location.", { status: 500 });
+        }
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        return new Response(
+            JSON.stringify({
+                success: true,
+                message: "Post created with invalid location",
+                post: post,
+                location: invalidLocation,
+            }),
+            { status: 201, headers: { "Content-Type": "application/json" } }
+        );
     }
 
     const placeId = placesResult.places[0]!.id;
+
+    // TODO: This is likely redundant in all cases
+    // Create embeddable TikTok URL
+    //embedUrl = embedUrl ?? buildTikTokEmbedUrl(embedInfo!.embedProductId);
 
     // Check if a location with this Google Place ID already exists
     const [rows, _] = await db.execute("SELECT id FROM map_points WHERE google_place_id = ?", [placeId]) as [any[], any];
@@ -134,37 +145,45 @@ export async function createPost(req: BunRequest): Promise<Response> {
     }
 
 
-    // If the location doesn't exist, we need to create it - first get the details
     const placeDetails = await getGooglePlaceDetails(placeId);
     if (!placeDetails) {
-
-        // TODO: Potentially prompt user to manually enter information? Since we have
-        //       the location resolved we can place it on the map, we just need general
-        //       business info, e.g. name which the user could fill out.
-        const post = await createPostForFallbackLocation(embedUrl!, userId);
-        if (!post) return new Response("", {status: 500});
-
         console.error("Failed to resolve place details");
-
-        return createManualLocationResponse(post);
+        const invalidLocation = await createInvalidLocation(embedInfo);
+        if (!invalidLocation) {
+            return new Response("Failed to create invalid location.", { status: 500 });
+        }
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        return new Response(
+            JSON.stringify({
+                success: true,
+                message: "Post created with invalid location",
+                post: post,
+                location: invalidLocation,
+            }),
+            { status: 201, headers: { "Content-Type": "application/json" } }
+        );
     }
 
     //console.log("Place details:");
     //console.log(placeDetails);
 
-    // Generate description and emoji using Gemini API
-    const locationDetails = await generateLocationDetails(placeDetails, embedInfo!);
+    const locationDetails = await generateLocationDetails(embedInfo!, placeDetails);
     if (!locationDetails) {
-
-        // TODO: Potentially prompt user to manually enter information? Since we have
-        //       the location resolved we can place it on the map, we just need general
-        //       business info, e.g. name which the user could fill out.
-        const post = await createPostForFallbackLocation(embedUrl!, userId);
-        if (!post) return new Response("", {status: 500});
-
         console.error("Failed to generate tagline and emoji");
-
-        return createManualLocationResponse(post);
+        const invalidLocation = await createInvalidLocation(embedInfo);
+        if (!invalidLocation) {
+            return new Response("Failed to create invalid location.", { status: 500 });
+        }
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        return new Response(
+            JSON.stringify({
+                success: true,
+                message: "Post created with invalid location",
+                post: post,
+                location: invalidLocation,
+            }),
+            { status: 201, headers: { "Content-Type": "application/json" } }
+        );
     }
 
     //console.log("Location details:");
@@ -249,23 +268,12 @@ export async function deletePost(req: BunRequest): Promise<Response> {
         return new Response("Forbidden", {status: 403});
     }
 
-    // Delete the post FOR THE USER ONLY!
-    await db.execute("UPDATE posts SET posted_by = NULL WHERE id = ?", [postId]);
+    // Delete the post
+    await db.execute("DELETE FROM posts WHERE id = ?", [postId]);
 
     return new Response(
         JSON.stringify({ success: true }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
-}
-
-async function createPostForFallbackLocation(embedUrl: string, userId: number): Promise<Post | null> {
-    
-    const postData: CreatePostRequest = {
-        url: embedUrl,
-        postedBy: userId,
-        mapPointId: FALLBACK_LOCATION_ID
-    };
-
-    return await createPostRecord(postData);
 }
 

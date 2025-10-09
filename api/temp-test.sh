@@ -1,8 +1,12 @@
 
 # Temporary test API calls
 
+#################### FAILING LINKS ####################
 #VID_URL="https://vt.tiktok.com/ZSULCJ4pr/"
-VID_URL="https://vt.tiktok.com/ZSUduGXs1/"
+#VID_URL="https://vt.tiktok.com/ZSUduGXs1/"
+
+#################### SUCCEEDING LINKS ####################
+VID_URL="https://vt.tiktok.com/ZSUdmTRsk/"
 
 AUTH_TOKEN="b62ecec6-4c5e-4cb6-afd2-2edf5ef015b5"
 
