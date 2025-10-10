@@ -1,10 +1,11 @@
 import { db, toCamelCase } from "../database";
+import { generateLocationDetails } from "../posts/get-location";
 import type { MapPoint } from "../map/types";
-import type { Post } from "./types";
+import type { EmbedResponse, Post } from "./types";
 
-// The name of the fallback location to attribute a failed post resolution to.
-export const fallbackPoint: string = "fallback_location";
-
+/**
+ * Represents an attempt to save a post.
+ */
 export interface PostSaveAttempt {
     id: number;
     requestId: string | null;
@@ -14,6 +15,9 @@ export interface PostSaveAttempt {
     createdAt: Date;
 }
 
+/**
+ * The input for creating a post save attempt.
+ */
 export interface CreatePostSaveAttemptInput {
     requestId?: string | null;
     url?: string | null;
@@ -21,12 +25,38 @@ export interface CreatePostSaveAttemptInput {
     userId?: number | null;
 }
 
+/**
+ * The request to create a new post.
+ */
 export interface CreatePostRequest {
-    url: string,
-    postedBy: number,
-    mapPointId: number
+    url: string;
+    postedBy: number;
+    mapPointId: number;
 }
 
+/**
+ * The request to create a new location.
+ */
+export interface CreateLocationRequest {
+    googlePlaceId: string | null;
+    title: string;
+    description: string | null;
+    emoji: string;
+    latitude: number;
+    longitude: number;
+    isValidLocation: boolean;
+    recommendable: boolean;
+    websiteUrl: string | null;
+    phoneNumber: string | null;
+    address: string | null;
+}
+
+/**
+ * Creates a record of a post save attempt.
+ *
+ * @param input - The details of the post save attempt.
+ * @returns A promise that resolves to the created post save attempt record.
+ */
 export async function createPostSaveAttempt(input: CreatePostSaveAttemptInput): Promise<PostSaveAttempt> {
     const query = `
         INSERT INTO post_save_attempts (request_id, url, session_token, user_id)
@@ -34,41 +64,42 @@ export async function createPostSaveAttempt(input: CreatePostSaveAttemptInput): 
     `;
     await db.execute(query, [input.requestId || null, input.url || null, input.sessionToken || null, input.userId ?? null]);
 
-    const [idRows, _] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
+    const [idRows] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
     const attemptId = idRows[0].id;
-    const [rows, __] = await db.execute("SELECT * FROM post_save_attempts WHERE id = ?", [attemptId]) as [any[], any];
+
+    const [rows] = await db.execute("SELECT * FROM post_save_attempts WHERE id = ?", [attemptId]) as [any[], any];
     return toCamelCase(rows[0]) as PostSaveAttempt;
 }
 
-export interface CreateLocationRequest {
-    googlePlaceId: string | null,
-    title: string,
-    description: string | null,
-    emoji: string,
-    latitude: number,
-    longitude: number,
-    isValidLocation: boolean,
-    recommendable: boolean,
-
-    websiteUrl: string | null,
-    phoneNumber: string | null,
-    address: string | null,
-}
-
+/**
+ * Creates a new location in the database.
+ *
+ * @param location - The details of the location to create.
+ * @returns A promise that resolves to the newly created map point, or null on failure.
+ */
 export async function createLocation(location: CreateLocationRequest): Promise<MapPoint | null> {
-
     const query = `
         INSERT INTO map_points (google_place_id, title, description, emoji, location, is_valid_location, recommendable, website_url, phone_number, address)
         VALUES (?, ?, ?, ?, POINT(?, ?), ?, ?, ?, ?, ?)
     `;
-    await db.execute(query, [location.googlePlaceId || null, location.title || null, location.description || null, location.emoji || null, location.longitude || null, location.latitude || null, location.isValidLocation || null, location.recommendable || false, location.websiteUrl || null, location.phoneNumber || null, location.address || null]);
+    await db.execute(query, [
+        location.googlePlaceId || null,
+        location.title || null,
+        location.description || null,
+        location.emoji || null,
+        location.longitude || null,
+        location.latitude || null,
+        location.isValidLocation || null,
+        location.recommendable || false,
+        location.websiteUrl || null,
+        location.phoneNumber || null,
+        location.address || null,
+    ]);
 
-    // Get the inserted ID
-    const [idRows, _] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
+    const [idRows] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
     const locationId = idRows[0].id;
 
-    // Fetch the created location to return it
-    const [locations, __] = await db.execute("SELECT * FROM map_points WHERE id = ?", [locationId]) as [any[], any];
+    const [locations] = await db.execute("SELECT * FROM map_points WHERE id = ?", [locationId]) as [any[], any];
     if (locations.length === 0) {
         return null;
     }
@@ -76,40 +107,12 @@ export async function createLocation(location: CreateLocationRequest): Promise<M
     return toCamelCase(locations[0]) as MapPoint;
 }
 
-export async function getOrCreateFallbackLocationId(): Promise<number> {
-
-    // Try find existing fallback location by title
-    const [existingRows, _] = await db.execute(
-        "SELECT id FROM map_points WHERE title = ?",
-        [fallbackPoint]
-    ) as [any[], any];
-    if (existingRows.length > 0) {
-        return existingRows[0].id as number;
-    }
-
-    // Otherwise, create a minimal non-recommendable placeholder at (0,0)
-    const insertQuery = `
-        INSERT INTO map_points (google_place_id, title, description, emoji, location, is_valid_location, recommendable, website_url, phone_number, address)
-        VALUES (?, ?, ?, ?, POINT(?, ?), ?, ?, ?, ?, ?)
-    `;
-    await db.execute(insertQuery, [
-        null,
-        fallbackPoint,
-        "Fallback Location",
-        "❓",
-        0,
-        0,
-        false,
-        false,
-        null,
-        null,
-        null,
-    ]);
-
-    const [idRows, __] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
-    return idRows[0].id as number;
-}
-
+/**
+ * Creates a new post in the database.
+ *
+ * @param post - The details of the post to create.
+ * @returns A promise that resolves to the newly created post, or null on failure.
+ */
 export async function createPost(post: CreatePostRequest): Promise<Post | null> {
     const query = `
         INSERT INTO posts (url, posted_by, map_point_id)
@@ -117,16 +120,43 @@ export async function createPost(post: CreatePostRequest): Promise<Post | null> 
     `;
     await db.execute(query, [post.url, post.postedBy, post.mapPointId]);
 
-    // Get the inserted ID
-    const [idRows, _] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
+    const [idRows] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
     const postId = idRows[0].id;
 
-    // Fetch the created post to return it
-    const [posts, __] = await db.execute("SELECT * FROM posts WHERE id = ?", [postId]) as [any[], any];
+    const [posts] = await db.execute("SELECT * FROM posts WHERE id = ?", [postId]) as [any[], any];
     if (posts.length === 0) {
         return null;
     }
 
     return toCamelCase(posts[0]) as Post;
+}
+
+/**
+ * Creates a new invalid location in the database.
+ *
+ * @param embedInfo - The embed information for the TikTok video.
+ * @returns A promise that resolves to the newly created map point, or null on failure.
+ */
+export async function createInvalidLocation(embedInfo: EmbedResponse): Promise<MapPoint | null> {
+    const locationDetails = await generateLocationDetails(embedInfo);
+    if (!locationDetails) {
+        return null;
+    }
+
+    const { title, description, emoji } = locationDetails;
+
+    return await createLocation({
+        googlePlaceId: null,
+        title: title,
+        description: description,
+        emoji: emoji,
+        latitude: 0,
+        longitude: 0,
+        isValidLocation: false,
+        recommendable: false,
+        websiteUrl: null,
+        phoneNumber: null,
+        address: null,
+    });
 }
 

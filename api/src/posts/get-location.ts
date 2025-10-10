@@ -1,19 +1,14 @@
 import { toCamelCase } from "../database";
+import type { EmbedResponse, Post } from "./types";
 
+/**
+ * The endpoint for the Gemini API.
+ */
 const AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
 
-
-// Contains everything 'interesting' from the TikTok embed API
-interface EmbedResponse {
-    title: string,
-    authorUrl: string,
-    authorName: string,
-    html: string,
-    thumbnailUrl: string,
-    embedProductId: string,
-};
-
-// Gemini API response structure
+/**
+ * Represents the structure of the Gemini API response.
+ */
 interface GeminiResponse {
     candidates?: Array<{
         content?: {
@@ -24,104 +19,76 @@ interface GeminiResponse {
     }>;
 }
 
-// Google Places Search API response structure (Essentials only SKU)
-// Completely free: no quota
+/**
+ * Represents the structure of the Google Places Text Search API response.
+ */
 interface PlacesTextSearchResponse {
     places: Array<{
         id: string;
     }>;
 }
 
-// Google Places Details API response structure (Enterprise SKU)
-// 1000 free calls per month, only called for *new* locations
+/**
+ * Represents the structure of the Google Places Details API response.
+ */
 interface PlacesDetailsResponse {
-    id: string,
+    id: string;
     displayName: {
-        text: string
-    },
-    nationalPhoneNumber: string,
-    websiteUri: string,
+        text: string;
+    };
+    nationalPhoneNumber: string;
+    websiteUri: string;
     location: {
-        latitude: number,
-        longitude: number
-    },
-    formattedAddress: string,
+        latitude: number;
+        longitude: number;
+    };
+    formattedAddress: string;
     generativeSummary: {
-        overview: string
-    }
+        overview: string;
+    };
 }
 
-// Extracts TikTok video ID from common URL formats
-export function extractTikTokVideoId(inputUrl: string): string | null {
-    try {
-        // Examples: https://www.tiktok.com/@user/video/1234567890
-        //           https://www.tiktok.com/video/1234567890
-        //           https://m.tiktok.com/v/1234567890.html
-        //           https://vm.tiktok.com/xxxxxx (may require redirect resolution; not handled here)
-        const patterns: RegExp[] = [
-            /\/video\/(\d+)/,
-            /\/v\/(\d+)\.html/
-        ];
-        for (const pattern of patterns) {
-            const match = inputUrl.match(pattern);
-            if (match && match[1]) {
-                return match[1];
-            }
-        }
-        // Some share links include item_id or share_item_id
-        const urlObj = new URL(inputUrl);
-        const itemId = urlObj.searchParams.get("item_id") || urlObj.searchParams.get("share_item_id");
-        if (itemId && /^\d+$/.test(itemId)) {
-            return itemId;
-        }
-    } catch {
-        // ignore
-    }
-    return null;
-}
 
-// Builds the standard TikTok player embed URL for a video id
+
+/**
+ * Builds the standard TikTok player embed URL for a given video ID.
+ *
+ * @param videoId - The ID of the TikTok video.
+ * @returns The embeddable URL for the TikTok player.
+ */
 export function buildTikTokEmbedUrl(videoId: string): string {
     return `https://www.tiktok.com/player/v1/${videoId}?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
 }
 
+/**
+ * Fetches embed information for a TikTok video from the oEmbed endpoint.
+ *
+ * @param vidUrl - The URL of the TikTok video.
+ * @returns A promise that resolves to the embed information or null on failure.
+ */
 export async function getTikTokEmbedInfo(vidUrl: string): Promise<EmbedResponse | null> {
-
     const ttEmbedEndpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(vidUrl)}`;
 
-    const doFetch = async (): Promise<Response> => {
-        return await fetch(ttEmbedEndpoint, {
-            headers: {
-                // Some endpoints are stricter without a browser-like UA
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-                "Accept": "application/json"
-            }
-        });
-    };
-
-    let embedResponse = await doFetch();
-
-    // Simple retry on transient errors
-    if (embedResponse.status === 429 || (embedResponse.status >= 500 && embedResponse.status <= 599)) {
-        await new Promise((r) => setTimeout(r, 200));
-        embedResponse = await doFetch();
-    }
-
-    if (embedResponse.status !== 200) {
-        return null;
-    }
-
     try {
-        const embedContent: EmbedResponse = toCamelCase(await embedResponse.json() as any) as EmbedResponse;
-        return embedContent;
-    } catch {
+        const embedResponse = await fetch(ttEmbedEndpoint);
+        if (!embedResponse.ok) {
+            console.error("TikTok oEmbed API request failed:", await embedResponse.text());
+            return null;
+        }
+        return toCamelCase(await embedResponse.json() as any) as EmbedResponse;
+    } catch (error) {
+        console.error("Error fetching TikTok embed info:", error);
         return null;
     }
 }
 
-
+/**
+ * Uses the Gemini API to extract a potential location name from TikTok embed information.
+ *
+ * @param embedInfo - The embed information for the TikTok video.
+ * @returns A promise that resolves to a search query for Google Places or null on failure.
+ */
 export async function extractPossibleLocationName(embedInfo: EmbedResponse): Promise<string | null> {
-    
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not set");
@@ -143,50 +110,37 @@ export async function extractPossibleLocationName(embedInfo: EmbedResponse): Pro
 
     Return ONLY the search query text, nothing else.`;
 
-    const response = await fetch(AI_ENDPOINT, {
-        method: "POST",
-        headers: {
-            "X-goog-api-key": apiKey,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            "contents": [
-                {
-                    "parts": [
-                        {
-                            "text": prompt
-                        }
-                    ]
-                }
-            ]
-        })
-    });
-
-    if (!response.ok) {
-        return null;
-    }
-
     try {
-        const result = await response.json() as GeminiResponse;
-        const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        const response = await fetch(AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "X-goog-api-key": apiKey,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        });
 
-        // When the LLM is unsure about the result, return null
-        if (generatedText === "") {
+        if (!response.ok) {
+            console.error("Gemini API request failed:", await response.text());
             return null;
         }
-        
-        if (generatedText) {
-            return generatedText.trim();
-        }
 
-        
-        return null;
+        const result = await response.json() as GeminiResponse;
+        const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+        return generatedText || null;
     } catch (error) {
-        console.error("Failed to parse Gemini API response:", error);
+        console.error("Error extracting possible location name:", error);
         return null;
     }
 }
 
+/**
+ * Searches Google Places for a location based on a given search query.
+ *
+ * @param searchQuery - The search query to use for the Google Places API.
+ * @returns A promise that resolves to the search results or null on failure.
+ */
 export async function searchGooglePlaces(searchQuery: string): Promise<PlacesTextSearchResponse | null> {
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
@@ -194,47 +148,44 @@ export async function searchGooglePlaces(searchQuery: string): Promise<PlacesTex
     }
 
     const placesEndpoint = `https://places.googleapis.com/v1/places:searchText`;
-    
+
     try {
         const response = await fetch(placesEndpoint, {
             method: "POST",
             headers: {
                 "X-Goog-Api-Key": apiKey,
-                "X-Goog-FieldMask": "places.id", // NOTE: We're making sure we only trigger the Essentials only SKU
+                "X-Goog-FieldMask": "places.id",
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-                textQuery: searchQuery
-            })
+            body: JSON.stringify({ textQuery: searchQuery }),
         });
+
         if (!response.ok) {
-            //console.log("Error text:");
-            //console.log(await response.text());
-            throw new Error(`Google Places API request failed: ${response.status}`);
+            console.error("Google Places API request failed:", await response.text());
+            return null;
         }
-        
-        const result = await response.json() as PlacesTextSearchResponse;
-        return result;
+
+        return await response.json() as PlacesTextSearchResponse;
     } catch (error) {
-        console.error("Failed to fetch from Google Places API:", error);
+        console.error("Error searching Google Places:", error);
         return null;
     }
 }
 
 /**
- * Fetches the details for a given Google Place ID, should only be called for *new* locations.
- * @param placeId 
- * @returns a PlacesDetailsResponse, or null if the request fails
+ * Fetches detailed information for a given Google Place ID.
+ *
+ * @param placeId - The ID of the place to fetch details for.
+ * @returns A promise that resolves to the place details or null on failure.
  */
 export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDetailsResponse | null> {
-
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
         throw new Error("GOOGLE_PLACES_API_KEY is not set");
     }
 
     const placesEndpoint = `https://places.googleapis.com/v1/places/${placeId}`;
-    
+
     try {
         const response = await fetch(placesEndpoint, {
             method: "GET",
@@ -243,140 +194,104 @@ export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDeta
                 "X-Goog-FieldMask": "id,displayName,formattedAddress,location,nationalPhoneNumber,websiteUri,generativeSummary",
             },
         });
-        if (!response.ok) {
-            //console.log("Error text:");
-            //console.log(await response.text());
 
-            throw new Error(`Google Places API request failed: ${response.status}`);
+        if (!response.ok) {
+            console.error("Google Places Details API request failed:", await response.text());
+            return null;
         }
-        
-        const result = await response.json() as PlacesDetailsResponse;
-        return result;
+
+        return await response.json() as PlacesDetailsResponse;
     } catch (error) {
-        console.error("Failed to fetch from Google Places API:", error);
+        console.error("Error fetching Google Place details:", error);
+        return null;
     }
-    return null;
 }
+
+
 
 /**
- * Creates a standardized response for when manual location definition is required.
- * This is used when the LLM can't extract a location name or when Google Places search returns no results.
+ * Generates a title, description and emoji for a location, based on its details and the context of a TikTok video.
+ *
+ * @param embedInfo - The embed information for the TikTok video.
+ * @param placeDetails - Optional: The Google Place details for the location.
+ * @returns A promise that resolves to the generated description and emoji, or null on failure.
  */
-export function createManualLocationResponse(embedInfo: EmbedResponse): Response {
-    return new Response(
-        JSON.stringify({
-            error: "LOCATION_NOT_FOUND",
-            message: "Location could not be automatically identified. Please manually select the location on the map.",
-            requiresManualLocation: true,
-            embedInfo: {
-                title: embedInfo.title,
-                authorName: embedInfo.authorName,
-                thumbnailUrl: embedInfo.thumbnailUrl
-            }
-        }),
-        {status: 422, headers: {'Content-Type': 'application/json'}}
-    );
-}
-
-export async function generateLocationDetails(placeDetails: PlacesDetailsResponse, embedInfo: EmbedResponse): Promise<{ description: string, emoji: string } | null> {
+export async function generateLocationDetails(
+    embedInfo: EmbedResponse,
+    placeDetails?: PlacesDetailsResponse
+): Promise<{ title: string; description: string; emoji: string } | null> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not set");
     }
 
-    //console.log("Generating location details with TikTok context:");
-    //console.log("Video title:", embedInfo.title);
-    //console.log("Video author:", embedInfo.authorName);
+    const prompt = `You are a location expert. Based on the following TikTok video context${placeDetails ? " and Google Place information" : ""}, generate a brief title, description and a relevant emoji for this location.
 
-    const prompt = `You are a location expert. Based on the following place information and TikTok video context, generate a brief description and a relevant emoji for this location.
+    TikTok Video Context:
+    Title: ${embedInfo.title}
+    Author: ${embedInfo.authorName}
+    ${placeDetails ? `
+    Google Place Information:
+    Name: ${placeDetails.displayName.text}
+    Address: ${placeDetails.formattedAddress}
+    Summary: ${placeDetails.generativeSummary?.overview || "N/A"}
+    ` : ""}
 
-Place Name: ${placeDetails.displayName.text}
-Address: ${placeDetails.formattedAddress}
-Overview: ${placeDetails.generativeSummary?.overview || 'No overview available'}
+    Requirements:
+    1. Title should be 2-5 words and accurately represent the contents of the video${placeDetails ? " and the location" : ""}.
+    2. Description should be 2-4 words that capture what makes this place special based on the TikTok video
+    3. Focus on the specific food, drink, or experience featured in the video
+    4. Description must NOT contain any punctuation (no commas, periods, apostrophes, hyphens, etc.)
+    5. Choose ONE emoji that best represents the featured item or experience
+    6. Be concise and accurate to what was shown in the video
 
-TikTok Video Context:
-Title: ${embedInfo.title}
-Author: ${embedInfo.authorName}
+    Examples of good responses are:
+    - "Homemade pasta recipe, Homemade pasta, 🍝"
+    - "Strawberry matcha latte, Japanese inspired cafe, 🍵"
+    - "OOTD video, Fashion inspiration, 👗"
 
-Requirements:
-1. Description should be 2-4 words that capture what makes this place special based on the TikTok video
-2. Focus on the specific food, drink, or experience featured in the video
-3. Description must NOT contain any punctuation (no commas, periods, apostrophes, hyphens, etc.)
-4. Choose ONE emoji that best represents the featured item or experience
-5. Be concise and accurate to what was shown in the video
+    CRITICAL: Respond with ONLY the title, description and emoji separated by a comma and space. No other text, no quotes, no punctuation in the description.
 
-Examples of good responses are:
-- "Cake and strawberry matcha, 🍰" (if video shows these specific items)
-- "Authentic matcha, 🍵" (if video shows the matcha)
-- "Japanese inspired cafe, ☕️" (if video shows the cafe atmosphere)
-- "Cozy coffee shop, ☕️" (if video emphasizes the cozy vibe)
-- "Fresh seafood restaurant, 🦞" (if video shows fresh seafood)
-- "Vintage clothing store, 🎩" (if video shows vintage items)
-
-CRITICAL: Respond with ONLY the description and emoji separated by a comma and space. No other text, no quotes, no punctuation in the description.
-
-Format: description, emoji`;
+    Format: title, description, emoji`;
 
     try {
         const response = await fetch(AI_ENDPOINT, {
             method: "POST",
             headers: {
                 "X-goog-api-key": apiKey,
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-                "contents": [
-                    {
-                        "parts": [
-                            {
-                                "text": prompt
-                            }
-                        ]
-                    }
-                ]
-            })
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
         });
 
         if (!response.ok) {
-            console.error(`Gemini API request failed: ${response.status}`);
+            console.error("Gemini API request failed for location details:", await response.text());
             return null;
         }
 
         const result = await response.json() as GeminiResponse;
-        const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-        
+        const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
         if (!generatedText) {
             return null;
         }
 
-        // Parse the comma-separated response
-        const trimmedText = generatedText.trim();
-        //console.log("Gemini response text:", trimmedText);
-        
-        const commaIndex = trimmedText.lastIndexOf(', ');
-        
-        if (commaIndex === -1) {
-            console.error("Failed to parse Gemini API response: no comma found");
+        const parts = generatedText.split(", ");
+        if (parts.length !== 3) {
+            console.error("Failed to parse Gemini API response for location details: incorrect number of parts");
             return null;
         }
-        
-        const description = trimmedText.substring(0, commaIndex).trim();
-        const emoji = trimmedText.substring(commaIndex + 2).trim();
-        
-        //console.log("Parsed description:", description);
-        //console.log("Parsed emoji:", emoji);
-        
-        if (!description || !emoji) {
-            console.error("Failed to parse Gemini API response: missing description or emoji");
+
+        const [title, description, emoji] = parts;
+
+        if (!title || !description || !emoji) {
+            console.error("Failed to parse Gemini API response for location details: missing title, description or emoji");
             return null;
         }
-        
-        return {
-            description: description,
-            emoji: emoji
-        };
+
+        return { title, description, emoji };
     } catch (error) {
-        console.error("Failed to generate location details:", error);
+        console.error("Error generating location details:", error);
         return null;
     }
 }

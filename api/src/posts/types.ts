@@ -1,11 +1,31 @@
-
-
+/**
+ * Represents a post made by a user.
+ */
 export interface Post {
-    id: number,
-    url: string,
-    postedBy: number,
-    mapPointId: number,
-    postedAt: Date
+    /** The unique identifier for the post. */
+    id: number;
+
+    /** The URL of the post, typically a TikTok video. */
+    url: string;
+
+    /** The ID of the user who created the post. */
+    postedBy: number;
+
+    /** The ID of the map point the post is associated with. */
+    mapPointId: number;
+
+    /** The timestamp when the post was created. */
+    postedAt: Date;
 }
 
-
+/**
+ * Represents the essential data from the TikTok embed API response.
+ */
+export interface EmbedResponse {
+    title: string;
+    authorUrl: string;
+    authorName: string;
+    html: string;
+    thumbnailUrl: string;
+    embedProductId: string;
+}
