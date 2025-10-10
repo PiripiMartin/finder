@@ -1,12 +1,16 @@
 
 # Temporary test API calls
 
-#################### FAILING LINKS ####################
+#################### FAILING LINKS (EMBED STAGE) ####################
 #VID_URL="https://vt.tiktok.com/ZSULCJ4pr/"
 #VID_URL="https://vt.tiktok.com/ZSUduGXs1/"
 
+#################### FAILING LINKS (LOCATION RES) #################### 
+VID_URL="https://vt.tiktok.com/ZSUdu6KuW/"
+
+
 #################### SUCCEEDING LINKS ####################
-VID_URL="https://vt.tiktok.com/ZSUdmTRsk/"
+#VID_URL="https://vt.tiktok.com/ZSUdmTRsk/"
 
 AUTH_TOKEN="b62ecec6-4c5e-4cb6-afd2-2edf5ef015b5"
 
