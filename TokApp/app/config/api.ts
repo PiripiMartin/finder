@@ -1,8 +1,8 @@
 // API Configuration
 export const API_CONFIG = {
   // Production API server
-  //BASE_URL: 'https://ptvalert.xyz/api',
-  BASE_URL: 'http://127.0.0.1:8000/api',
+  BASE_URL: 'https://ptvalert.xyz/api',
+  //BASE_URL: 'http://127.0.0.1:8000/api',
   ENDPOINTS: {
     LOGIN: '/login',
     CREATE_ACCOUNT: '/signup', // Note: API uses /signup, not /create-account
