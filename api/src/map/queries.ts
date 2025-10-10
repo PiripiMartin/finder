@@ -122,7 +122,6 @@ export async function getRecommendedLocationsWithTopPost(
             ST_Distance_Sphere(mp.location, POINT(?, ?)) / 1000 as distance_km
         FROM map_points mp
         LEFT JOIN (
-            -- Find the most recent post for each location
             SELECT
                 map_point_id,
                 FIRST_VALUE(id) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as id,
@@ -132,31 +131,29 @@ export async function getRecommendedLocationsWithTopPost(
             FROM posts
         ) p ON mp.id = p.map_point_id
         WHERE ST_Distance_Sphere(mp.location, POINT(?, ?)) <= ? * 1000
-        -- Exclude locations where the current user has posted
+        -- Exclude locations where the current user has posted (these are saved locations)
         AND mp.id NOT IN (
             SELECT DISTINCT map_point_id 
             FROM posts 
             WHERE posted_by = ?
         )
-        -- Only include recommendable locations unless explicitly overridden
+        -- Only include recommendable locations unless explicitly overridden (e.g., guests)
         AND ${recommendableCondition}
         -- Only include locations that have at least one post
         AND p.id IS NOT NULL
         ORDER BY distance_km ASC, mp.created_at DESC
-        LIMIT ?
-    `;
+        LIMIT ${Number(limit)}
+    ;`
 
-    const params = [
-        longitude,
-        latitude,
-        longitude,
-        latitude,
-        radiusKm,
-        accountId,
-        limit
-    ];
+    const [rows, _] = await db.execute(query, [
+        Number(longitude),
+        Number(latitude),
+        Number(longitude),
+        Number(latitude),
+        Number(radiusKm),
+        Number(accountId)
+    ]) as [any[], any];
 
-    const [rows] = await db.execute(query, params) as [any[], any];
     const results = toCamelCase(rows) as any[];
     
     return results.map(row => ({

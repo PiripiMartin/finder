@@ -120,6 +120,7 @@ export async function validateSessionToken(req: BunRequest): Promise<Response> {
  */
 export async function getProfileData(req: BunRequest): Promise<Response> {
     const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+
     if (!sessionToken) {
         return new Response("Missing session token", { status: 401 });
     }
@@ -130,7 +131,8 @@ export async function getProfileData(req: BunRequest): Promise<Response> {
     }
 
     const [rows] = await db.execute("SELECT username, email, created_at FROM users WHERE id = ?", [userId]) as [any[], any];
-    const profileData = toCamelCase(rows[0]) as ProfileStats;
+    const profileData = toCamelCase(rows) as Array<ProfileStats>;
+
 
     return new Response(JSON.stringify(profileData), { status: 200, headers: { "Content-Type": "application/json" } });
 }
