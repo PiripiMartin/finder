@@ -41,3 +41,21 @@ export interface MapPoint {
     /** The timestamp when the location was created. */
     createdAt: Date;
 }
+
+export interface LocationEdit {
+    userId: number,
+    mapPointId: number,
+
+    googlePlaceId: string | null;
+    title: string | null;
+    description: string | null;
+    emoji: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    websiteUrl: string | null;
+    phoneNumber: string | null;
+    address: string | null;
+    createdAt: Date;
+    lastUpdated: Date;
+};
+

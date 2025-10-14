@@ -1,5 +1,5 @@
 import { db, toCamelCase } from "../database";
-import type { MapPoint } from "./types";
+import type { LocationEdit, MapPoint } from "./types";
 import type { Post } from "../posts/types";
 
 /**
@@ -203,3 +203,29 @@ export async function fetchPostsForLocation(locationId: number): Promise<Post[]>
     const [rows] = await db.execute(query, [locationId]) as [any[], any];
     return toCamelCase(rows) as Post[];
 }
+
+
+export async function fetchUserLocationEdits(userId: number): Promise<LocationEdit[]> {
+    const query = `
+        SELECT
+            google_place_id,
+            title,
+            description,
+            emoji,
+            location,
+            website_url,
+            phone_number,
+            address,
+            created_at,
+            last_edited
+        FROM 
+            user_location_edits
+        WHERE
+            user_id = ?;
+    `;
+
+    const [rows] = await db.execute(query, [userId]) as [any[], any];
+    return toCamelCase(rows) as LocationEdit[];
+}
+
+
