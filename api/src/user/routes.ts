@@ -3,6 +3,9 @@ import { db, toCamelCase } from "../database";
 import type { User } from "./types";
 import { generateSessionToken, verifySessionToken } from "./session";
 import { checkedExtractBody } from "../utils";
+import { createUserLocationEdit, updateUserLocationEdit } from "./queries";
+import { getGooglePlaceDetails, searchGooglePlaces } from "../posts/get-location";
+import type { LocationEdit } from "../map/types";
 
 /**
  * Represents the request body for a user login.
@@ -160,4 +163,47 @@ export async function deleteUserAccount(req: BunRequest): Promise<Response> {
     const deleted = (verifyRows[0]?.count ?? 1) === 0;
 
     return new Response(JSON.stringify({ deleted }), { status: deleted ? 200 : 500, headers: { "Content-Type": "application/json" } });
+}
+
+export async function editUserLocation(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const mapPointId = parseInt((req.params as any).id);
+    if (isNaN(mapPointId)) {
+        return new Response("Invalid map point ID", { status: 400 });
+    }
+
+    const edits = await req.json() as Partial<LocationEdit>;
+
+    if (edits.address) {
+        const searchResult = await searchGooglePlaces(edits.address);
+        if (searchResult && searchResult.places.length > 0) {
+            const placeId = searchResult.places[0]!.id;
+            edits.googlePlaceId = placeId;
+
+            const placeDetails = await getGooglePlaceDetails(placeId);
+            if (placeDetails) {
+                edits.latitude = placeDetails.location.latitude;
+                edits.longitude = placeDetails.location.longitude;
+            }
+        }
+    }
+
+    const [existingEdit] = await db.execute("SELECT * FROM user_location_edits WHERE user_id = ? AND map_point_id = ?", [userId, mapPointId]) as [any[], any];
+
+    if (existingEdit.length > 0) {
+        await updateUserLocationEdit(userId, mapPointId, edits);
+    } else {
+        await createUserLocationEdit(userId, mapPointId, edits);
+    }
+
+    return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
 }

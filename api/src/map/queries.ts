@@ -82,6 +82,9 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             location.websiteUrl = edit.websiteUrl ?? location.websiteUrl;
             location.phoneNumber = edit.phoneNumber ?? location.phoneNumber;
             location.address = edit.address ?? location.address;
+            location.googlePlaceId = edit.googlePlaceId ?? location.googlePlaceId;
+            location.latitude = edit.latitude ?? location.latitude;
+            location.longitude = edit.longitude ?? location.longitude;
         }
 
         return {
@@ -202,6 +205,9 @@ export async function getRecommendedLocationsWithTopPost(
             location.websiteUrl = edit.websiteUrl ?? location.websiteUrl;
             location.phoneNumber = edit.phoneNumber ?? location.phoneNumber;
             location.address = edit.address ?? location.address;
+            location.googlePlaceId = edit.googlePlaceId ?? location.googlePlaceId;
+            location.latitude = edit.latitude ?? location.latitude;
+            location.longitude = edit.longitude ?? location.longitude;
         }
 
         return {
@@ -247,7 +253,8 @@ export async function fetchUserLocationEdits(userId: number): Promise<LocationEd
             title,
             description,
             emoji,
-            location,
+            ST_X(location) as longitude,
+            ST_Y(location) as latitude,
             website_url,
             phone_number,
             address,
