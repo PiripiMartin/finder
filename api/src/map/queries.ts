@@ -21,6 +21,7 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
     const query = `
         SELECT 
             mp.id,
+            mp.google_place_id,
             mp.title,
             mp.description,
             mp.emoji,
@@ -52,9 +53,12 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
 
     const [rows] = await db.execute(query, [userId]) as [any[], any];
     const results = toCamelCase(rows) as any[];
-    
-    return results.map(row => ({
-        location: {
+
+    const userEdits = await fetchUserLocationEdits(userId);
+    const editsMap = new Map(userEdits.map(edit => [edit.mapPointId, edit]));
+
+    return results.map(row => {
+        const location: MapPoint = {
             id: row.id,
             googlePlaceId: row.googlePlaceId,
             title: row.title,
@@ -68,15 +72,29 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             phoneNumber: row.phoneNumber,
             address: row.address,
             createdAt: row.createdAt
-        },
-        topPost: {
-            id: row.postId,
-            url: row.postUrl,
-            postedBy: row.postPostedBy,
-            mapPointId: parseInt(row.id),
-            postedAt: row.postPostedAt
+        };
+
+        const edit = editsMap.get(row.id);
+        if (edit) {
+            location.title = edit.title ?? location.title;
+            location.description = edit.description ?? location.description;
+            location.emoji = edit.emoji ?? location.emoji;
+            location.websiteUrl = edit.websiteUrl ?? location.websiteUrl;
+            location.phoneNumber = edit.phoneNumber ?? location.phoneNumber;
+            location.address = edit.address ?? location.address;
         }
-    }));
+
+        return {
+            location,
+            topPost: {
+                id: row.postId,
+                url: row.postUrl,
+                postedBy: row.postPostedBy,
+                mapPointId: parseInt(row.id),
+                postedAt: row.postPostedAt
+            }
+        };
+    });
 }
 
 /**
@@ -105,6 +123,7 @@ export async function getRecommendedLocationsWithTopPost(
     const query = `
         SELECT DISTINCT
             mp.id,
+            mp.google_place_id,
             mp.title,
             mp.description,
             mp.emoji,
@@ -155,9 +174,11 @@ export async function getRecommendedLocationsWithTopPost(
     ]) as [any[], any];
 
     const results = toCamelCase(rows) as any[];
-    
-    return results.map(row => ({
-        location: {
+    const userEdits = await fetchUserLocationEdits(accountId);
+    const editsMap = new Map(userEdits.map(edit => [edit.mapPointId, edit]));
+
+    return results.map(row => {
+        const location: MapPoint = {
             id: row.id,
             googlePlaceId: row.googlePlaceId,
             title: row.title,
@@ -171,15 +192,29 @@ export async function getRecommendedLocationsWithTopPost(
             phoneNumber: row.phoneNumber,
             address: row.address,
             createdAt: row.createdAt
-        },
-        topPost: {
-            id: row.postId,
-            url: row.postUrl,
-            postedBy: row.postPostedBy,
-            mapPointId: parseInt(row.id),
-            postedAt: row.postPostedAt
+        };
+
+        const edit = editsMap.get(row.id);
+        if (edit) {
+            location.title = edit.title ?? location.title;
+            location.description = edit.description ?? location.description;
+            location.emoji = edit.emoji ?? location.emoji;
+            location.websiteUrl = edit.websiteUrl ?? location.websiteUrl;
+            location.phoneNumber = edit.phoneNumber ?? location.phoneNumber;
+            location.address = edit.address ?? location.address;
         }
-    }));
+
+        return {
+            location,
+            topPost: {
+                id: row.postId,
+                url: row.postUrl,
+                postedBy: row.postPostedBy,
+                mapPointId: parseInt(row.id),
+                postedAt: row.postPostedAt
+            }
+        };
+    });
 }
 
 /**
@@ -208,7 +243,7 @@ export async function fetchPostsForLocation(locationId: number): Promise<Post[]>
 export async function fetchUserLocationEdits(userId: number): Promise<LocationEdit[]> {
     const query = `
         SELECT
-            google_place_id,
+            map_point_id,
             title,
             description,
             emoji,
@@ -217,7 +252,7 @@ export async function fetchUserLocationEdits(userId: number): Promise<LocationEd
             phone_number,
             address,
             created_at,
-            last_edited
+            last_updated
         FROM 
             user_location_edits
         WHERE

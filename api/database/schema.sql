@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS user_location_edits (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
+    PRIMARY KEY (user_id, map_point_id),
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (map_point_id) REFERENCES map_points(id)
 );
