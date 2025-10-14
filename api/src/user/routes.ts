@@ -193,6 +193,10 @@ export async function editUserLocation(req: BunRequest): Promise<Response> {
             if (placeDetails) {
                 edits.latitude = placeDetails.location.latitude;
                 edits.longitude = placeDetails.location.longitude;
+
+                if (placeDetails.websiteUri) edits.websiteUrl = placeDetails.websiteUri;
+                if (placeDetails.nationalPhoneNumber) edits.phoneNumber = placeDetails.nationalPhoneNumber;
+                if (placeDetails.formattedAddress) edits.address = placeDetails.formattedAddress;
             }
         }
     }
