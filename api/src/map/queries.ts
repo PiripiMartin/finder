@@ -75,6 +75,9 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
         };
 
         const edit = editsMap.get(row.id);
+
+        const addressUpdated = edit?.googlePlaceId != location.googlePlaceId;
+
         if (edit) {
             location.title = edit.title ?? location.title;
             location.description = edit.description ?? location.description;
@@ -85,6 +88,13 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             location.googlePlaceId = edit.googlePlaceId ?? location.googlePlaceId;
             location.latitude = edit.latitude ?? location.latitude;
             location.longitude = edit.longitude ?? location.longitude;
+
+            if (addressUpdated) {
+                // If the location changed in Google Maps but the new website/phone number 
+                // wasn't found, make sure we're not just reporting the old website/phone.
+                location.websiteUrl = edit.websiteUrl ?? "";
+                location.phoneNumber = edit.phoneNumber ?? "";
+            }
         }
 
         return {
