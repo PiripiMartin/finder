@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
-import { API_CONFIG, getMapPointsUrl } from '../config/api';
+import { API_CONFIG, getMapPointsUrl, getEditLocationUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
@@ -85,7 +85,7 @@ export default function Location() {
   const { id, needsCoordinates } = useLocalSearchParams();
   const { theme } = useTheme();
   const { sessionToken } = useAuth();
-  const { findLocationById, removeLocation, addBlockedLocation } = useLocationContext();
+  const { findLocationById, removeLocation, addBlockedLocation, refreshLocations } = useLocationContext();
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [videos, setVideos] = useState<VideoPost[]>([]);
@@ -97,6 +97,16 @@ export default function Location() {
   const [submitCoordsError, setSubmitCoordsError] = useState<string | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [isBlockingLocation, setIsBlockingLocation] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    description: '',
+    emoji: '',
+    address: '',
+    websiteUrl: '',
+    phoneNumber: '',
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Fetch videos for the current location
   const fetchLocationVideos = async (locationId: string) => {
@@ -328,6 +338,77 @@ export default function Location() {
     }
   };
 
+  const handleEditPress = () => {
+    if (!locationData) return;
+    // Pre-fill form with current data
+    setEditFormData({
+      title: locationData.title,
+      description: locationData.description,
+      emoji: locationData.emoji,
+      address: locationData.address || '',
+      websiteUrl: locationData.websiteUrl || '',
+      phoneNumber: locationData.phoneNumber || '',
+    });
+    setIsEditModalVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!locationData || !sessionToken) return;
+    
+    try {
+      setIsSavingEdit(true);
+      
+      const url = getEditLocationUrl(parseInt(locationData.id));
+      console.log('✏️ [Location] Editing location:', url);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify(editFormData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ [Location] Edit successful:', result);
+      
+      // Update local location data immediately
+      setLocationData({
+        ...locationData,
+        title: editFormData.title,
+        description: editFormData.description,
+        emoji: editFormData.emoji,
+        address: editFormData.address,
+        websiteUrl: editFormData.websiteUrl,
+        phoneNumber: editFormData.phoneNumber,
+      });
+      
+      // Close modal
+      setIsEditModalVisible(false);
+      
+      // Refresh locations via context (for map and saved list)
+      refreshLocations();
+      
+      // Show success alert
+      Alert.alert('Success', 'Location updated successfully!');
+      
+    } catch (error) {
+      console.error('❌ [Location] Error editing location:', error);
+      Alert.alert('Error', 'Failed to update location. Please try again.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditModalVisible(false);
+  };
+
   if (!locationData) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -461,32 +542,15 @@ export default function Location() {
             <Ionicons name="navigate" size={20} color="#FFF0F0" />
             <Text style={styles.directionsButtonText}>Get Directions</Text>
           </TouchableOpacity>
-        </View>
 
-        {/* Action Buttons Section */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Actions</Text>
-          
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: '#ff6b6b' }]}
-              onPress={handleReportLocation}
-            >
-              <Ionicons name="flag" size={20} color="#FFF0F0" />
-              <Text style={styles.actionButtonText}>Report</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: '#6c5ce7' }]}
-              onPress={handleBlockLocation}
-              disabled={isBlockingLocation}
-            >
-              <Ionicons name="ban" size={20} color="#FFF0F0" />
-              <Text style={styles.actionButtonText}>
-                {isBlockingLocation ? 'Blocking...' : 'Block Location'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {/* Edit Button */}
+          <TouchableOpacity 
+            style={[styles.editButton, { backgroundColor: theme.colors.primary }]}
+            onPress={handleEditPress}
+          >
+            <Ionicons name="pencil" size={20} color="#FFF0F0" />
+            <Text style={styles.editButtonText}>Edit Location</Text>
+          </TouchableOpacity>
         </View>
 
         {/* TikTok Videos Section - Only show for authenticated users */}
@@ -648,6 +712,133 @@ export default function Location() {
               <Text style={[styles.modalButtonText, { color: '#FFF0F0' }]}>OK</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      {/* Edit Location Modal */}
+      <Modal
+        visible={isEditModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleCancelEdit}
+      >
+        <View style={styles.editModalOverlay}>
+          <ScrollView 
+            style={[styles.editModalContent, { backgroundColor: theme.colors.surface }]}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={[styles.editModalTitle, { color: theme.colors.text }]}>Edit Location</Text>
+            
+            {/* Title Input */}
+            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Title</Text>
+            <TextInput
+              style={[styles.editFormInput, { 
+                backgroundColor: theme.colors.background,
+                color: theme.colors.text,
+                borderColor: theme.colors.border || '#835858'
+              }]}
+              value={editFormData.title}
+              onChangeText={(text) => setEditFormData({ ...editFormData, title: text })}
+              placeholder="Enter location title"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+
+            {/* Description Input */}
+            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Description</Text>
+            <TextInput
+              style={[styles.editFormInput, styles.editFormTextArea, { 
+                backgroundColor: theme.colors.background,
+                color: theme.colors.text,
+                borderColor: theme.colors.border || '#835858'
+              }]}
+              value={editFormData.description}
+              onChangeText={(text) => setEditFormData({ ...editFormData, description: text })}
+              placeholder="Enter description"
+              placeholderTextColor={theme.colors.textSecondary}
+              multiline
+              numberOfLines={4}
+            />
+
+            {/* Emoji Input */}
+            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Emoji</Text>
+            <TextInput
+              style={[styles.editFormInput, { 
+                backgroundColor: theme.colors.background,
+                color: theme.colors.text,
+                borderColor: theme.colors.border || '#835858'
+              }]}
+              value={editFormData.emoji}
+              onChangeText={(text) => setEditFormData({ ...editFormData, emoji: text })}
+              placeholder="Enter emoji (e.g., 🍕)"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+
+            {/* Address Input */}
+            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Address</Text>
+            <TextInput
+              style={[styles.editFormInput, { 
+                backgroundColor: theme.colors.background,
+                color: theme.colors.text,
+                borderColor: theme.colors.border || '#835858'
+              }]}
+              value={editFormData.address}
+              onChangeText={(text) => setEditFormData({ ...editFormData, address: text })}
+              placeholder="Enter address"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+
+            {/* Website URL Input */}
+            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Website URL</Text>
+            <TextInput
+              style={[styles.editFormInput, { 
+                backgroundColor: theme.colors.background,
+                color: theme.colors.text,
+                borderColor: theme.colors.border || '#835858'
+              }]}
+              value={editFormData.websiteUrl}
+              onChangeText={(text) => setEditFormData({ ...editFormData, websiteUrl: text })}
+              placeholder="Enter website URL"
+              placeholderTextColor={theme.colors.textSecondary}
+              keyboardType="url"
+              autoCapitalize="none"
+            />
+
+            {/* Phone Number Input */}
+            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Phone Number</Text>
+            <TextInput
+              style={[styles.editFormInput, { 
+                backgroundColor: theme.colors.background,
+                color: theme.colors.text,
+                borderColor: theme.colors.border || '#835858'
+              }]}
+              value={editFormData.phoneNumber}
+              onChangeText={(text) => setEditFormData({ ...editFormData, phoneNumber: text })}
+              placeholder="Enter phone number"
+              placeholderTextColor={theme.colors.textSecondary}
+              keyboardType="phone-pad"
+            />
+
+            {/* Action Buttons */}
+            <View style={styles.editModalButtons}>
+              <TouchableOpacity
+                style={[styles.editModalButton, { backgroundColor: theme.colors.textSecondary }]}
+                onPress={handleCancelEdit}
+                disabled={isSavingEdit}
+              >
+                <Text style={[styles.editModalButtonText, { color: '#FFF0F0' }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.editModalButton, { backgroundColor: theme.colors.primary }]}
+                onPress={handleSaveEdit}
+                disabled={isSavingEdit}
+              >
+                <Text style={[styles.editModalButtonText, { color: '#FFF0F0' }]}>
+                  {isSavingEdit ? 'Saving...' : 'Save'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -923,5 +1114,70 @@ const styles = StyleSheet.create({
   loginPromptButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 10,
+    gap: 8,
+  },
+  editButtonText: {
+    color: '#FFF0F0',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  editModalContent: {
+    width: '100%',
+    maxWidth: 500,
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  editModalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  editFormLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  editFormInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  editFormTextArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  editModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  editModalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  editModalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -60,5 +60,16 @@ target 'lai' do
         end
       end
     end
+
+    # Fix Yoga header search paths
+    installer.pods_project.targets.each do |target|
+      if target.name == 'Yoga'
+        target.build_configurations.each do |config|
+          config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited) '
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_TARGET_SRCROOT}" '
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_ROOT}/Headers/Public/Yoga" '
+        end
+      end
+    end
   end
 end
