@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { db } from "../database";
 import { verifySessionToken } from "../user/session";
-import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, getSavedLocationsWithTopPost } from "./queries";
+import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, getSavedLocationsWithTopPost, hasUserDeletedLocation, markLocationDeleted } from "./queries";
 
 /**
  * Fetches all posts for a given map point ID.
@@ -26,6 +26,12 @@ export async function getPostsForLocation(req: BunRequest): Promise<Response> {
     }
 
     try {
+        // Hide posts for locations the user has soft-deleted
+        const deleted = await hasUserDeletedLocation(accountId, id);
+        if (deleted) {
+            return new Response(JSON.stringify([]), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+
         const posts = await fetchPostsForLocation(id);
         return new Response(JSON.stringify(posts), { status: 200, headers: { "Content-Type": "application/json" } });
     } catch (error) {
@@ -128,6 +134,37 @@ export async function blockLocation(req: BunRequest): Promise<Response> {
         return new Response(null, { status: 204 });
     } catch (error) {
         console.error(`Error blocking location ${id} for account ${accountId}:`, error);
+        return new Response("Internal server error", { status: 500 });
+    }
+}
+
+/**
+ * Soft-deletes a location for the authenticated user by recording the deletion.
+ *
+ * @param req - The Bun request, containing the session token and the location ID.
+ * @returns A response indicating success or failure.
+ */
+export async function deleteLocationForUser(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing or malformed session token", { status: 401 });
+    }
+
+    const accountId = await verifySessionToken(sessionToken);
+    if (accountId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const id = parseInt((req.params as any).id, 10);
+    if (isNaN(id)) {
+        return new Response("Invalid map point ID", { status: 400 });
+    }
+
+    try {
+        await markLocationDeleted(accountId, id);
+        return new Response(null, { status: 204 });
+    } catch (error) {
+        console.error(`Error deleting location ${id} for account ${accountId}:`, error);
         return new Response("Internal server error", { status: 500 });
     }
 }
