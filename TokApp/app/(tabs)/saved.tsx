@@ -168,6 +168,7 @@ export default function Saved() {
 
 
 
+
   useEffect(() => {
     console.log('📚 [Saved] Page loaded, fetching saved locations...');
     fetchSavedLocations();

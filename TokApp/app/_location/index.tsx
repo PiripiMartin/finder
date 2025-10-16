@@ -409,6 +409,56 @@ export default function Location() {
     setIsEditModalVisible(false);
   };
 
+  const handleDeleteLocation = async () => {
+    if (!locationData || !sessionToken) return;
+    
+    Alert.alert(
+      'Delete Location',
+      'Are you sure you want to delete this location? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🗑️ [Location] Deleting location:', locationData.id);
+              
+              const response = await fetch(`${API_CONFIG.BASE_URL}/map/${locationData.id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${sessionToken}`,
+                },
+              });
+              
+              if (!response.ok) {
+                throw new Error(`Failed to delete location: ${response.status}`);
+              }
+              
+              console.log('✅ [Location] Location deleted successfully');
+              
+              // Refresh locations via context
+              refreshLocations();
+              
+              // Navigate back
+              router.back();
+              
+              Alert.alert('Success', 'Location deleted successfully!');
+              
+            } catch (error) {
+              console.error('❌ [Location] Error deleting location:', error);
+              Alert.alert('Error', 'Failed to delete location. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (!locationData) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -501,6 +551,27 @@ export default function Location() {
         <View style={[styles.heroSection, { backgroundColor: theme.colors.background }]}>
           <View style={styles.heroContent}>
             <Text style={[styles.locationName, { color: theme.colors.text }]}>{locationData.title}</Text>
+            {/* Action Icons */}
+            <View style={styles.actionIconsContainer}>
+              <TouchableOpacity 
+                style={styles.actionIcon}
+                onPress={openDirections}
+              >
+                <Ionicons name="navigate" size={28} color={theme.colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionIcon}
+                onPress={handleEditPress}
+              >
+                <Ionicons name="pencil" size={28} color={theme.colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionIcon}
+                onPress={handleDeleteLocation}
+              >
+                <Ionicons name="trash-outline" size={28} color="#ff6b6b" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -533,24 +604,6 @@ export default function Location() {
             <Ionicons name="globe" size={20} color={theme.colors.primary} />
             <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.websiteUrl || 'Not available'}</Text>
           </View>
-          
-          {/* Directions Button */}
-          <TouchableOpacity 
-            style={[styles.directionsButton, { backgroundColor: theme.colors.primary }]}
-            onPress={openDirections}
-          >
-            <Ionicons name="navigate" size={20} color="#FFFFFF" />
-            <Text style={styles.directionsButtonText}>Get Directions</Text>
-          </TouchableOpacity>
-
-          {/* Edit Button */}
-          <TouchableOpacity 
-            style={[styles.editButton, { backgroundColor: theme.colors.primary }]}
-            onPress={handleEditPress}
-          >
-            <Ionicons name="pencil" size={20} color="#FFFFFF" />
-            <Text style={styles.editButtonText}>Edit Location</Text>
-          </TouchableOpacity>
         </View>
 
         {/* TikTok Videos Section - Only show for authenticated users */}
@@ -1012,10 +1065,32 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroSection: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   heroContent: {
     alignItems: 'center',
+  },
+  actionIconsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
+    marginTop: 12,
+  },
+  actionIcon: {
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   locationName: {
     fontSize: 28,
@@ -1038,8 +1113,8 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 15,
-    paddingVertical: 20,
-    marginTop: 10,
+    paddingVertical: 12,
+    marginTop: 0,
   },
   sectionTitle: {
     fontSize: 20,
@@ -1263,6 +1338,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   editButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 10,
+    gap: 8,
+  },
+  deleteButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
