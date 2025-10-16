@@ -826,7 +826,7 @@ export default function Location() {
                       }]}
                       value={editFormData.emoji}
                       onChangeText={(text) => setEditFormData({ ...editFormData, emoji: text.slice(0, 2) })}
-                      placeholder="🍕"
+                      placeholder=""
                       placeholderTextColor={theme.colors.textSecondary}
                       maxLength={2}
                     />
