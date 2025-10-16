@@ -259,7 +259,7 @@ export default function Profile() {
           style={[styles.deleteButton, { backgroundColor: '#B14D4D' }]}
           onPress={handleDeleteAccount}
         >
-          <Ionicons name="trash-outline" size={20} color="#FFF0F0" />
+          <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
       </View>
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EBD4D4',
   },
   header: {
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     padding: 20,
     paddingTop: 60,
     alignItems: 'center',
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#4E8886',
+    borderColor: '#A8C3A0',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   section: {
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#FFF0F0',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deleteText: {
-    color: '#FFF0F0',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },

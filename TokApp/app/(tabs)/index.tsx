@@ -927,7 +927,7 @@ export default function Index() {
           setSelectedMarkerId(null);
         }}
       >
-        <Ionicons name="navigate" size={28} color="#4E8886" />
+        <Ionicons name="navigate" size={28} color="#A8C3A0" />
       </TouchableOpacity>
 
       {/* Tutorial Button - Below Location Button (only if feature enabled) */}
@@ -945,7 +945,7 @@ export default function Index() {
             setShowManualTutorial(true);
           }}
         >
-          <Ionicons name="help-circle-outline" size={28} color="#4E8886" />
+          <Ionicons name="help-circle-outline" size={28} color="#A8C3A0" />
         </TouchableOpacity>
       )}
 
@@ -961,7 +961,7 @@ export default function Index() {
           ]}
           onPress={() => router.push('/auth/login')}
         >
-          <Ionicons name="log-in" size={20} color="#4E8886" />
+          <Ionicons name="log-in" size={20} color="#A8C3A0" />
           <Text style={styles.guestLoginButtonText}>Login</Text>
         </TouchableOpacity>
       )}
@@ -980,7 +980,7 @@ export default function Index() {
           ]}
           onPress={handleLogout}
         >
-          <Ionicons name="log-out" size={20} color="#4E8886" />
+          <Ionicons name="log-out" size={20} color="#A8C3A0" />
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
       )}
@@ -1058,7 +1058,7 @@ export default function Index() {
         >
           {/* Shop Button with Arrow */}
           <TouchableOpacity
-            style={[styles.shopButton, { backgroundColor: '#FFF0F0' }]}
+            style={[styles.shopButton, { backgroundColor: '#FFFFFF' }]}
             onPress={() => {
               // Log the "Check it out" process
               console.log('=== "Check it out" Button Tapped ===');
@@ -1198,11 +1198,11 @@ const styles = StyleSheet.create({
     height: Dimensions.get('window').height,
   },
   customMarker: {
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 6,
     borderWidth: 1,
-            borderColor: '#4E8886',
+            borderColor: '#A8C3A0',
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1296,7 +1296,7 @@ const styles = StyleSheet.create({
   },
   locationButton: {
     position: 'absolute',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 25,
     width: 50,
     height: 50,
@@ -1310,7 +1310,7 @@ const styles = StyleSheet.create({
   },
   tutorialButton: {
     position: 'absolute',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 25,
     width: 50,
     height: 50,
@@ -1371,7 +1371,7 @@ const styles = StyleSheet.create({
 
   customLabel: {
     position: 'absolute',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     padding: 8,
     borderRadius: 6,
     zIndex: 1000,
@@ -1382,7 +1382,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
     borderWidth: 1,
-            borderColor: '#835858',
+            borderColor: '#FFFFFF',
   },
   labelTitle: {
     color: '#000000',
@@ -1399,7 +1399,7 @@ const styles = StyleSheet.create({
   },
   guestLoginButton: {
     position: 'absolute',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1413,13 +1413,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   guestLoginButtonText: {
-    color: '#4E8886',
+    color: '#A8C3A0',
     fontSize: 14,
     fontWeight: '600',
   },
   logoutButton: {
     position: 'absolute',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1433,7 +1433,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   logoutButtonText: {
-    color: '#4E8886',
+    color: '#A8C3A0',
     fontSize: 14,
     fontWeight: '600',
   },

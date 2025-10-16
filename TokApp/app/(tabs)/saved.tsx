@@ -251,7 +251,7 @@ export default function Saved() {
               >
                 <Text style={[
                   styles.emojiFilterText,
-                  selectedEmoji === emoji && { color: '#FFF0F0' }
+                  selectedEmoji === emoji && { color: '#FFFFFF' }
                 ]}>
                   {emoji}
                 </Text>
@@ -387,18 +387,20 @@ const styles = StyleSheet.create({
   },
   locationCard: {
     width: locationCardWidth,
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 10,
     marginBottom: 10,
     padding: 10,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(131, 88, 88, 0.15)',
   },
   locationHeader: {
     flexDirection: 'row',

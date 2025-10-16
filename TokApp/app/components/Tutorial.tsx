@@ -239,7 +239,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',

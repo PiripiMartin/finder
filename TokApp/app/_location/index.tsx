@@ -417,7 +417,7 @@ export default function Location() {
           style={[styles.loadingButton, { backgroundColor: theme.colors.primary }]}
           onPress={() => setLocationData(mockLocationData['1'])}
         >
-          <Text style={[styles.loadingButtonText, { color: '#FFF0F0' }]}>Load Demo Location</Text>
+          <Text style={[styles.loadingButtonText, { color: '#FFFFFF' }]}>Load Demo Location</Text>
         </TouchableOpacity>
       </View>
     );
@@ -477,7 +477,7 @@ export default function Location() {
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: '#FFF0F0', fontWeight: 'bold', fontSize: 16 }}>
+            <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 }}>
               {isSubmittingCoords ? 'Saving…' : 'Save Coordinates'}
             </Text>
           </TouchableOpacity>
@@ -539,7 +539,7 @@ export default function Location() {
             style={[styles.directionsButton, { backgroundColor: theme.colors.primary }]}
             onPress={openDirections}
           >
-            <Ionicons name="navigate" size={20} color="#FFF0F0" />
+            <Ionicons name="navigate" size={20} color="#FFFFFF" />
             <Text style={styles.directionsButtonText}>Get Directions</Text>
           </TouchableOpacity>
 
@@ -548,7 +548,7 @@ export default function Location() {
             style={[styles.editButton, { backgroundColor: theme.colors.primary }]}
             onPress={handleEditPress}
           >
-            <Ionicons name="pencil" size={20} color="#FFF0F0" />
+            <Ionicons name="pencil" size={20} color="#FFFFFF" />
             <Text style={styles.editButtonText}>Edit Location</Text>
           </TouchableOpacity>
         </View>
@@ -709,7 +709,7 @@ export default function Location() {
               style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
               onPress={() => setShowReportModal(false)}
             >
-              <Text style={[styles.modalButtonText, { color: '#FFF0F0' }]}>OK</Text>
+              <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>OK</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1158,7 +1158,7 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   directionsButtonText: {
-    color: '#FFF0F0',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
@@ -1175,7 +1175,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#FFF0F0',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -1200,7 +1200,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButtonText: {
-    color: '#FFF0F0',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -1265,7 +1265,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   editButtonText: {
-    color: '#FFF0F0',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
