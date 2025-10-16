@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
-const locationCardWidth = width - 100; // Even smaller width for more compact cards
+const locationCardWidth = (width - 36) / 2; // Two cards per row with padding
 
 interface SavedLocation {
   location: {
@@ -42,6 +42,7 @@ export default function Saved() {
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<SavedLocation[]>([]);
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,17 +118,35 @@ export default function Saved() {
     return [...new Set(emojis)];
   };
 
+  // Apply filters (search + emoji)
+  const applyFilters = useCallback(() => {
+    let filtered = savedLocations;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(item => 
+        item.location.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.location.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.location.address?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Apply emoji filter
+    if (selectedEmoji) {
+      filtered = filtered.filter(item => item.location.emoji === selectedEmoji);
+    }
+
+    setFilteredLocations(filtered);
+  }, [savedLocations, searchQuery, selectedEmoji]);
+
   // Filter locations by selected emoji
   const filterByEmoji = (emoji: string) => {
     if (selectedEmoji === emoji) {
-      // If clicking the same emoji, deselect it and show all locations
+      // If clicking the same emoji, deselect it
       setSelectedEmoji(null);
-      setFilteredLocations(savedLocations);
     } else {
-      // Filter by the new emoji
+      // Select the new emoji
       setSelectedEmoji(emoji);
-      const filtered = savedLocations.filter(item => item.location.emoji === emoji);
-      setFilteredLocations(filtered);
     }
   };
 
@@ -163,6 +182,11 @@ export default function Saved() {
 
     return unregister;
   }, [registerRefreshCallback, fetchSavedLocations]);
+
+  // Apply filters when search query, emoji, or locations change
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
 
   if (isLoading) {
     return (
@@ -231,6 +255,27 @@ export default function Saved() {
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
       </View>
 
+      {/* Search Bar */}
+      {savedLocations.length > 0 && (
+        <View style={[styles.searchContainer, { backgroundColor: theme.colors.background }]}>
+          <View style={[styles.searchInputContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Ionicons name="search" size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.colors.text }]}
+              placeholder="Search locations..."
+              placeholderTextColor={theme.colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
       {/* Emoji Filter Bar */}
       {savedLocations.length > 0 && (
         <View style={[styles.filterContainer, { backgroundColor: theme.colors.background }]}>
@@ -284,29 +329,22 @@ export default function Saved() {
                 style={[styles.locationCard, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
                 onPress={() => handleLocationPress(item.location.id)}
               >
-                {/* Location Header */}
                 <View style={styles.locationHeader}>
                   <View style={styles.locationInfo}>
                     <Text style={styles.locationEmoji}>{item.location.emoji}</Text>
                     <View style={styles.locationText}>
-                      <Text style={[styles.locationTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                      <Text style={[styles.locationTitle, { color: theme.colors.text }]} numberOfLines={2}>
                         {item.location.title}
-                      </Text>
-                      <Text style={[styles.locationDescription, { color: theme.colors.textSecondary }]} numberOfLines={2}>
-                        {item.location.description}
                       </Text>
                     </View>
                   </View>
-                  <View style={styles.locationActions}>
-                    {/* Alert symbol for locations with null coordinates */}
-                    {(item.location.latitude === null || item.location.longitude === null) && (
-                      <Ionicons name="alert-circle" size={20} color="#ff6b6b" style={styles.alertIcon} />
-                    )}
-                    <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
-                  </View>
+                  {/* Alert symbol for locations with null coordinates */}
+                  {(item.location.latitude === null || item.location.longitude === null) && (
+                    <View style={styles.locationActions}>
+                      <Ionicons name="alert-circle" size={18} color="#ff6b6b" />
+                    </View>
+                  )}
                 </View>
-
-
               </TouchableOpacity>
             ))}
           </View>
@@ -332,7 +370,26 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
-
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
+  },
   scrollView: {
     flex: 1,
   },
@@ -385,12 +442,16 @@ const styles = StyleSheet.create({
   },
   locationsList: {
     padding: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   locationCard: {
     width: locationCardWidth,
+    height: locationCardWidth * 0.6,
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
-    marginBottom: 10,
+    marginBottom: 12,
     padding: 10,
     shadowColor: '#000',
     shadowOffset: {
@@ -404,31 +465,32 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(131, 88, 88, 0.15)',
   },
   locationHeader: {
-    flexDirection: 'row',
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
   },
   locationInfo: {
-    flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    justifyContent: 'center',
   },
   locationEmoji: {
-    fontSize: 24,
-    marginRight: 8,
+    fontSize: 32,
+    marginBottom: 6,
   },
   locationText: {
-    flex: 1,
+    alignItems: 'center',
   },
   locationTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 2,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   locationDescription: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 14,
+    textAlign: 'center',
   },
   filterContainer: {
     paddingVertical: 16,
@@ -452,12 +514,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   locationActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  alertIcon: {
-    marginRight: 4,
+    position: 'absolute',
+    top: 8,
+    right: 8,
   },
   guestContainer: {
     flex: 1,
