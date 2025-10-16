@@ -435,7 +435,7 @@ export default function Location() {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>        
         {/* Header */}
-        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>          
+        <View style={[styles.header, { backgroundColor: theme.colors.background }]}>          
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
@@ -489,7 +489,7 @@ export default function Location() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
@@ -498,20 +498,20 @@ export default function Location() {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
-        <View style={[styles.heroSection, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.heroSection, { backgroundColor: theme.colors.background }]}>
           <View style={styles.heroContent}>
             <Text style={[styles.locationName, { color: theme.colors.text }]}>{locationData.title}</Text>
           </View>
         </View>
 
         {/* Description Section */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.section, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>About</Text>
           <Text style={[styles.description, { color: theme.colors.textSecondary }]}>{locationData.description}</Text>
         </View>
 
         {/* Contact Info Section */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.section, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Contact & Hours</Text>
           
           <View style={styles.contactItem}>
@@ -555,7 +555,7 @@ export default function Location() {
 
         {/* TikTok Videos Section - Only show for authenticated users */}
         {sessionToken && (
-          <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <View style={[styles.section, { backgroundColor: theme.colors.background }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>TikTok Videos</Text>
             <View style={styles.videoGrid}>
               {isLoadingVideos ? (
@@ -1013,8 +1013,6 @@ const styles = StyleSheet.create({
   },
   heroSection: {
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#835858',
   },
   heroContent: {
     alignItems: 'center',

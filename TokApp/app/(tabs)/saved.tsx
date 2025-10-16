@@ -167,7 +167,7 @@ export default function Saved() {
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
         </View>
         <View style={styles.loadingContainer}>
@@ -182,7 +182,7 @@ export default function Saved() {
   if (isGuest) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
         </View>
         <View style={styles.guestContainer}>
@@ -211,7 +211,7 @@ export default function Saved() {
   if (error) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
         </View>
         <View style={styles.errorContainer}>
@@ -227,13 +227,13 @@ export default function Saved() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
       </View>
 
       {/* Emoji Filter Bar */}
       {savedLocations.length > 0 && (
-        <View style={[styles.filterContainer, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.filterContainer, { backgroundColor: theme.colors.background }]}>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
@@ -251,6 +251,7 @@ export default function Saved() {
               >
                 <Text style={[
                   styles.emojiFilterText,
+                  { color: theme.colors.text },
                   selectedEmoji === emoji && { color: '#FFFFFF' }
                 ]}>
                   {emoji}
@@ -280,7 +281,7 @@ export default function Saved() {
             {filteredLocations.map((item) => (
               <TouchableOpacity 
                 key={item.location.id} 
-                style={[styles.locationCard, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow }]}
+                style={[styles.locationCard, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
                 onPress={() => handleLocationPress(item.location.id)}
               >
                 {/* Location Header */}
@@ -431,8 +432,6 @@ const styles = StyleSheet.create({
   },
   filterContainer: {
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#835858',
   },
   filterScrollContent: {
     paddingHorizontal: 20,
@@ -451,7 +450,6 @@ const styles = StyleSheet.create({
   emojiFilterText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#835858',
   },
   locationActions: {
     flexDirection: 'row',
