@@ -24,7 +24,7 @@ export default function CreateAccountScreen() {
   const [isLoading, setIsLoading] = useState(false);
   
   const router = useRouter();
-  const { createAccount, guestLogin } = useAuth();
+  const { createAccount } = useAuth();
   const { theme } = useTheme();
   const { recheckTutorialAfterLogin } = useTutorial();
 
@@ -163,15 +163,6 @@ export default function CreateAccountScreen() {
     }
   };
 
-  const handleGuestLogin = async () => {
-    try {
-      await guestLogin();
-      router.replace('/(tabs)');
-    } catch (error) {
-      Alert.alert('Error', 'An error occurred while entering guest mode');
-    }
-  };
-
   const goToLogin = () => {
     logger.navigation('CreateAccount', 'create-account', 'login');
     router.push('/auth/login');
@@ -236,19 +227,6 @@ export default function CreateAccountScreen() {
     disabledButton: {
       backgroundColor: theme.colors.textSecondary,
       opacity: 0.6,
-    },
-    guestButton: {
-      backgroundColor: theme.colors.textSecondary,
-      borderRadius: 8,
-      paddingVertical: 16,
-      alignItems: 'center',
-      marginTop: 10,
-      marginBottom: 20,
-    },
-    guestButtonText: {
-      color: theme.colors.surface,
-      fontSize: 18,
-      fontWeight: '600',
     },
   });
 
@@ -329,15 +307,6 @@ export default function CreateAccountScreen() {
         >
           <Text style={styles.loginText}>
             Already have an account? Login
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.guestButton}
-          onPress={handleGuestLogin}
-        >
-          <Text style={styles.guestButtonText}>
-            Continue as Guest
           </Text>
         </TouchableOpacity>
       </ScrollView>

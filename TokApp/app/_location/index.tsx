@@ -723,122 +723,262 @@ export default function Location() {
         onRequestClose={handleCancelEdit}
       >
         <View style={styles.editModalOverlay}>
-          <ScrollView 
-            style={[styles.editModalContent, { backgroundColor: theme.colors.surface }]}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={[styles.editModalTitle, { color: theme.colors.text }]}>Edit Location</Text>
-            
-            {/* Title Input */}
-            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Title</Text>
-            <TextInput
-              style={[styles.editFormInput, { 
-                backgroundColor: theme.colors.background,
-                color: theme.colors.text,
-                borderColor: theme.colors.border || '#835858'
-              }]}
-              value={editFormData.title}
-              onChangeText={(text) => setEditFormData({ ...editFormData, title: text })}
-              placeholder="Enter location title"
-              placeholderTextColor={theme.colors.textSecondary}
-            />
+          <View style={[styles.editModalContent, { backgroundColor: theme.colors.surface }]}>
+            {/* Header with Close Button */}
+            <View style={[styles.editModalHeader, { 
+              backgroundColor: theme.colors.surface,
+            }]}>
+              <View style={styles.editModalHandleBar} />
+              <View style={styles.editModalHeaderContent}>
+                <Text style={[styles.editModalTitle, { color: theme.colors.text }]}>Edit Location</Text>
+                <TouchableOpacity 
+                  style={styles.editModalCloseButton} 
+                  onPress={handleCancelEdit}
+                  disabled={isSavingEdit}
+                >
+                  <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </View>
 
-            {/* Description Input */}
-            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Description</Text>
-            <TextInput
-              style={[styles.editFormInput, styles.editFormTextArea, { 
-                backgroundColor: theme.colors.background,
-                color: theme.colors.text,
-                borderColor: theme.colors.border || '#835858'
-              }]}
-              value={editFormData.description}
-              onChangeText={(text) => setEditFormData({ ...editFormData, description: text })}
-              placeholder="Enter description"
-              placeholderTextColor={theme.colors.textSecondary}
-              multiline
-              numberOfLines={4}
-            />
+            {/* Scrollable Content */}
+            <ScrollView 
+              style={styles.editModalScrollView}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.editModalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Title Input */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>
+                  Title {editFormData.title.length > 0 && (
+                    <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
+                      ({editFormData.title.length}/100)
+                    </Text>
+                  )}
+                </Text>
+                <View style={styles.inputWithClearContainer}>
+                  <TextInput
+                    style={[styles.editFormInput, styles.inputWithClear, { 
+                      backgroundColor: theme.colors.background,
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                    }]}
+                    value={editFormData.title}
+                    onChangeText={(text) => setEditFormData({ ...editFormData, title: text.slice(0, 100) })}
+                    placeholder="Enter location title"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    maxLength={100}
+                  />
+                  {editFormData.title.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.clearButton}
+                      onPress={() => setEditFormData({ ...editFormData, title: '' })}
+                    >
+                      <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
 
-            {/* Emoji Input */}
-            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Emoji</Text>
-            <TextInput
-              style={[styles.editFormInput, { 
-                backgroundColor: theme.colors.background,
-                color: theme.colors.text,
-                borderColor: theme.colors.border || '#835858'
-              }]}
-              value={editFormData.emoji}
-              onChangeText={(text) => setEditFormData({ ...editFormData, emoji: text })}
-              placeholder="Enter emoji (e.g., 🍕)"
-              placeholderTextColor={theme.colors.textSecondary}
-            />
+              {/* Address Input */}
+              <View style={styles.inputGroup}>
+                <View style={styles.labelWithIcon}>
+                  <Ionicons name="location-outline" size={18} color={theme.colors.primary} />
+                  <Text style={[styles.editFormLabel, { color: theme.colors.text, marginTop: 0 }]}>Address</Text>
+                </View>
+                <View style={styles.inputWithClearContainer}>
+                  <TextInput
+                    style={[styles.editFormInput, styles.inputWithClear, { 
+                      backgroundColor: theme.colors.background,
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                    }]}
+                    value={editFormData.address}
+                    onChangeText={(text) => setEditFormData({ ...editFormData, address: text })}
+                    placeholder="123 Main St, City, State"
+                    placeholderTextColor={theme.colors.textSecondary}
+                  />
+                  {editFormData.address.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.clearButton}
+                      onPress={() => setEditFormData({ ...editFormData, address: '' })}
+                    >
+                      <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
 
-            {/* Address Input */}
-            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Address</Text>
-            <TextInput
-              style={[styles.editFormInput, { 
-                backgroundColor: theme.colors.background,
-                color: theme.colors.text,
-                borderColor: theme.colors.border || '#835858'
-              }]}
-              value={editFormData.address}
-              onChangeText={(text) => setEditFormData({ ...editFormData, address: text })}
-              placeholder="Enter address"
-              placeholderTextColor={theme.colors.textSecondary}
-            />
+              {/* Emoji Input */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Emoji</Text>
+                <View style={styles.emojiInputContainer}>
+                  <View style={styles.emojiInputWrapper}>
+                    <TextInput
+                      style={[styles.editFormInput, styles.emojiInput, { 
+                        backgroundColor: theme.colors.background,
+                        color: theme.colors.text,
+                        borderColor: theme.colors.border,
+                        fontSize: 32,
+                        textAlign: 'center',
+                        textAlignVertical: 'center',
+                      }]}
+                      value={editFormData.emoji}
+                      onChangeText={(text) => setEditFormData({ ...editFormData, emoji: text.slice(0, 2) })}
+                      placeholder="🍕"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      maxLength={2}
+                    />
+                    {editFormData.emoji.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.emojiClearButton}
+                        onPress={() => setEditFormData({ ...editFormData, emoji: '' })}
+                      >
+                        <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </View>
 
-            {/* Website URL Input */}
-            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Website URL</Text>
-            <TextInput
-              style={[styles.editFormInput, { 
-                backgroundColor: theme.colors.background,
-                color: theme.colors.text,
-                borderColor: theme.colors.border || '#835858'
-              }]}
-              value={editFormData.websiteUrl}
-              onChangeText={(text) => setEditFormData({ ...editFormData, websiteUrl: text })}
-              placeholder="Enter website URL"
-              placeholderTextColor={theme.colors.textSecondary}
-              keyboardType="url"
-              autoCapitalize="none"
-            />
+              {/* Description Input */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>
+                  Description {editFormData.description.length > 0 && (
+                    <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
+                      ({editFormData.description.length}/500)
+                    </Text>
+                  )}
+                </Text>
+                <View style={styles.inputWithClearContainer}>
+                  <TextInput
+                    style={[styles.editFormInput, styles.editFormTextArea, styles.inputWithClear, { 
+                      backgroundColor: theme.colors.background,
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                    }]}
+                    value={editFormData.description}
+                    onChangeText={(text) => setEditFormData({ ...editFormData, description: text.slice(0, 500) })}
+                    placeholder="Describe this location..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                    maxLength={500}
+                  />
+                  {editFormData.description.length > 0 && (
+                    <TouchableOpacity
+                      style={[styles.clearButton, styles.textAreaClearButton]}
+                      onPress={() => setEditFormData({ ...editFormData, description: '' })}
+                    >
+                      <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
 
-            {/* Phone Number Input */}
-            <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Phone Number</Text>
-            <TextInput
-              style={[styles.editFormInput, { 
-                backgroundColor: theme.colors.background,
-                color: theme.colors.text,
-                borderColor: theme.colors.border || '#835858'
-              }]}
-              value={editFormData.phoneNumber}
-              onChangeText={(text) => setEditFormData({ ...editFormData, phoneNumber: text })}
-              placeholder="Enter phone number"
-              placeholderTextColor={theme.colors.textSecondary}
-              keyboardType="phone-pad"
-            />
+              {/* Contact Information Section */}
+              <View style={[styles.formSection, { borderTopColor: theme.colors.border }]}>
+                <Text style={[styles.formSectionTitle, { color: theme.colors.text }]}>Contact Information</Text>
+                
+                {/* Phone Number Input */}
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelWithIcon}>
+                    <Ionicons name="call-outline" size={18} color={theme.colors.primary} />
+                    <Text style={[styles.editFormLabel, { color: theme.colors.text, marginTop: 0 }]}>Phone Number</Text>
+                  </View>
+                  <View style={styles.inputWithClearContainer}>
+                    <TextInput
+                      style={[styles.editFormInput, styles.inputWithClear, { 
+                        backgroundColor: theme.colors.background,
+                        color: theme.colors.text,
+                        borderColor: theme.colors.border,
+                      }]}
+                      value={editFormData.phoneNumber}
+                      onChangeText={(text) => setEditFormData({ ...editFormData, phoneNumber: text })}
+                      placeholder="(555) 123-4567"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      keyboardType="phone-pad"
+                    />
+                    {editFormData.phoneNumber.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.clearButton}
+                        onPress={() => setEditFormData({ ...editFormData, phoneNumber: '' })}
+                      >
+                        <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
 
-            {/* Action Buttons */}
-            <View style={styles.editModalButtons}>
+                {/* Website URL Input */}
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelWithIcon}>
+                    <Ionicons name="globe-outline" size={18} color={theme.colors.primary} />
+                    <Text style={[styles.editFormLabel, { color: theme.colors.text, marginTop: 0 }]}>Website</Text>
+                  </View>
+                  <View style={styles.inputWithClearContainer}>
+                    <TextInput
+                      style={[styles.editFormInput, styles.inputWithClear, { 
+                        backgroundColor: theme.colors.background,
+                        color: theme.colors.text,
+                        borderColor: theme.colors.border,
+                      }]}
+                      value={editFormData.websiteUrl}
+                      onChangeText={(text) => setEditFormData({ ...editFormData, websiteUrl: text })}
+                      placeholder="www.example.com"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      keyboardType="url"
+                      autoCapitalize="none"
+                    />
+                    {editFormData.websiteUrl.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.clearButton}
+                        onPress={() => setEditFormData({ ...editFormData, websiteUrl: '' })}
+                      >
+                        <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Fixed Footer Buttons */}
+            <View style={[styles.editModalFooter, { 
+              backgroundColor: theme.colors.surface,
+            }]}>
               <TouchableOpacity
-                style={[styles.editModalButton, { backgroundColor: theme.colors.textSecondary }]}
+                style={[styles.editModalButton, styles.cancelButton, { 
+                  backgroundColor: 'transparent',
+                  borderWidth: 2,
+                  borderColor: theme.colors.border,
+                }]}
                 onPress={handleCancelEdit}
                 disabled={isSavingEdit}
               >
-                <Text style={[styles.editModalButtonText, { color: '#FFF0F0' }]}>Cancel</Text>
+                <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.editModalButton, { backgroundColor: theme.colors.primary }]}
+                style={[styles.editModalButton, styles.saveButton, { 
+                  backgroundColor: theme.colors.primary,
+                  opacity: isSavingEdit ? 0.7 : 1,
+                }]}
                 onPress={handleSaveEdit}
                 disabled={isSavingEdit}
               >
-                <Text style={[styles.editModalButtonText, { color: '#FFF0F0' }]}>
-                  {isSavingEdit ? 'Saving...' : 'Save'}
-                </Text>
+                {isSavingEdit ? (
+                  <View style={styles.savingContainer}>
+                    <Text style={[styles.saveButtonText, { color: '#FFFFFF' }]}>Saving</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.saveButtonText, { color: '#FFFFFF' }]}>Save Changes</Text>
+                )}
               </TouchableOpacity>
             </View>
-          </ScrollView>
+          </View>
         </View>
       </Modal>
     </View>
@@ -1131,53 +1271,186 @@ const styles = StyleSheet.create({
   },
   editModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
   },
   editModalContent: {
     width: '100%',
-    maxWidth: 500,
-    borderRadius: 16,
-    padding: 20,
-    maxHeight: '80%',
+    height: '92%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 16,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  editModalHeader: {
+    paddingTop: 12,
+    paddingBottom: 16,
+    paddingHorizontal: 24,
+    flexShrink: 0,
+  },
+  editModalHandleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#CBD5E0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  editModalHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
   editModalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    fontSize: 26,
+    fontWeight: '700',
     textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  editModalCloseButton: {
+    position: 'absolute',
+    right: 0,
+    padding: 4,
+  },
+  editModalScrollView: {
+    flex: 1,
+    flexGrow: 1,
+  },
+  editModalScrollContent: {
+    padding: 24,
+    paddingTop: 8,
+    paddingBottom: 40,
+  },
+  inputGroup: {
+    marginBottom: 20,
   },
   editFormLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 8,
-    marginTop: 12,
+    marginBottom: 10,
+    marginTop: 4,
+    letterSpacing: 0.2,
+  },
+  characterCount: {
+    fontSize: 13,
+    fontWeight: '400',
   },
   editFormInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
+    lineHeight: 22,
   },
   editFormTextArea: {
-    minHeight: 80,
+    minHeight: 120,
     textAlignVertical: 'top',
+    paddingTop: 16,
   },
-  editModalButtons: {
+  emojiInputContainer: {
+    alignItems: 'center',
+  },
+  emojiInputWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+  },
+  emojiInput: {
+    width: 100,
+    height: 100,
+    padding: 0,
+  },
+  emojiClearButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+  },
+  inputWithClearContainer: {
+    position: 'relative',
+  },
+  inputWithClear: {
+    paddingRight: 45,
+  },
+  clearButton: {
+    position: 'absolute',
+    right: 12,
+    top: '50%',
+    transform: [{ translateY: -10 }],
+    padding: 4,
+  },
+  textAreaClearButton: {
+    top: 16,
+    transform: [{ translateY: 0 }],
+  },
+  formSection: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+  },
+  formSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
+    letterSpacing: -0.3,
+  },
+  labelWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  editModalFooter: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 20,
+    padding: 24,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+    flexShrink: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 12,
   },
   editModalButton: {
     flex: 1,
-    padding: 14,
-    borderRadius: 10,
+    paddingVertical: 18,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
   },
-  editModalButtonText: {
-    fontSize: 16,
+  cancelButton: {
+    borderWidth: 2,
+  },
+  cancelButtonText: {
+    fontSize: 17,
     fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  saveButton: {
+    shadowColor: '#4E8886',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  saveButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  savingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

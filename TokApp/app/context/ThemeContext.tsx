@@ -21,12 +21,12 @@ interface Theme {
 
 const lightTheme: Theme = {
   colors: {
-    background: '#EBD4D4',
-          surface: '#FFF0F0',
+    background: '#FFFFFF',
+    surface: '#F8F9FA',
     text: '#333333',
     textSecondary: '#835858',
     primary: '#4E8886',
-    border: '#835858',
+    border: '#E5E7EB',
     shadow: '#463333',
   },
 };
