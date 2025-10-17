@@ -205,10 +205,18 @@ export default function Saved() {
       setIsReorderMode(false);
       console.log('✅ [Saved] Exited reorder mode, saved unfiled locations order');
     } else {
-      // Entering reorder mode - clear filters and set only unfiled locations
+      // Entering reorder mode - clear filters and get unfiled locations
       setSearchQuery('');
       setSelectedEmoji(null);
-      setReorderedLocations(getUnfiledLocations());
+      
+      // Get unfiled locations without search filter for reordering
+      const filedIds = new Set<number>();
+      folders.forEach(folder => {
+        folder.locationIds.forEach(id => filedIds.add(id));
+      });
+      const unfiled = savedLocations.filter(loc => !filedIds.has(loc.location.id));
+      
+      setReorderedLocations(unfiled);
       setIsReorderMode(true);
       console.log('🔄 [Saved] Entered reorder mode for unfiled locations');
     }
