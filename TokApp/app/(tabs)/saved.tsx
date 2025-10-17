@@ -258,6 +258,7 @@ export default function Saved() {
   const handleFolderPress = (folderId: string) => {
     if (isReorderMode) return; // Don't navigate in reorder mode
     setSelectedFolderId(folderId);
+    setSearchQuery(''); // Clear search when entering folder
     console.log('📂 [Saved] Opened folder:', folderId);
   };
 
@@ -266,6 +267,7 @@ export default function Saved() {
     setSelectedFolderId(null);
     setIsFolderEditMode(false);
     setIsFolderReorderMode(false);
+    setSearchQuery(''); // Clear search when going back to main view
     console.log('📂 [Saved] Back to main view');
   };
 
@@ -347,18 +349,28 @@ export default function Saved() {
     }
   };
 
-  // Get unfiled locations (not in any folder), respecting saved order
+  // Get unfiled locations (not in any folder), respecting saved order and applying search
   const getUnfiledLocations = (): SavedLocation[] => {
     const filedIds = new Set<number>();
     folders.forEach(folder => {
       folder.locationIds.forEach(id => filedIds.add(id));
     });
     
-    const unfiled = savedLocations.filter(loc => !filedIds.has(loc.location.id));
+    let unfiled = savedLocations.filter(loc => !filedIds.has(loc.location.id));
+    
+    // Apply search filter if there's a search query
+    if (searchQuery.trim() && !selectedFolderId) {
+      unfiled = unfiled.filter(item => 
+        item.location.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.location.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.location.address?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
     return unfiled;
   };
 
-  // Get locations in a specific folder
+  // Get locations in a specific folder, applying search filter
   const getFolderLocations = (folderId: string): SavedLocation[] => {
     const folder = folders.find(f => f.id === folderId);
     if (!folder) return [];
@@ -368,9 +380,20 @@ export default function Saved() {
       locationMap.set(loc.location.id, loc);
     });
     
-    return folder.locationIds
+    let folderLocations = folder.locationIds
       .map(id => locationMap.get(id))
       .filter(loc => loc !== undefined) as SavedLocation[];
+    
+    // Apply search filter if there's a search query
+    if (searchQuery.trim()) {
+      folderLocations = folderLocations.filter(item => 
+        item.location.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.location.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.location.address?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    return folderLocations;
   };
 
   // Handle adding multiple locations to folder
@@ -531,7 +554,7 @@ export default function Saved() {
           // Main view header
           <>
             <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
-            {getUnfiledLocations().length > 1 && !selectedFolderId && (
+            {getUnfiledLocations().length > 1 && !searchQuery && !selectedFolderId && (
               <TouchableOpacity
                 style={[styles.reorderButton, isReorderMode && { backgroundColor: theme.colors.primary }]}
                 onPress={toggleReorderMode}
@@ -547,8 +570,8 @@ export default function Saved() {
         )}
       </View>
 
-      {/* Search Bar */}
-      {savedLocations.length > 0 && !isReorderMode && !selectedFolderId && (
+      {/* Search Bar - Show in main view and folder view */}
+      {savedLocations.length > 0 && !isReorderMode && !isFolderReorderMode && (
         <View style={[styles.searchContainer, { backgroundColor: theme.colors.background }]}>
           <View style={[styles.searchInputContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Ionicons name="search" size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
