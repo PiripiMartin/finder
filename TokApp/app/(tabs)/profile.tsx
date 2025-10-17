@@ -75,7 +75,7 @@ export default function Profile() {
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.',
+      'Are you sure you want to delete your account? This action cannot be undone and all your saved locations will be permanently deleted.',
       [
         {
           text: 'Cancel',

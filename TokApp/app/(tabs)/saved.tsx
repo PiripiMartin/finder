@@ -860,9 +860,9 @@ export default function Saved() {
                     <Text style={[styles.folderTitle, { color: theme.colors.text }]} numberOfLines={2}>
                       {folder.title}
                     </Text>
-                    <View style={[styles.folderCount, { backgroundColor: folder.color }]}>
-                      <Text style={styles.folderCountText}>{folder.locationIds.length}</Text>
-                    </View>
+                  </View>
+                  <View style={[styles.folderCount, { backgroundColor: folder.color }]}>
+                    <Text style={styles.folderCountText}>{folder.locationIds.length}</Text>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -1195,10 +1195,11 @@ const styles = StyleSheet.create({
   },
   folderCount: {
     position: 'absolute',
-    top: 8,
+    bottom: 8,
     right: 8,
-    width: 24,
+    minWidth: 24,
     height: 24,
+    paddingHorizontal: 8,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
