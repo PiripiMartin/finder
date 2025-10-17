@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
@@ -448,19 +448,29 @@ export default function Index() {
     }
   }, [userLocation, isGuest, sessionToken]);
 
-  // Load folders
-  useEffect(() => {
-    const loadFoldersData = async () => {
-      try {
-        const loadedFolders = await loadFolders();
-        setFolders(loadedFolders);
-        console.log('📂 [Map] Loaded folders:', loadedFolders.length);
-      } catch (error) {
-        console.error('❌ [Map] Error loading folders:', error);
-      }
-    };
-    loadFoldersData();
+  // Load folders function
+  const loadFoldersData = useCallback(async () => {
+    try {
+      const loadedFolders = await loadFolders();
+      setFolders(loadedFolders);
+      console.log('📂 [Map] Loaded folders:', loadedFolders.length);
+    } catch (error) {
+      console.error('❌ [Map] Error loading folders:', error);
+    }
   }, []);
+
+  // Load folders on mount
+  useEffect(() => {
+    loadFoldersData();
+  }, [loadFoldersData]);
+
+  // Reload folders when screen comes into focus (e.g., returning from saved tab)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📂 [Map] Screen focused, reloading folders...');
+      loadFoldersData();
+    }, [loadFoldersData])
+  );
 
   // Load map points when user location is available
   useEffect(() => {
@@ -1181,6 +1191,45 @@ export default function Index() {
           )}
         </View>
       )}
+
+      {/* Progress Goal Banner - Show when user has less than 3 saved locations */}
+      {!isGuest && savedLocations.length < 3 && (
+        <View style={[
+          styles.progressBanner,
+          {
+            backgroundColor: theme.colors.primary,
+            bottom: insets.bottom - 10, // Position very close to the nav bar
+          }
+        ]}>
+          <View style={styles.progressBannerTop}>
+            <View style={styles.progressContent}>
+              <Ionicons name="flag-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.progressText}>
+                Goal: Save {savedLocations.length}/3 TikToks
+              </Text>
+            </View>
+            {tutorialFeatureEnabled && (
+              <TouchableOpacity
+                style={styles.howButton}
+                onPress={() => {
+                  console.log('🎓 [Map] Opening tutorial from goal banner');
+                  setShowManualTutorial(true);
+                }}
+              >
+                <Text style={styles.howButtonText}>How?</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View 
+              style={[
+                styles.progressBarFill, 
+                { width: `${(savedLocations.length / 3) * 100}%` }
+              ]} 
+            />
+          </View>
+        </View>
+      )}
       
     </View>
   );
@@ -1482,6 +1531,58 @@ const styles = StyleSheet.create({
   filterBadgeText: {
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  progressBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 100,
+  },
+  progressBannerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  progressText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  howButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginLeft: 12,
+  },
+  howButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressBarContainer: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 3,
   },
 
 });

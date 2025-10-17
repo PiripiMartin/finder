@@ -34,7 +34,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           <View style={styles.videoContainer}>
             {isVideoLoading && (
               <View style={styles.videoLoadingOverlay}>
-                <ActivityIndicator size="large" color="#4E8886" />
+                <ActivityIndicator size="large" color="#A8C3A0" />
               </View>
             )}
             <Video
@@ -91,7 +91,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           </View>
           
           <View style={styles.illustrationContainer}>
-            <Ionicons name="share-outline" size={60} color="#4E8886" />
+            <Ionicons name="share-outline" size={60} color="#A8C3A0" />
             <Text style={styles.illustrationText}>Share from any TikTok video!</Text>
           </View>
         </View>
@@ -143,13 +143,13 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           
           <View style={styles.illustrationContainer}>
             <View style={styles.iconRow}>
-              <Ionicons name="share-outline" size={40} color="#4E8886" />
+              <Ionicons name="share-outline" size={40} color="#A8C3A0" />
               <Ionicons name="chevron-forward" size={30} color="#999" />
-              <Ionicons name="ellipsis-horizontal" size={40} color="#4E8886" />
+              <Ionicons name="ellipsis-horizontal" size={40} color="#A8C3A0" />
               <Ionicons name="chevron-forward" size={30} color="#999" />
-              <Ionicons name="create-outline" size={40} color="#4E8886" />
+              <Ionicons name="create-outline" size={40} color="#A8C3A0" />
               <Ionicons name="chevron-forward" size={30} color="#999" />
-              <Ionicons name="add-circle-outline" size={40} color="#4E8886" />
+              <Ionicons name="add-circle-outline" size={40} color="#A8C3A0" />
             </View>
             <Text style={styles.illustrationText}>
               Share → More → Edit → Add lai
@@ -168,7 +168,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           
           <View style={styles.featureCard}>
             <View style={styles.featureIcon}>
-              <Ionicons name="bookmark" size={32} color="#4E8886" />
+              <Ionicons name="bookmark" size={32} color="#A8C3A0" />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>Save to Your Collection</Text>
@@ -180,7 +180,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
 
           <View style={styles.featureCard}>
             <View style={styles.featureIcon}>
-              <Ionicons name="location" size={32} color="#4E8886" />
+              <Ionicons name="location" size={32} color="#A8C3A0" />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>Pin on the Map</Text>
@@ -192,7 +192,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
 
           <View style={styles.featureCard}>
             <View style={styles.featureIcon}>
-              <Ionicons name="star" size={32} color="#4E8886" />
+              <Ionicons name="star" size={32} color="#A8C3A0" />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>Smart Organization</Text>
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     width: 60,
   },
   skipText: {
-    color: '#4E8886',
+    color: '#A8C3A0',
     fontSize: 16,
     fontWeight: '500',
   },
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   progressDotActive: {
-    backgroundColor: '#4E8886',
+    backgroundColor: '#A8C3A0',
   },
   progressDotInactive: {
     backgroundColor: '#E0E0E0',
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#4E8886',
+    backgroundColor: '#A8C3A0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   },
   boldText: {
     fontWeight: 'bold',
-    color: '#4E8886',
+    color: '#A8C3A0',
   },
   illustrationContainer: {
     alignItems: 'center',
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
   finalText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#4E8886',
+    color: '#A8C3A0',
     marginTop: 10,
   },
   footer: {
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   nextButton: {
-    backgroundColor: '#4E8886',
+    backgroundColor: '#A8C3A0',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

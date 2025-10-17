@@ -257,7 +257,7 @@ export default function Saved() {
   const handleCreateFolder = async (title: string, color: string) => {
     try {
       const newFolder = await createFolderStorage(title, color);
-      setFolders([...folders, newFolder]);
+      await loadFoldersData(); // Reload all folders to ensure consistency
       console.log('✅ [Saved] Created folder:', newFolder.id);
     } catch (error) {
       console.error('❌ [Saved] Error creating folder:', error);
@@ -811,7 +811,11 @@ export default function Saved() {
               {!selectedEmoji && tutorialFeatureEnabled && (
                 <TouchableOpacity
                   style={[styles.tutorialButton, { backgroundColor: theme.colors.primary }]}
-                  onPress={showTutorial}
+                  onPress={() => {
+                    showTutorial();
+                    // Navigate to map tab where tutorial is displayed
+                    router.push('/(tabs)');
+                  }}
                 >
                   <Ionicons name="help-circle-outline" size={20} color="#FFFFFF" style={styles.tutorialButtonIcon} />
                   <Text style={styles.tutorialButtonText}>Learn How</Text>
