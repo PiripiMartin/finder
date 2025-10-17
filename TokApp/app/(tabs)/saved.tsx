@@ -195,11 +195,11 @@ export default function Saved() {
   };
 
   // Toggle reorder mode
-  const toggleReorderMode = () => {
+  const toggleReorderMode = async () => {
     if (isReorderMode) {
       // Exiting reorder mode - save the order of unfiled locations only
       const unfiledLocationIds = reorderedLocations.map(item => item.location.id);
-      saveLocationOrder(unfiledLocationIds);
+      await saveLocationOrder(unfiledLocationIds);
       
       // Don't replace savedLocations - just update the filtered view
       // savedLocations should remain unchanged as it contains ALL locations
@@ -218,7 +218,11 @@ export default function Saved() {
       });
       const unfiled = savedLocations.filter(loc => !filedIds.has(loc.location.id));
       
-      setReorderedLocations(unfiled);
+      // Apply saved order to unfiled locations before showing them in reorder mode
+      const savedOrder = await loadLocationOrder();
+      const orderedUnfiled = applySavedOrder(unfiled, savedOrder);
+      
+      setReorderedLocations(orderedUnfiled);
       setIsReorderMode(true);
       console.log('🔄 [Saved] Entered reorder mode for unfiled locations');
     }
@@ -391,6 +395,22 @@ export default function Saved() {
     });
     
     let unfiled = savedLocations.filter(loc => !filedIds.has(loc.location.id));
+    
+    // Apply saved order to unfiled locations
+    // We need to use the reorderedLocations state to maintain order
+    if (!isReorderMode && reorderedLocations.length > 0) {
+      // Create a map of current unfiled location IDs
+      const unfiledIds = new Set(unfiled.map(loc => loc.location.id));
+      
+      // Filter reorderedLocations to only include current unfiled ones
+      const orderedUnfiled = reorderedLocations.filter(loc => unfiledIds.has(loc.location.id));
+      
+      // Add any new locations that aren't in reorderedLocations yet
+      const reorderedIds = new Set(orderedUnfiled.map(loc => loc.location.id));
+      const newLocations = unfiled.filter(loc => !reorderedIds.has(loc.location.id));
+      
+      unfiled = [...orderedUnfiled, ...newLocations];
+    }
     
     // Apply search filter if there's a search query
     if (searchQuery.trim() && !selectedFolderId) {

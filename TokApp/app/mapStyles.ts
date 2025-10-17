@@ -2,7 +2,7 @@
 export const realisticFlairStyle = [
   {
     "elementType": "geometry",
-    "stylers": [{"color": "#EBD4D4"}]
+    "stylers": [{"color": "#F5F5F5"}]
   },
   {
     "elementType": "labels.text.fill",
@@ -15,22 +15,22 @@ export const realisticFlairStyle = [
   {
     "featureType": "administrative",
     "elementType": "geometry.stroke",
-    "stylers": [{"color": "#835858"}]
+    "stylers": [{"color": "#B0B0B0"}]
   },
   {
     "featureType": "landscape",
     "elementType": "geometry",
-    "stylers": [{"color": "#EBD4D4"}]
+    "stylers": [{"color": "#F5F5F5"}]
   },
   {
     "featureType": "landscape.natural",
     "elementType": "geometry",
-    "stylers": [{"color": "#EBD4D4"}]
+    "stylers": [{"color": "#F5F5F5"}]
   },
   {
     "featureType": "poi",
     "elementType": "geometry",
-    "stylers": [{"color": "#EBD4D4"}]
+    "stylers": [{"color": "#F5F5F5"}]
   },
   {
     "featureType": "poi",
@@ -55,7 +55,7 @@ export const realisticFlairStyle = [
   {
     "featureType": "road",
     "elementType": "geometry.stroke",
-    "stylers": [{"color": "#835858"}]
+    "stylers": [{"color": "#B0B0B0"}]
   },
   {
     "featureType": "road",
@@ -65,12 +65,12 @@ export const realisticFlairStyle = [
   {
     "featureType": "road.highway",
     "elementType": "geometry",
-    "stylers": [{"color": "#EBD4D4"}]
+    "stylers": [{"color": "#F5F5F5"}]
   },
   {
     "featureType": "road.highway",
     "elementType": "geometry.stroke",
-    "stylers": [{"color": "#835858"}]
+    "stylers": [{"color": "#B0B0B0"}]
   },
   {
     "featureType": "road.highway",
@@ -80,7 +80,7 @@ export const realisticFlairStyle = [
   {
     "featureType": "transit",
     "elementType": "geometry",
-    "stylers": [{"color": "#EBD4D4"}]
+    "stylers": [{"color": "#F5F5F5"}]
   },
   {
     "featureType": "transit",

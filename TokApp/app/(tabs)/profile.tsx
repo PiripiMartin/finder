@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -72,36 +72,52 @@ export default function Profile() {
   };
 
   // Delete account
-  const handleDeleteAccount = async () => {
-    try {
-      console.log('👤 [Profile] Deleting account...');
-      const apiUrl = `${API_CONFIG.BASE_URL}/delete-account`;
-      console.log('🌐 [Profile] DELETE URL:', apiUrl);
-
-      const response = await fetch(apiUrl, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken || ''}`,
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
         },
-      });
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('👤 [Profile] Deleting account...');
+              const apiUrl = `${API_CONFIG.BASE_URL}/delete-account`;
+              console.log('🌐 [Profile] DELETE URL:', apiUrl);
 
-      console.log('📥 [Profile] Delete Response:', {
-        status: response.status,
-        ok: response.ok,
-        timestamp: new Date().toISOString()
-      });
+              const response = await fetch(apiUrl, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${sessionToken || ''}`,
+                },
+              });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+              console.log('📥 [Profile] Delete Response:', {
+                status: response.status,
+                ok: response.ok,
+                timestamp: new Date().toISOString()
+              });
 
-      // Redirect to login after successful deletion
-      router.replace('/auth/login');
-    } catch (error) {
-      console.error('👤 [Profile] Error deleting account:', error);
-      setError(error instanceof Error ? error.message : 'Failed to delete account');
-    }
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+
+              // Redirect to login after successful deletion
+              router.replace('/auth/login');
+            } catch (error) {
+              console.error('👤 [Profile] Error deleting account:', error);
+              setError(error instanceof Error ? error.message : 'Failed to delete account');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleLogout = () => {
@@ -256,7 +272,7 @@ export default function Profile() {
 
         {/* Delete Account */}
         <TouchableOpacity 
-          style={[styles.deleteButton, { backgroundColor: '#B14D4D' }]}
+          style={[styles.deleteButton, { backgroundColor: '#D97B7B' }]}
           onPress={handleDeleteAccount}
         >
           <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
@@ -270,7 +286,6 @@ export default function Profile() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EBD4D4',
   },
   header: {
     backgroundColor: '#FFFFFF',
@@ -303,7 +318,7 @@ const styles = StyleSheet.create({
   },
   displayName: {
     fontSize: 16,
-    color: '#835858',
+    color: '#666666',
     marginBottom: 12,
   },
   bioContainer: {
@@ -382,7 +397,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#EBD4D4',
   },
   loadingText: {
     marginTop: 10,
@@ -392,7 +406,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#EBD4D4',
   },
   errorText: {
     fontSize: 18,

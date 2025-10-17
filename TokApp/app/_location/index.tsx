@@ -1165,7 +1165,7 @@ const styles = StyleSheet.create({
   videoNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#835858',
+    color: '#666666',
   },
   videoTitle: {
     fontSize: 14,

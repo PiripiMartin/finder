@@ -1438,7 +1438,7 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   labelDescription: {
-            color: '#835858',
+    color: '#666666',
     fontSize: 8, // Smaller font
     textAlign: 'center',
     lineHeight: 10,
