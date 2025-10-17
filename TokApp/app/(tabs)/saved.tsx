@@ -2,10 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import DraggableGrid from 'react-native-draggable-grid';
 import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
+import { applySavedOrder, loadLocationOrder, saveLocationOrder } from '../utils/locationOrderStorage';
 
 const { width } = Dimensions.get('window');
 const locationCardWidth = (width - 36) / 2; // Two cards per row with padding
@@ -45,6 +47,9 @@ export default function Saved() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const [reorderedLocations, setReorderedLocations] = useState<SavedLocation[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
 
 
@@ -99,8 +104,13 @@ export default function Saved() {
       const locations = Array.isArray(data) ? data : [];
       console.log('📚 [Saved] Found saved locations:', locations.length);
       
-      setSavedLocations(locations);
-      setFilteredLocations(locations);
+      // Load and apply saved custom order
+      const savedOrder = await loadLocationOrder();
+      const orderedLocations = applySavedOrder(locations, savedOrder);
+      
+      setSavedLocations(orderedLocations);
+      setFilteredLocations(orderedLocations);
+      setReorderedLocations(orderedLocations);
       // Start with no filter selected (show all locations)
       setSelectedEmoji(null);
       
@@ -152,6 +162,11 @@ export default function Saved() {
 
   // Handle location tap - navigate to location page or coordinate selection
   const handleLocationPress = (locationId: number) => {
+    // Prevent navigation in reorder mode
+    if (isReorderMode) {
+      return;
+    }
+    
     console.log('📍 [Saved] Location tapped:', locationId);
     
     const location = savedLocations.find(item => item.location.id === locationId);
@@ -164,6 +179,44 @@ export default function Saved() {
       // Navigate to normal location page
       router.push(`/_location?id=${locationId}`);
     }
+  };
+
+  // Toggle reorder mode
+  const toggleReorderMode = () => {
+    if (isReorderMode) {
+      // Exiting reorder mode - save the order
+      const locationIds = reorderedLocations.map(item => item.location.id);
+      saveLocationOrder(locationIds);
+      setSavedLocations(reorderedLocations);
+      setFilteredLocations(reorderedLocations);
+      setIsReorderMode(false);
+      console.log('✅ [Saved] Exited reorder mode, saved order');
+    } else {
+      // Entering reorder mode - clear filters
+      setSearchQuery('');
+      setSelectedEmoji(null);
+      setReorderedLocations(savedLocations);
+      setIsReorderMode(true);
+      console.log('🔄 [Saved] Entered reorder mode');
+    }
+  };
+
+  // Handle drag start
+  const handleDragStart = () => {
+    setIsDragging(true);
+    console.log('🔄 [Saved] Started dragging');
+  };
+
+  // Handle drag end event for DraggableGrid
+  const handleDragRelease = (data: any[]) => {
+    setIsDragging(false);
+    // Filter out any undefined or invalid items and convert back to SavedLocation format
+    const validData = data
+      .filter(item => item && item.data)
+      .map(item => item.data);
+    
+    setReorderedLocations(validData);
+    console.log('🔄 [Saved] Locations reordered:', validData.length);
   };
 
 
@@ -254,10 +307,22 @@ export default function Saved() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
+        {savedLocations.length > 0 && !searchQuery && !selectedEmoji && (
+          <TouchableOpacity
+            style={[styles.reorderButton, isReorderMode && { backgroundColor: theme.colors.primary }]}
+            onPress={toggleReorderMode}
+          >
+            <Ionicons 
+              name={isReorderMode ? "checkmark" : "reorder-three"} 
+              size={24} 
+              color={isReorderMode ? '#FFFFFF' : theme.colors.text} 
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Search Bar */}
-      {savedLocations.length > 0 && (
+      {savedLocations.length > 0 && !isReorderMode && (
         <View style={[styles.searchContainer, { backgroundColor: theme.colors.background }]}>
           <View style={[styles.searchInputContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Ionicons name="search" size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
@@ -278,7 +343,7 @@ export default function Saved() {
       )}
 
       {/* Emoji Filter Bar */}
-      {savedLocations.length > 0 && (
+      {savedLocations.length > 0 && !isReorderMode && (
         <View style={[styles.filterContainer, { backgroundColor: theme.colors.background }]}>
           <ScrollView 
             horizontal 
@@ -308,49 +373,105 @@ export default function Saved() {
         </View>
       )}
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {filteredLocations.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="bookmark-outline" size={64} color={theme.colors.textSecondary} />
-            <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-              {selectedEmoji ? `No ${selectedEmoji} Locations` : 'No Saved Locations'}
-            </Text>
-            <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
-              {selectedEmoji 
-                ? `No saved locations with ${selectedEmoji} emoji found`
-                : 'Save locations from the map to see them here'
-              }
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.locationsList}>
-            {filteredLocations.map((item) => (
-              <TouchableOpacity 
-                key={item.location.id} 
-                style={[styles.locationCard, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
-                onPress={() => handleLocationPress(item.location.id)}
-              >
-                <View style={styles.locationHeader}>
-                  <View style={styles.locationInfo}>
-                    <Text style={styles.locationEmoji}>{item.location.emoji}</Text>
-                    <View style={styles.locationText}>
-                      <Text style={[styles.locationTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                        {item.location.title}
-                      </Text>
+      {/* Locations Grid - Works for both normal and reorder mode */}
+      {isReorderMode ? (
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={!isDragging}
+        >
+          <View style={styles.draggableGridContainer}>
+            <DraggableGrid
+              numColumns={2}
+              itemHeight={locationCardWidth * 0.65}
+              renderItem={(item: any) => {
+                const location = item.data as SavedLocation;
+                
+                return (
+                  <View
+                    style={[
+                      styles.locationCard,
+                      styles.draggableLocationCard,
+                      { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }
+                    ]}
+                  >
+                    <View style={styles.locationHeader}>
+                      <View style={styles.locationInfo}>
+                        <Text style={styles.locationEmoji}>{location.location.emoji}</Text>
+                        <View style={styles.locationText}>
+                          <Text style={[styles.locationTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                            {location.location.title}
+                          </Text>
+                        </View>
+                      </View>
+                      {/* Show drag handle in reorder mode */}
+                      <View style={styles.locationActions}>
+                        <Ionicons 
+                          name="reorder-two" 
+                          size={20} 
+                          color={theme.colors.textSecondary}
+                        />
+                      </View>
                     </View>
                   </View>
-                  {/* Alert symbol for locations with null coordinates */}
-                  {(item.location.latitude === null || item.location.longitude === null) && (
-                    <View style={styles.locationActions}>
-                      <Ionicons name="alert-circle" size={18} color="#ff6b6b" />
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
+                );
+              }}
+              data={reorderedLocations
+                .filter(loc => loc && loc.location && loc.location.id)
+                .map((loc) => ({
+                  key: loc.location.id.toString(),
+                  data: loc,
+                }))}
+              onDragStart={handleDragStart}
+              onDragRelease={handleDragRelease}
+            />
           </View>
-        )}
-      </ScrollView>
+        </ScrollView>
+      ) : (
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {filteredLocations.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="bookmark-outline" size={64} color={theme.colors.textSecondary} />
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                {selectedEmoji ? `No ${selectedEmoji} Locations` : 'No Saved Locations'}
+              </Text>
+              <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
+                {selectedEmoji 
+                  ? `No saved locations with ${selectedEmoji} emoji found`
+                  : 'Save locations from the map to see them here'
+                }
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.locationsList}>
+              {filteredLocations.map((item) => (
+                <TouchableOpacity 
+                  key={item.location.id} 
+                  style={[styles.locationCard, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
+                  onPress={() => handleLocationPress(item.location.id)}
+                >
+                  <View style={styles.locationHeader}>
+                    <View style={styles.locationInfo}>
+                      <Text style={styles.locationEmoji}>{item.location.emoji}</Text>
+                      <View style={styles.locationText}>
+                        <Text style={[styles.locationTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                          {item.location.title}
+                        </Text>
+                      </View>
+                    </View>
+                    {/* Alert symbol for locations with null coordinates */}
+                    {(item.location.latitude === null || item.location.longitude === null) && (
+                      <View style={styles.locationActions}>
+                        <Ionicons name="alert-circle" size={18} color="#ff6b6b" />
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -564,5 +685,21 @@ const styles = StyleSheet.create({
   createAccountButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  reorderButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  draggableGridContainer: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+  },
+  draggableLocationCard: {
+    marginBottom: 0,
   },
 }); 
