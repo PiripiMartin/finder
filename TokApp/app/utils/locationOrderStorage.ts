@@ -27,6 +27,7 @@ interface SavedLocation {
 
 /**
  * Save the custom order of location IDs to AsyncStorage
+ * Can save either simple array or folder structure
  */
 export async function saveLocationOrder(locationIds: number[]): Promise<void> {
   try {
@@ -35,6 +36,59 @@ export async function saveLocationOrder(locationIds: number[]): Promise<void> {
     console.log('💾 [LocationOrder] Saved order:', locationIds);
   } catch (error) {
     console.error('❌ [LocationOrder] Error saving order:', error);
+  }
+}
+
+/**
+ * Save complete folder order structure
+ */
+export async function saveFolderOrder(
+  folderOrder: string[],
+  unfiledLocations: number[]
+): Promise<void> {
+  try {
+    const orderData = {
+      folders: folderOrder,
+      unfiledLocations: unfiledLocations,
+    };
+    const orderString = JSON.stringify(orderData);
+    await AsyncStorage.setItem(STORAGE_KEY, orderString);
+    console.log('💾 [LocationOrder] Saved folder order:', orderData);
+  } catch (error) {
+    console.error('❌ [LocationOrder] Error saving folder order:', error);
+  }
+}
+
+/**
+ * Load folder order from AsyncStorage
+ */
+export async function loadFolderOrder(): Promise<{ folders: string[]; unfiledLocations: number[] }> {
+  try {
+    const orderString = await AsyncStorage.getItem(STORAGE_KEY);
+    if (orderString) {
+      const order = JSON.parse(orderString);
+      
+      // Handle new folder format
+      if (order && typeof order === 'object' && order.folders) {
+        return {
+          folders: order.folders || [],
+          unfiledLocations: order.unfiledLocations || [],
+        };
+      }
+      
+      // Handle old format: convert to new format
+      if (Array.isArray(order)) {
+        return {
+          folders: [],
+          unfiledLocations: order,
+        };
+      }
+    }
+    
+    return { folders: [], unfiledLocations: [] };
+  } catch (error) {
+    console.error('❌ [LocationOrder] Error loading folder order:', error);
+    return { folders: [], unfiledLocations: [] };
   }
 }
 

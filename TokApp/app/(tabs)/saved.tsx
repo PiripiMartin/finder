@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import DraggableGrid from 'react-native-draggable-grid';
 import { API_CONFIG } from '../config/api';
+import CreateFolderModal from '../components/CreateFolderModal';
+import LocationSelectorModal from '../components/LocationSelectorModal';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
-import { applySavedOrder, loadLocationOrder, saveLocationOrder } from '../utils/locationOrderStorage';
+import { addLocationToFolder, createFolder as createFolderStorage, deleteFolder, Folder, getFiledLocationIds, loadFolders, removeLocationFromFolder, saveFolders } from '../utils/folderStorage';
+import { applySavedOrder, loadFolderOrder, loadLocationOrder, saveFolderOrder, saveLocationOrder } from '../utils/locationOrderStorage';
 
 const { width } = Dimensions.get('window');
 const locationCardWidth = (width - 36) / 2; // Two cards per row with padding
@@ -50,6 +53,16 @@ export default function Saved() {
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [reorderedLocations, setReorderedLocations] = useState<SavedLocation[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  
+  // Folder state
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [showLocationSelectorModal, setShowLocationSelectorModal] = useState(false);
+  const [folderDragTarget, setFolderDragTarget] = useState<string | null>(null);
+  const [isFolderEditMode, setIsFolderEditMode] = useState(false);
+  const [isFolderReorderMode, setIsFolderReorderMode] = useState(false);
+  const [reorderedFolderLocations, setReorderedFolderLocations] = useState<SavedLocation[]>([]);
 
 
 
@@ -104,13 +117,11 @@ export default function Saved() {
       const locations = Array.isArray(data) ? data : [];
       console.log('📚 [Saved] Found saved locations:', locations.length);
       
-      // Load and apply saved custom order
-      const savedOrder = await loadLocationOrder();
-      const orderedLocations = applySavedOrder(locations, savedOrder);
-      
-      setSavedLocations(orderedLocations);
-      setFilteredLocations(orderedLocations);
-      setReorderedLocations(orderedLocations);
+      // Store all locations without reordering
+      // The ordering will be applied when displaying unfiled locations
+      setSavedLocations(locations);
+      setFilteredLocations(locations);
+      setReorderedLocations(locations);
       // Start with no filter selected (show all locations)
       setSelectedEmoji(null);
       
@@ -184,20 +195,22 @@ export default function Saved() {
   // Toggle reorder mode
   const toggleReorderMode = () => {
     if (isReorderMode) {
-      // Exiting reorder mode - save the order
-      const locationIds = reorderedLocations.map(item => item.location.id);
-      saveLocationOrder(locationIds);
-      setSavedLocations(reorderedLocations);
-      setFilteredLocations(reorderedLocations);
+      // Exiting reorder mode - save the order of unfiled locations only
+      const unfiledLocationIds = reorderedLocations.map(item => item.location.id);
+      saveLocationOrder(unfiledLocationIds);
+      
+      // Don't replace savedLocations - just update the filtered view
+      // savedLocations should remain unchanged as it contains ALL locations
+      setFilteredLocations(savedLocations);
       setIsReorderMode(false);
-      console.log('✅ [Saved] Exited reorder mode, saved order');
+      console.log('✅ [Saved] Exited reorder mode, saved unfiled locations order');
     } else {
-      // Entering reorder mode - clear filters
+      // Entering reorder mode - clear filters and set only unfiled locations
       setSearchQuery('');
       setSelectedEmoji(null);
-      setReorderedLocations(savedLocations);
+      setReorderedLocations(getUnfiledLocations());
       setIsReorderMode(true);
-      console.log('🔄 [Saved] Entered reorder mode');
+      console.log('🔄 [Saved] Entered reorder mode for unfiled locations');
     }
   };
 
@@ -219,12 +232,172 @@ export default function Saved() {
     console.log('🔄 [Saved] Locations reordered:', validData.length);
   };
 
+  // Load folders from storage
+  const loadFoldersData = async () => {
+    try {
+      const loadedFolders = await loadFolders();
+      setFolders(loadedFolders);
+      console.log('📂 [Saved] Loaded folders:', loadedFolders.length);
+    } catch (error) {
+      console.error('❌ [Saved] Error loading folders:', error);
+    }
+  };
+
+  // Handle folder creation
+  const handleCreateFolder = async (title: string, color: string) => {
+    try {
+      const newFolder = await createFolderStorage(title, color);
+      setFolders([...folders, newFolder]);
+      console.log('✅ [Saved] Created folder:', newFolder.id);
+    } catch (error) {
+      console.error('❌ [Saved] Error creating folder:', error);
+    }
+  };
+
+  // Handle folder tap - navigate into folder view
+  const handleFolderPress = (folderId: string) => {
+    if (isReorderMode) return; // Don't navigate in reorder mode
+    setSelectedFolderId(folderId);
+    console.log('📂 [Saved] Opened folder:', folderId);
+  };
+
+  // Handle back to main view
+  const handleBackToMain = () => {
+    setSelectedFolderId(null);
+    setIsFolderEditMode(false);
+    setIsFolderReorderMode(false);
+    console.log('📂 [Saved] Back to main view');
+  };
+
+  // Toggle folder reorder mode
+  const toggleFolderReorderMode = () => {
+    if (isFolderReorderMode) {
+      // Exiting reorder mode - save the order
+      if (selectedFolderId) {
+        const folder = folders.find(f => f.id === selectedFolderId);
+        if (folder) {
+          const newLocationIds = reorderedFolderLocations.map(loc => loc.location.id);
+          folder.locationIds = newLocationIds;
+          saveFolders(folders);
+          console.log('✅ [Saved] Saved folder location order');
+        }
+      }
+      setIsFolderReorderMode(false);
+    } else {
+      // Entering reorder mode
+      if (selectedFolderId) {
+        setReorderedFolderLocations(getFolderLocations(selectedFolderId));
+      }
+      setIsFolderReorderMode(true);
+      setIsFolderEditMode(false); // Exit edit mode if active
+      console.log('🔄 [Saved] Entered folder reorder mode');
+    }
+  };
+
+  // Handle folder drag release
+  const handleFolderDragRelease = (data: any[]) => {
+    setIsDragging(false);
+    const validData = data
+      .filter(item => item && item.data)
+      .map(item => item.data);
+    
+    setReorderedFolderLocations(validData);
+    console.log('🔄 [Saved] Folder locations reordered:', validData.length);
+  };
+
+  // Handle removing location from folder
+  const handleRemoveFromFolder = async (folderId: string, locationId: number) => {
+    const location = savedLocations.find(loc => loc.location.id === locationId);
+    const locationTitle = location?.location.title || 'this location';
+    
+    Alert.alert(
+      'Remove from Folder',
+      `Remove "${locationTitle}" from this folder? It will be moved back to your unfiled locations.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeLocationFromFolder(folderId, locationId);
+              // Reload folders to get updated data
+              await loadFoldersData();
+              console.log('➖ [Saved] Removed location from folder');
+            } catch (error) {
+              console.error('❌ [Saved] Error removing from folder:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Handle deleting folder
+  const handleDeleteFolder = async (folderId: string) => {
+    try {
+      await deleteFolder(folderId);
+      setFolders(folders.filter(f => f.id !== folderId));
+      console.log('🗑️ [Saved] Deleted folder:', folderId);
+    } catch (error) {
+      console.error('❌ [Saved] Error deleting folder:', error);
+    }
+  };
+
+  // Get unfiled locations (not in any folder), respecting saved order
+  const getUnfiledLocations = (): SavedLocation[] => {
+    const filedIds = new Set<number>();
+    folders.forEach(folder => {
+      folder.locationIds.forEach(id => filedIds.add(id));
+    });
+    
+    const unfiled = savedLocations.filter(loc => !filedIds.has(loc.location.id));
+    return unfiled;
+  };
+
+  // Get locations in a specific folder
+  const getFolderLocations = (folderId: string): SavedLocation[] => {
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return [];
+    
+    const locationMap = new Map<number, SavedLocation>();
+    savedLocations.forEach(loc => {
+      locationMap.set(loc.location.id, loc);
+    });
+    
+    return folder.locationIds
+      .map(id => locationMap.get(id))
+      .filter(loc => loc !== undefined) as SavedLocation[];
+  };
+
+  // Handle adding multiple locations to folder
+  const handleAddLocationsToFolder = async (locationIds: number[]) => {
+    if (!selectedFolderId) return;
+    
+    try {
+      // Add each location to the folder
+      for (const locationId of locationIds) {
+        await addLocationToFolder(selectedFolderId, locationId);
+      }
+      
+      // Reload folders to get updated data
+      await loadFoldersData();
+      console.log('➕ [Saved] Added', locationIds.length, 'locations to folder');
+    } catch (error) {
+      console.error('❌ [Saved] Error adding locations to folder:', error);
+    }
+  };
+
 
 
 
   useEffect(() => {
     console.log('📚 [Saved] Page loaded, fetching saved locations...');
     fetchSavedLocations();
+    loadFoldersData();
   }, [sessionToken, fetchSavedLocations]);
 
   // Register refresh callback with LocationContext
@@ -302,27 +475,80 @@ export default function Saved() {
     );
   }
 
+  // Get current folder for header display
+  const currentFolder = selectedFolderId ? folders.find(f => f.id === selectedFolderId) : null;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
-        {savedLocations.length > 0 && !searchQuery && !selectedEmoji && (
-          <TouchableOpacity
-            style={[styles.reorderButton, isReorderMode && { backgroundColor: theme.colors.primary }]}
-            onPress={toggleReorderMode}
-          >
-            <Ionicons 
-              name={isReorderMode ? "checkmark" : "reorder-three"} 
-              size={24} 
-              color={isReorderMode ? '#FFFFFF' : theme.colors.text} 
-            />
-          </TouchableOpacity>
+        {selectedFolderId && currentFolder ? (
+          // Folder view header
+          <>
+            <TouchableOpacity onPress={handleBackToMain} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+            <View style={styles.folderHeaderInfo}>
+              <View style={[styles.folderHeaderColorBar, { backgroundColor: currentFolder.color }]} />
+              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{currentFolder.title}</Text>
+            </View>
+            <View style={styles.folderHeaderButtons}>
+              {!isFolderReorderMode && (
+                <TouchableOpacity
+                  style={[styles.reorderButton, isFolderEditMode && { backgroundColor: theme.colors.primary }]}
+                  onPress={() => setIsFolderEditMode(!isFolderEditMode)}
+                >
+                  <Ionicons 
+                    name={isFolderEditMode ? "checkmark" : "create-outline"} 
+                    size={24} 
+                    color={isFolderEditMode ? '#FFFFFF' : theme.colors.text} 
+                  />
+                </TouchableOpacity>
+              )}
+              {!isFolderEditMode && getFolderLocations(selectedFolderId).length > 1 && (
+                <TouchableOpacity
+                  style={[styles.reorderButton, { marginLeft: 8 }, isFolderReorderMode && { backgroundColor: theme.colors.primary }]}
+                  onPress={toggleFolderReorderMode}
+                >
+                  <Ionicons 
+                    name={isFolderReorderMode ? "checkmark" : "reorder-three"} 
+                    size={24} 
+                    color={isFolderReorderMode ? '#FFFFFF' : theme.colors.text} 
+                  />
+                </TouchableOpacity>
+              )}
+              {!isFolderReorderMode && !isFolderEditMode && (
+                <TouchableOpacity
+                  style={[styles.reorderButton, { backgroundColor: theme.colors.primary, marginLeft: 8 }]}
+                  onPress={() => setShowLocationSelectorModal(true)}
+                >
+                  <Ionicons name="add" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        ) : (
+          // Main view header
+          <>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
+            {getUnfiledLocations().length > 1 && !selectedFolderId && (
+              <TouchableOpacity
+                style={[styles.reorderButton, isReorderMode && { backgroundColor: theme.colors.primary }]}
+                onPress={toggleReorderMode}
+              >
+                <Ionicons 
+                  name={isReorderMode ? "checkmark" : "reorder-three"} 
+                  size={24} 
+                  color={isReorderMode ? '#FFFFFF' : theme.colors.text} 
+                />
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </View>
 
       {/* Search Bar */}
-      {savedLocations.length > 0 && !isReorderMode && (
+      {savedLocations.length > 0 && !isReorderMode && !selectedFolderId && (
         <View style={[styles.searchContainer, { backgroundColor: theme.colors.background }]}>
           <View style={[styles.searchInputContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Ionicons name="search" size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
@@ -339,37 +565,6 @@ export default function Saved() {
               </TouchableOpacity>
             )}
           </View>
-        </View>
-      )}
-
-      {/* Emoji Filter Bar */}
-      {savedLocations.length > 0 && !isReorderMode && (
-        <View style={[styles.filterContainer, { backgroundColor: theme.colors.background }]}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterScrollContent}
-          >
-            {/* Emoji filters */}
-            {getUniqueEmojis().map((emoji) => (
-              <TouchableOpacity
-                key={emoji}
-                style={[
-                  styles.emojiFilterButton,
-                  selectedEmoji === emoji && { backgroundColor: theme.colors.primary }
-                ]}
-                onPress={() => filterByEmoji(emoji)}
-              >
-                <Text style={[
-                  styles.emojiFilterText,
-                  { color: theme.colors.text },
-                  selectedEmoji === emoji && { color: '#FFFFFF' }
-                ]}>
-                  {emoji}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </View>
       )}
 
@@ -427,9 +622,116 @@ export default function Saved() {
             />
           </View>
         </ScrollView>
+      ) : selectedFolderId ? (
+        // Folder view - show locations in the selected folder
+        isFolderReorderMode ? (
+          // Reorder mode for folder
+          <ScrollView 
+            style={styles.scrollView} 
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={!isDragging}
+          >
+            <View style={styles.draggableGridContainer}>
+              <DraggableGrid
+                numColumns={2}
+                itemHeight={locationCardWidth * 0.65}
+                renderItem={(item: any) => {
+                  const location = item.data as SavedLocation;
+                  
+                  return (
+                    <View
+                      style={[
+                        styles.locationCard,
+                        styles.draggableLocationCard,
+                        { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }
+                      ]}
+                    >
+                      <View style={styles.locationHeader}>
+                        <View style={styles.locationInfo}>
+                          <Text style={styles.locationEmoji}>{location.location.emoji}</Text>
+                          <View style={styles.locationText}>
+                            <Text style={[styles.locationTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                              {location.location.title}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.locationActions}>
+                          <Ionicons 
+                            name="reorder-two" 
+                            size={20} 
+                            color={theme.colors.textSecondary}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  );
+                }}
+                data={reorderedFolderLocations
+                  .filter(loc => loc && loc.location && loc.location.id)
+                  .map((loc) => ({
+                    key: loc.location.id.toString(),
+                    data: loc,
+                  }))}
+                onDragStart={handleDragStart}
+                onDragRelease={handleFolderDragRelease}
+              />
+            </View>
+          </ScrollView>
+        ) : (
+          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            {getFolderLocations(selectedFolderId).length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="folder-open-outline" size={64} color={theme.colors.textSecondary} />
+                <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>Empty Folder</Text>
+                <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
+                  No locations in this folder yet. Tap the + button to add some!
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.locationsList}>
+                {getFolderLocations(selectedFolderId).map((item) => (
+                  <View key={item.location.id} style={styles.locationCardWrapper}>
+                    <TouchableOpacity 
+                      style={[styles.locationCard, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, marginBottom: 0 }]}
+                      onPress={() => !isFolderEditMode && handleLocationPress(item.location.id)}
+                      activeOpacity={isFolderEditMode ? 1 : 0.7}
+                    >
+                      <View style={styles.locationHeader}>
+                        <View style={styles.locationInfo}>
+                          <Text style={styles.locationEmoji}>{item.location.emoji}</Text>
+                          <View style={styles.locationText}>
+                            <Text style={[styles.locationTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                              {item.location.title}
+                            </Text>
+                          </View>
+                        </View>
+                        {/* Alert symbol for locations with null coordinates (only in non-edit mode) */}
+                        {!isFolderEditMode && (item.location.latitude === null || item.location.longitude === null) && (
+                          <View style={styles.locationActions}>
+                            <Ionicons name="alert-circle" size={18} color="#ff6b6b" />
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                    {/* Remove button in edit mode */}
+                    {isFolderEditMode && (
+                      <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={() => selectedFolderId && handleRemoveFromFolder(selectedFolderId, item.location.id)}
+                      >
+                        <Ionicons name="remove-circle" size={24} color="#ff6b6b" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        )
       ) : (
+        // Main view - show folders and unfiled locations
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {filteredLocations.length === 0 ? (
+          {filteredLocations.length === 0 && folders.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="bookmark-outline" size={64} color={theme.colors.textSecondary} />
               <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
@@ -444,7 +746,48 @@ export default function Saved() {
             </View>
           ) : (
             <View style={styles.locationsList}>
-              {filteredLocations.map((item) => (
+              {/* Render folders first */}
+              {folders.map((folder) => (
+                <TouchableOpacity 
+                  key={folder.id} 
+                  style={[
+                    styles.locationCard,
+                    styles.folderCard,
+                    { backgroundColor: folder.color + '20', borderColor: folder.color, shadowColor: theme.colors.shadow }
+                  ]}
+                  onPress={() => handleFolderPress(folder.id)}
+                >
+                  <View style={styles.folderCardContent}>
+                    <Ionicons name="folder" size={32} color={folder.color} />
+                    <Text style={[styles.folderTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                      {folder.title}
+                    </Text>
+                    <View style={[styles.folderCount, { backgroundColor: folder.color }]}>
+                      <Text style={styles.folderCountText}>{folder.locationIds.length}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+              {/* Create folder card */}
+              <TouchableOpacity 
+                style={[
+                  styles.locationCard,
+                  styles.createFolderCard,
+                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }
+                ]}
+                onPress={() => setShowCreateFolderModal(true)}
+              >
+                <View style={styles.createFolderContent}>
+                  <Ionicons name="add-circle-outline" size={32} color={theme.colors.textSecondary} />
+                  <Text style={[styles.createFolderText, { color: theme.colors.textSecondary }]}>
+                    Create Folder
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Render unfiled locations */}
+              {getUnfiledLocations().map((item) => (
                 <TouchableOpacity 
                   key={item.location.id} 
                   style={[styles.locationCard, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
@@ -471,6 +814,24 @@ export default function Saved() {
             </View>
           )}
         </ScrollView>
+      )}
+
+      {/* Create Folder Modal */}
+      <CreateFolderModal
+        visible={showCreateFolderModal}
+        onClose={() => setShowCreateFolderModal(false)}
+        onCreateFolder={handleCreateFolder}
+      />
+
+      {/* Location Selector Modal */}
+      {selectedFolderId && (
+        <LocationSelectorModal
+          visible={showLocationSelectorModal}
+          onClose={() => setShowLocationSelectorModal(false)}
+          onAddLocations={handleAddLocationsToFolder}
+          availableLocations={getUnfiledLocations()}
+          currentFolderLocationIds={[]}
+        />
       )}
     </View>
   );
@@ -573,8 +934,8 @@ const styles = StyleSheet.create({
     height: locationCardWidth * 0.6,
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
-    marginBottom: 12,
-    padding: 10,
+    marginBottom: 8,
+    padding: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -598,7 +959,7 @@ const styles = StyleSheet.create({
   },
   locationEmoji: {
     fontSize: 32,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   locationText: {
     alignItems: 'center',
@@ -606,7 +967,7 @@ const styles = StyleSheet.create({
   locationTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 2,
     textAlign: 'center',
   },
   locationDescription: {
@@ -701,5 +1062,96 @@ const styles = StyleSheet.create({
   },
   draggableLocationCard: {
     marginBottom: 0,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 12,
+  },
+  folderHeaderInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  folderHeaderColorBar: {
+    width: 4,
+    height: 24,
+    borderRadius: 2,
+    marginRight: 12,
+  },
+  folderCard: {
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  folderCardContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  folderTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  folderCount: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  folderCountText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  createFolderCard: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  createFolderContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createFolderText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  folderHeaderButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationCardWrapper: {
+    position: 'relative',
+    width: locationCardWidth,
+    marginBottom: 8,
+  },
+  removeButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 10,
   },
 }); 
