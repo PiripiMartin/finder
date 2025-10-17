@@ -47,7 +47,19 @@ export async function loadLocationOrder(): Promise<number[]> {
     if (orderString) {
       const order = JSON.parse(orderString);
       console.log('📂 [LocationOrder] Loaded order:', order);
-      return order;
+      
+      // Handle new folder format: extract unfiledLocations array
+      if (order && typeof order === 'object' && order.unfiledLocations) {
+        console.log('📂 [LocationOrder] Using unfiled locations from folder structure');
+        return order.unfiledLocations || [];
+      }
+      
+      // Handle old format: simple array
+      if (Array.isArray(order)) {
+        return order;
+      }
+      
+      return [];
     }
     console.log('📂 [LocationOrder] No saved order found');
     return [];
@@ -64,9 +76,10 @@ export async function loadLocationOrder(): Promise<number[]> {
  */
 export function applySavedOrder(
   locations: SavedLocation[],
-  savedOrder: number[]
+  savedOrder: number[] | undefined
 ): SavedLocation[] {
-  if (savedOrder.length === 0) {
+  // Handle undefined or empty order
+  if (!savedOrder || !Array.isArray(savedOrder) || savedOrder.length === 0) {
     return locations;
   }
 
