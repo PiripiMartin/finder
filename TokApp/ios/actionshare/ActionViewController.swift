@@ -25,7 +25,7 @@ class ActionViewController: UIViewController {
         view.backgroundColor = .clear
         
         // Container view (app theme color bottom sheet)
-        containerView.backgroundColor = UIColor(red: 1.0, green: 0.941, blue: 0.941, alpha: 1.0) // #FFF0F0
+      containerView.backgroundColor = .white // #FFF0F0
         containerView.layer.cornerRadius = 20
         containerView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner] // Only top corners
         containerView.layer.shadowColor = UIColor.black.cgColor
