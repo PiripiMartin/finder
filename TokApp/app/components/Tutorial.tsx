@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { ResizeMode, Video } from 'expo-av';
+import React, { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -18,8 +20,41 @@ interface TutorialProps {
 
 const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
+  const videoRef = useRef<Video>(null);
 
   const tutorialSteps = [
+    {
+      title: "Welcome to lai!",
+      content: (
+        <View style={styles.videoStepContent}>
+          <Text style={styles.stepDescription}>
+            This is how you setup to save tiktoks to lai!
+          </Text>
+          <View style={styles.videoContainer}>
+            {isVideoLoading && (
+              <View style={styles.videoLoadingOverlay}>
+                <ActivityIndicator size="large" color="#4E8886" />
+              </View>
+            )}
+            <Video
+              ref={videoRef}
+              source={require('../../tutorial.mov')}
+              style={styles.video}
+              useNativeControls
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay={currentStep === 0}
+              isLooping
+              onLoad={() => setIsVideoLoading(false)}
+              onError={(error) => {
+                console.error('Video error:', error);
+                setIsVideoLoading(false);
+              }}
+            />
+          </View>
+        </View>
+      ),
+    },
     {
       title: "How to Share from TikTok",
       content: (
@@ -176,7 +211,12 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
     },
   ];
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // Pause video when leaving the first step
+    if (currentStep === 0 && videoRef.current) {
+      await videoRef.current.pauseAsync();
+    }
+    
     if (currentStep < tutorialSteps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -210,8 +250,8 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
         <View style={styles.skipButton} />
       </View>
 
-      <View style={styles.content}>
-        <Text style={styles.title}>{tutorialSteps[currentStep].title}</Text>
+      <View style={[styles.content, currentStep === 0 && styles.videoContent]}>
+        <Text style={[styles.title, currentStep === 0 && styles.videoTitle]}>{tutorialSteps[currentStep].title}</Text>
         {tutorialSteps[currentStep].content}
       </View>
 
@@ -275,6 +315,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
+  videoContent: {
+    paddingHorizontal: 10,
+    paddingTop: 0,
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -282,15 +326,46 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 30,
   },
+  videoTitle: {
+    fontSize: 24,
+    marginBottom: 10,
+    marginTop: 5,
+  },
   stepContent: {
     flex: 1,
   },
+  videoStepContent: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 0,
+  },
+  videoContainer: {
+    width: '100%',
+    height: '90%',
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    overflow: 'hidden',
+    marginTop: 0,
+    position: 'relative',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'transparent',
+  },
+  videoLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
   stepDescription: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 22,
+    marginBottom: 5,
+    lineHeight: 18,
   },
   instructionStep: {
     flexDirection: 'row',

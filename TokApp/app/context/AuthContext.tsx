@@ -260,6 +260,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     try {
+      // Clear AsyncStorage before creating account (preserve Apple ID tokens if they exist)
+      logger.info('AuthContext', 'Clearing AsyncStorage before account creation');
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        logger.debug('AuthContext', 'Current AsyncStorage keys:', allKeys);
+        
+        // Filter out keys we want to preserve (Apple ID tokens, etc.)
+        const keysToPreserve = allKeys.filter(key => 
+          key.includes('apple') || 
+          key.includes('Apple') || 
+          key.toLowerCase().includes('appleauth')
+        );
+        
+        // Get the values we want to preserve
+        const preservedData: Record<string, string> = {};
+        for (const key of keysToPreserve) {
+          const value = await AsyncStorage.getItem(key);
+          if (value) {
+            preservedData[key] = value;
+            logger.debug('AuthContext', `Preserving key: ${key}`);
+          }
+        }
+        
+        // Clear all AsyncStorage (including folders, location order, tutorial state, etc.)
+        await AsyncStorage.clear();
+        logger.info('AuthContext', 'AsyncStorage cleared successfully (folders, location order, tutorial, session)');
+        
+        // Restore preserved keys
+        for (const [key, value] of Object.entries(preservedData)) {
+          await AsyncStorage.setItem(key, value);
+          logger.debug('AuthContext', `Restored key: ${key}`);
+        }
+        
+        if (keysToPreserve.length > 0) {
+          logger.info('AuthContext', `Preserved ${keysToPreserve.length} keys during AsyncStorage clear`);
+        } else {
+          logger.info('AuthContext', 'No keys preserved - fresh account creation');
+        }
+      } catch (storageError) {
+        logger.error('AuthContext', 'Error clearing AsyncStorage', {
+          error: storageError instanceof Error ? storageError.message : 'Unknown error'
+        });
+        // Continue with account creation even if storage clear fails
+      }
+
       const apiUrl = getApiUrl('CREATE_ACCOUNT');
       logger.apiCall('AuthContext', apiUrl, 'POST', { username, email, passwordLength: password.length });
       

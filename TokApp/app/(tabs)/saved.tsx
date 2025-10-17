@@ -9,6 +9,7 @@ import LocationSelectorModal from '../components/LocationSelectorModal';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTutorial } from '../context/TutorialContext';
 import { addLocationToFolder, createFolder as createFolderStorage, deleteFolder, Folder, getFiledLocationIds, loadFolders, removeLocationFromFolder, saveFolders } from '../utils/folderStorage';
 import { applySavedOrder, loadFolderOrder, loadLocationOrder, saveFolderOrder, saveLocationOrder } from '../utils/locationOrderStorage';
 
@@ -43,6 +44,7 @@ export default function Saved() {
   const { theme } = useTheme();
   const { sessionToken, isGuest } = useAuth();
   const { registerRefreshCallback } = useLocationContext();
+  const { showTutorial, tutorialFeatureEnabled } = useTutorial();
   
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<SavedLocation[]>([]);
@@ -346,15 +348,39 @@ export default function Saved() {
     );
   };
 
-  // Handle deleting folder
+  // Handle deleting folder with confirmation
   const handleDeleteFolder = async (folderId: string) => {
-    try {
-      await deleteFolder(folderId);
-      setFolders(folders.filter(f => f.id !== folderId));
-      console.log('🗑️ [Saved] Deleted folder:', folderId);
-    } catch (error) {
-      console.error('❌ [Saved] Error deleting folder:', error);
-    }
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return;
+    
+    Alert.alert(
+      'Delete Folder',
+      `Are you sure you want to delete "${folder.title}"? All locations will be moved back to your unfiled locations.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteFolder(folderId);
+              setFolders(folders.filter(f => f.id !== folderId));
+              console.log('🗑️ [Saved] Deleted folder:', folderId);
+              
+              // Navigate back to main view if we're currently viewing this folder
+              if (selectedFolderId === folderId) {
+                handleBackToMain();
+              }
+            } catch (error) {
+              console.error('❌ [Saved] Error deleting folder:', error);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Get unfiled locations (not in any folder), respecting saved order and applying search
@@ -524,9 +550,17 @@ export default function Saved() {
               <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{currentFolder.title}</Text>
             </View>
             <View style={styles.folderHeaderButtons}>
+              {!isFolderReorderMode && !isFolderEditMode && (
+                <TouchableOpacity
+                  style={[styles.reorderButton, { backgroundColor: '#ff6b6b' }]}
+                  onPress={() => handleDeleteFolder(selectedFolderId)}
+                >
+                  <Ionicons name="trash-outline" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
               {!isFolderReorderMode && (
                 <TouchableOpacity
-                  style={[styles.reorderButton, isFolderEditMode && { backgroundColor: theme.colors.primary }]}
+                  style={[styles.reorderButton, { marginLeft: 8 }, isFolderEditMode && { backgroundColor: theme.colors.primary }]}
                   onPress={() => setIsFolderEditMode(!isFolderEditMode)}
                 >
                   <Ionicons 
@@ -771,9 +805,18 @@ export default function Saved() {
               <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
                 {selectedEmoji 
                   ? `No saved locations with ${selectedEmoji} emoji found`
-                  : 'Save locations from the map to see them here'
+                  : 'Save your first location by sharing a TikTok video to lai!'
                 }
               </Text>
+              {!selectedEmoji && tutorialFeatureEnabled && (
+                <TouchableOpacity
+                  style={[styles.tutorialButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={showTutorial}
+                >
+                  <Ionicons name="help-circle-outline" size={20} color="#FFFFFF" style={styles.tutorialButtonIcon} />
+                  <Text style={styles.tutorialButtonText}>Learn How</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View style={styles.locationsList}>
@@ -1184,5 +1227,23 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     zIndex: 10,
+  },
+  tutorialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 24,
+    minWidth: 150,
+  },
+  tutorialButtonIcon: {
+    marginRight: 8,
+  },
+  tutorialButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 
