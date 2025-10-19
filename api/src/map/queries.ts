@@ -49,15 +49,11 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             FROM posts
             WHERE posted_by = ?
         ) p ON mp.id = p.map_point_id
-        -- Exclude locations the user has soft-deleted
-        WHERE usl.user_id = ? 
-        AND mp.id NOT IN (
-            SELECT map_point_id FROM user_deleted_locations WHERE user_id = ?
-        )
+        WHERE usl.user_id = ?
         ORDER BY usl.created_at DESC
     `;
 
-    const [rows] = await db.execute(query, [userId, userId, userId]) as [any[], any];
+    const [rows] = await db.execute(query, [userId, userId]) as [any[], any];
     const results = toCamelCase(rows) as any[];
 
     const userEdits = await fetchUserLocationEdits(userId);
@@ -292,30 +288,5 @@ export async function fetchUserLocationEdits(userId: number): Promise<LocationEd
 }
 
 
-/**
- * Inserts a per-user soft-delete record for a given location.
- */
-export async function markLocationDeleted(userId: number, mapPointId: number): Promise<void> {
-    const query = `
-        INSERT INTO user_deleted_locations (user_id, map_point_id)
-        VALUES (?, ?)
-        ON DUPLICATE KEY UPDATE created_at = created_at
-    `;
-    await db.execute(query, [userId, mapPointId]);
-}
-
-/**
- * Checks whether a user has soft-deleted a specific location.
- */
-export async function hasUserDeletedLocation(userId: number, mapPointId: number): Promise<boolean> {
-    const query = `
-        SELECT 1
-        FROM user_deleted_locations
-        WHERE user_id = ? AND map_point_id = ?
-        LIMIT 1
-    `;
-    const [rows] = await db.execute(query, [userId, mapPointId]) as [any[], any];
-    return Array.isArray(rows) && rows.length > 0;
-}
 
 

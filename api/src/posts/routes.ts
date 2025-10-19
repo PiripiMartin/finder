@@ -17,11 +17,11 @@ export async function createPost(req: BunRequest): Promise<Response> {
     const data: NewPostRequest | null = await checkedExtractBody(req, ["url"]);
 
     // Create an early attempt record (before auth and location resolution)
-    await createPostSaveAttempt({
-        requestId: crypto.randomUUID(),
-        url: data?.url ?? null,
-        sessionToken,
-    });
+    //await createPostSaveAttempt({
+    //    requestId: crypto.randomUUID(),
+    //    url: data?.url ?? null,
+    //    sessionToken,
+    //});
 
     // Now check user has a valid session
     if (!sessionToken) {

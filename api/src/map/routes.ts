@@ -1,7 +1,8 @@
 import type { BunRequest } from "bun";
 import { db } from "../database";
 import { verifySessionToken } from "../user/session";
-import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, getSavedLocationsWithTopPost, hasUserDeletedLocation, markLocationDeleted } from "./queries";
+import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, getSavedLocationsWithTopPost } from "./queries";
+import { removeSavedLocationForUser } from "../posts/queries";
 
 /**
  * Fetches all posts for a given map point ID.
@@ -26,12 +27,6 @@ export async function getPostsForLocation(req: BunRequest): Promise<Response> {
     }
 
     try {
-        // Hide posts for locations the user has soft-deleted
-        const deleted = await hasUserDeletedLocation(accountId, id);
-        if (deleted) {
-            return new Response(JSON.stringify([]), { status: 200, headers: { "Content-Type": "application/json" } });
-        }
-
         const posts = await fetchPostsForLocation(id);
         return new Response(JSON.stringify(posts), { status: 200, headers: { "Content-Type": "application/json" } });
     } catch (error) {
@@ -139,7 +134,8 @@ export async function blockLocation(req: BunRequest): Promise<Response> {
 }
 
 /**
- * Soft-deletes a location for the authenticated user by recording the deletion.
+ * Deletes a location for the authenticated user by removing it from saved locations
+ * and setting posted_by to null for all their posts at that location.
  *
  * @param req - The Bun request, containing the session token and the location ID.
  * @returns A response indicating success or failure.
@@ -161,7 +157,15 @@ export async function deleteLocationForUser(req: BunRequest): Promise<Response> 
     }
 
     try {
-        await markLocationDeleted(accountId, id);
+        // Remove the location from user's saved locations
+        await removeSavedLocationForUser(accountId, id);
+        
+        // Set posted_by to null for all posts by this user at this location
+        await db.execute(
+            "UPDATE posts SET posted_by = NULL WHERE posted_by = ? AND map_point_id = ?",
+            [accountId, id]
+        );
+        
         return new Response(null, { status: 204 });
     } catch (error) {
         console.error(`Error deleting location ${id} for account ${accountId}:`, error);

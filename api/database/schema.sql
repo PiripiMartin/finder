@@ -107,19 +107,6 @@ CREATE TABLE IF NOT EXISTS user_location_edits (
 );
 
 
-/*
-  Tracks locations a specific user has chosen to delete (soft-delete per user).
-  Used to hide these locations from that user's saved/recommended lists and detail fetches.
-*/
-CREATE TABLE IF NOT EXISTS user_deleted_locations (
-    user_id INT NOT NULL,
-    map_point_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    PRIMARY KEY (user_id, map_point_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE
-);
 
 /*
   Tracks locations a user has saved (per user).
