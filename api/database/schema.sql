@@ -1,4 +1,8 @@
+----------------------------- USERS -----------------------------
 
+/*
+  Users table
+*/
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(32) NOT NULL UNIQUE,
@@ -9,6 +13,9 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 
+/*
+  User sessions table
+*/
 CREATE TABLE IF NOT EXISTS user_sessions(
     session_token CHAR(36) PRIMARY KEY,
     user_id INT NOT NULL,
@@ -22,6 +29,9 @@ CREATE TABLE IF NOT EXISTS user_sessions(
 );
 
 
+/*
+  Map points (locations) table
+*/
 CREATE TABLE IF NOT EXISTS map_points (
     id INT AUTO_INCREMENT PRIMARY KEY,
     google_place_id VARCHAR(255) UNIQUE, /* NOTE: UNIQUE still allows multiple nulls */
@@ -42,7 +52,9 @@ CREATE TABLE IF NOT EXISTS map_points (
     SPATIAL INDEX idx_location (location)
 );
 
-
+/*
+  Posts table
+*/
 CREATE TABLE IF NOT EXISTS posts (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     url VARCHAR(2048) NOT NULL,
@@ -95,8 +107,6 @@ CREATE TABLE IF NOT EXISTS user_location_edits (
 );
 
 
-
-
 /*
   Tracks locations a specific user has chosen to delete (soft-delete per user).
   Used to hide these locations from that user's saved/recommended lists and detail fetches.
@@ -110,4 +120,57 @@ CREATE TABLE IF NOT EXISTS user_deleted_locations (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE
 );
+
+/*
+  Tracks locations a user has saved (per user).
+*/
+CREATE TABLE IF NOT EXISTS user_saved_locations (
+    user_id INT NOT NULL,
+    map_point_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (user_id, map_point_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE
+);
+
+----------------------------- FOLDERS -----------------------------
+
+/*
+  Standalone folders
+*/
+CREATE TABLE IF NOT EXISTS folders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    creator_id INT NULL,
+    name VARCHAR(100) NOT NULL,
+    color VARCHAR(16) NOT NULL, -- Assuming we can just serialize the color to a string
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+/*
+  Location folder attributions (allows many to many relationship between locations and folders)
+*/
+CREATE TABLE IF NOT EXISTS folder_locations (
+    folder_id INT NOT NULL,
+    map_point_id INT NOT NULL,
+
+    PRIMARY KEY (folder_id, map_point_id),
+    FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE,
+    FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE
+);
+
+/*
+  Folder follows (allows user to follow a folder)
+*/
+CREATE TABLE IF NOT EXISTS folder_follows (
+    user_id INT NOT NULL,
+    folder_id INT NOT NULL,
+
+    PRIMARY KEY (user_id, folder_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
+);
+
 

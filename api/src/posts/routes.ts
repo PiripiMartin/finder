@@ -3,7 +3,7 @@ import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
 import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, buildTikTokEmbedUrl } from "./get-location";
 import { db } from "../database";
-import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, createInvalidLocation } from "./queries";
+import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, createInvalidLocation, saveLocationForUser, removeSavedLocationForUser } from "./queries";
 
 
 interface NewPostRequest {
@@ -58,6 +58,10 @@ export async function createPost(req: BunRequest): Promise<Response> {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
         const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        
+        // Add to user's saved locations
+        await saveLocationForUser(userId, invalidLocation.id);
+        
         return new Response(
             JSON.stringify({
                 success: true,
@@ -79,6 +83,10 @@ export async function createPost(req: BunRequest): Promise<Response> {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
         const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        
+        // Add to user's saved locations
+        await saveLocationForUser(userId, invalidLocation.id);
+        
         return new Response(
             JSON.stringify({
                 success: true,
@@ -98,6 +106,10 @@ export async function createPost(req: BunRequest): Promise<Response> {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
         const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        
+        // Add to user's saved locations
+        await saveLocationForUser(userId, invalidLocation.id);
+        
         return new Response(
             JSON.stringify({
                 success: true,
@@ -133,6 +145,9 @@ export async function createPost(req: BunRequest): Promise<Response> {
             return new Response("Error creating post for existing location.", {status: 500});
         }
 
+        // Add to user's saved locations
+        await saveLocationForUser(userId, existingLocationId);
+
         return new Response(
             JSON.stringify({
                 success: true,
@@ -153,6 +168,10 @@ export async function createPost(req: BunRequest): Promise<Response> {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
         const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        
+        // Add to user's saved locations
+        await saveLocationForUser(userId, invalidLocation.id);
+        
         return new Response(
             JSON.stringify({
                 success: true,
@@ -175,6 +194,10 @@ export async function createPost(req: BunRequest): Promise<Response> {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
         const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        
+        // Add to user's saved locations
+        await saveLocationForUser(userId, invalidLocation.id);
+        
         return new Response(
             JSON.stringify({
                 success: true,
@@ -222,6 +245,9 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Error creating post for new location.", {status: 500});
     }
 
+    // Add to user's saved locations
+    await saveLocationForUser(userId, newLocation.id);
+
     return new Response(
         JSON.stringify({
             success: true,
@@ -267,6 +293,18 @@ export async function deletePost(req: BunRequest): Promise<Response> {
     if (ownerId == null || ownerId !== userId) {
         return new Response("Forbidden", {status: 403});
     }
+
+    // Get the map_point_id before deleting the post
+    const [postRows] = await db.execute(
+        "SELECT map_point_id FROM posts WHERE id = ?",
+        [postId]
+    ) as [any[], any];
+    
+    if (postRows.length === 0) {
+        return new Response("Post not found", {status: 404});
+    }
+    
+    const mapPointId = postRows[0].map_point_id;
 
     // Delete the post
     await db.execute("DELETE FROM posts WHERE id = ?", [postId]);

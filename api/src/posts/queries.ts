@@ -160,3 +160,67 @@ export async function createInvalidLocation(embedInfo: EmbedResponse): Promise<M
     });
 }
 
+/**
+ * Adds a location to a user's saved locations.
+ * This function is idempotent - it won't create duplicates if the record already exists.
+ *
+ * @param userId - The ID of the user.
+ * @param mapPointId - The ID of the map point to save.
+ * @returns A promise that resolves when the location is saved.
+ */
+export async function saveLocationForUser(userId: number, mapPointId: number): Promise<void> {
+    const query = `
+        INSERT IGNORE INTO user_saved_locations (user_id, map_point_id)
+        VALUES (?, ?)
+    `;
+    await db.execute(query, [userId, mapPointId]);
+}
+
+/**
+ * Removes a location from a user's saved locations.
+ *
+ * @param userId - The ID of the user.
+ * @param mapPointId - The ID of the map point to remove.
+ * @returns A promise that resolves when the location is removed.
+ */
+export async function removeSavedLocationForUser(userId: number, mapPointId: number): Promise<void> {
+    const query = `
+        DELETE FROM user_saved_locations 
+        WHERE user_id = ? AND map_point_id = ?
+    `;
+    await db.execute(query, [userId, mapPointId]);
+}
+
+/**
+ * Checks if a user has saved a specific location.
+ *
+ * @param userId - The ID of the user.
+ * @param mapPointId - The ID of the map point to check.
+ * @returns A promise that resolves to true if the location is saved, false otherwise.
+ */
+export async function isLocationSavedByUser(userId: number, mapPointId: number): Promise<boolean> {
+    const query = `
+        SELECT 1 FROM user_saved_locations 
+        WHERE user_id = ? AND map_point_id = ?
+        LIMIT 1
+    `;
+    const [rows] = await db.execute(query, [userId, mapPointId]) as [any[], any];
+    return rows.length > 0;
+}
+
+/**
+ * Gets all saved locations for a user.
+ *
+ * @param userId - The ID of the user.
+ * @returns A promise that resolves to an array of map point IDs that the user has saved.
+ */
+export async function getUserSavedLocationIds(userId: number): Promise<number[]> {
+    const query = `
+        SELECT map_point_id FROM user_saved_locations 
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    `;
+    const [rows] = await db.execute(query, [userId]) as [any[], any];
+    return rows.map(row => row.map_point_id);
+}
+

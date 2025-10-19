@@ -11,7 +11,7 @@ export interface LocationAndPost {
 }
 
 /**
- * Fetches saved locations for a user (locations where they've posted) along with their most recent post.
+ * Fetches saved locations for a user from the user_saved_locations table along with their most recent post.
  * These are locations the user has personally posted to and should not appear in recommendations.
  *
  * @param userId - The ID of the user whose saved locations are to be fetched.
@@ -36,7 +36,8 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             p.url as post_url,
             p.posted_by as post_posted_by,
             p.posted_at as post_posted_at
-        FROM map_points mp
+        FROM user_saved_locations usl
+        INNER JOIN map_points mp ON usl.map_point_id = mp.id
         INNER JOIN (
             -- Find the most recent post for each location by the user
             SELECT DISTINCT
@@ -49,13 +50,14 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             WHERE posted_by = ?
         ) p ON mp.id = p.map_point_id
         -- Exclude locations the user has soft-deleted
-        WHERE mp.id NOT IN (
+        WHERE usl.user_id = ? 
+        AND mp.id NOT IN (
             SELECT map_point_id FROM user_deleted_locations WHERE user_id = ?
         )
-        ORDER BY p.posted_at DESC
+        ORDER BY usl.created_at DESC
     `;
 
-    const [rows] = await db.execute(query, [userId, userId]) as [any[], any];
+    const [rows] = await db.execute(query, [userId, userId, userId]) as [any[], any];
     const results = toCamelCase(rows) as any[];
 
     const userEdits = await fetchUserLocationEdits(userId);
