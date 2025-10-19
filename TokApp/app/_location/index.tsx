@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
-import { API_CONFIG, getMapPointsUrl } from '../config/api';
+import { API_CONFIG, getMapPointsUrl, getEditLocationUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
@@ -85,7 +85,7 @@ export default function Location() {
   const { id, needsCoordinates } = useLocalSearchParams();
   const { theme } = useTheme();
   const { sessionToken } = useAuth();
-  const { findLocationById, removeLocation, addBlockedLocation } = useLocationContext();
+  const { findLocationById, removeLocation, addBlockedLocation, refreshLocations } = useLocationContext();
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [videos, setVideos] = useState<VideoPost[]>([]);
@@ -97,6 +97,16 @@ export default function Location() {
   const [submitCoordsError, setSubmitCoordsError] = useState<string | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [isBlockingLocation, setIsBlockingLocation] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    description: '',
+    emoji: '',
+    address: '',
+    websiteUrl: '',
+    phoneNumber: '',
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Fetch videos for the current location
   const fetchLocationVideos = async (locationId: string) => {
@@ -328,6 +338,127 @@ export default function Location() {
     }
   };
 
+  const handleEditPress = () => {
+    if (!locationData) return;
+    // Pre-fill form with current data
+    setEditFormData({
+      title: locationData.title,
+      description: locationData.description,
+      emoji: locationData.emoji,
+      address: locationData.address || '',
+      websiteUrl: locationData.websiteUrl || '',
+      phoneNumber: locationData.phoneNumber || '',
+    });
+    setIsEditModalVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!locationData || !sessionToken) return;
+    
+    try {
+      setIsSavingEdit(true);
+      
+      const url = getEditLocationUrl(parseInt(locationData.id));
+      console.log('✏️ [Location] Editing location:', url);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify(editFormData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ [Location] Edit successful:', result);
+      
+      // Update local location data immediately
+      setLocationData({
+        ...locationData,
+        title: editFormData.title,
+        description: editFormData.description,
+        emoji: editFormData.emoji,
+        address: editFormData.address,
+        websiteUrl: editFormData.websiteUrl,
+        phoneNumber: editFormData.phoneNumber,
+      });
+      
+      // Close modal
+      setIsEditModalVisible(false);
+      
+      // Refresh locations via context (for map and saved list)
+      refreshLocations();
+      
+      // Show success alert
+      Alert.alert('Success', 'Location updated successfully!');
+      
+    } catch (error) {
+      console.error('❌ [Location] Error editing location:', error);
+      Alert.alert('Error', 'Failed to update location. Please try again.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditModalVisible(false);
+  };
+
+  const handleDeleteLocation = async () => {
+    if (!locationData || !sessionToken) return;
+    
+    Alert.alert(
+      'Delete Location',
+      'Are you sure you want to delete this location? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🗑️ [Location] Deleting location:', locationData.id);
+              
+              const response = await fetch(`${API_CONFIG.BASE_URL}/map/${locationData.id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${sessionToken}`,
+                },
+              });
+              
+              if (!response.ok) {
+                throw new Error(`Failed to delete location: ${response.status}`);
+              }
+              
+              console.log('✅ [Location] Location deleted successfully');
+              
+              // Refresh locations via context
+              refreshLocations();
+              
+              // Navigate back
+              router.back();
+              
+              Alert.alert('Success', 'Location deleted successfully!');
+              
+            } catch (error) {
+              console.error('❌ [Location] Error deleting location:', error);
+              Alert.alert('Error', 'Failed to delete location. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (!locationData) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -336,7 +467,7 @@ export default function Location() {
           style={[styles.loadingButton, { backgroundColor: theme.colors.primary }]}
           onPress={() => setLocationData(mockLocationData['1'])}
         >
-          <Text style={[styles.loadingButtonText, { color: '#FFF0F0' }]}>Load Demo Location</Text>
+          <Text style={[styles.loadingButtonText, { color: '#FFFFFF' }]}>Load Demo Location</Text>
         </TouchableOpacity>
       </View>
     );
@@ -354,7 +485,7 @@ export default function Location() {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>        
         {/* Header */}
-        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>          
+        <View style={[styles.header, { backgroundColor: theme.colors.background }]}>          
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
@@ -396,7 +527,7 @@ export default function Location() {
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: '#FFF0F0', fontWeight: 'bold', fontSize: 16 }}>
+            <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 }}>
               {isSubmittingCoords ? 'Saving…' : 'Save Coordinates'}
             </Text>
           </TouchableOpacity>
@@ -408,7 +539,7 @@ export default function Location() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
@@ -417,20 +548,41 @@ export default function Location() {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
-        <View style={[styles.heroSection, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.heroSection, { backgroundColor: theme.colors.background }]}>
           <View style={styles.heroContent}>
             <Text style={[styles.locationName, { color: theme.colors.text }]}>{locationData.title}</Text>
+            {/* Action Icons */}
+            <View style={styles.actionIconsContainer}>
+              <TouchableOpacity 
+                style={styles.actionIcon}
+                onPress={openDirections}
+              >
+                <Ionicons name="navigate" size={28} color={theme.colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionIcon}
+                onPress={handleEditPress}
+              >
+                <Ionicons name="pencil" size={28} color={theme.colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionIcon}
+                onPress={handleDeleteLocation}
+              >
+                <Ionicons name="trash-outline" size={28} color="#ff6b6b" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
         {/* Description Section */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.section, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>About</Text>
           <Text style={[styles.description, { color: theme.colors.textSecondary }]}>{locationData.description}</Text>
         </View>
 
         {/* Contact Info Section */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.section, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Contact & Hours</Text>
           
           <View style={styles.contactItem}>
@@ -452,46 +604,11 @@ export default function Location() {
             <Ionicons name="globe" size={20} color={theme.colors.primary} />
             <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.websiteUrl || 'Not available'}</Text>
           </View>
-          
-          {/* Directions Button */}
-          <TouchableOpacity 
-            style={[styles.directionsButton, { backgroundColor: theme.colors.primary }]}
-            onPress={openDirections}
-          >
-            <Ionicons name="navigate" size={20} color="#FFF0F0" />
-            <Text style={styles.directionsButtonText}>Get Directions</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Action Buttons Section */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Actions</Text>
-          
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: '#ff6b6b' }]}
-              onPress={handleReportLocation}
-            >
-              <Ionicons name="flag" size={20} color="#FFF0F0" />
-              <Text style={styles.actionButtonText}>Report</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: '#6c5ce7' }]}
-              onPress={handleBlockLocation}
-              disabled={isBlockingLocation}
-            >
-              <Ionicons name="ban" size={20} color="#FFF0F0" />
-              <Text style={styles.actionButtonText}>
-                {isBlockingLocation ? 'Blocking...' : 'Block Location'}
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* TikTok Videos Section - Only show for authenticated users */}
         {sessionToken && (
-          <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <View style={[styles.section, { backgroundColor: theme.colors.background }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>TikTok Videos</Text>
             <View style={styles.videoGrid}>
               {isLoadingVideos ? (
@@ -645,8 +762,275 @@ export default function Location() {
               style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
               onPress={() => setShowReportModal(false)}
             >
-              <Text style={[styles.modalButtonText, { color: '#FFF0F0' }]}>OK</Text>
+              <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>OK</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Location Modal */}
+      <Modal
+        visible={isEditModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleCancelEdit}
+      >
+        <View style={styles.editModalOverlay}>
+          <View style={[styles.editModalContent, { backgroundColor: theme.colors.surface }]}>
+            {/* Header with Close Button */}
+            <View style={[styles.editModalHeader, { 
+              backgroundColor: theme.colors.surface,
+            }]}>
+              <View style={styles.editModalHandleBar} />
+              <View style={styles.editModalHeaderContent}>
+                <Text style={[styles.editModalTitle, { color: theme.colors.text }]}>Edit Location</Text>
+                <TouchableOpacity 
+                  style={styles.editModalCloseButton} 
+                  onPress={handleCancelEdit}
+                  disabled={isSavingEdit}
+                >
+                  <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Scrollable Content */}
+            <ScrollView 
+              style={styles.editModalScrollView}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.editModalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Title Input */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>
+                  Title {editFormData.title.length > 0 && (
+                    <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
+                      ({editFormData.title.length}/100)
+                    </Text>
+                  )}
+                </Text>
+                <View style={styles.inputWithClearContainer}>
+                  <TextInput
+                    style={[styles.editFormInput, styles.inputWithClear, { 
+                      backgroundColor: theme.colors.background,
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                    }]}
+                    value={editFormData.title}
+                    onChangeText={(text) => setEditFormData({ ...editFormData, title: text.slice(0, 100) })}
+                    placeholder="Enter location title"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    maxLength={100}
+                  />
+                  {editFormData.title.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.clearButton}
+                      onPress={() => setEditFormData({ ...editFormData, title: '' })}
+                    >
+                      <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Address Input */}
+              <View style={styles.inputGroup}>
+                <View style={styles.labelWithIcon}>
+                  <Ionicons name="location-outline" size={18} color={theme.colors.primary} />
+                  <Text style={[styles.editFormLabel, { color: theme.colors.text, marginTop: 0 }]}>Address</Text>
+                </View>
+                <View style={styles.inputWithClearContainer}>
+                  <TextInput
+                    style={[styles.editFormInput, styles.inputWithClear, { 
+                      backgroundColor: theme.colors.background,
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                    }]}
+                    value={editFormData.address}
+                    onChangeText={(text) => setEditFormData({ ...editFormData, address: text })}
+                    placeholder="123 Main St, City, State"
+                    placeholderTextColor={theme.colors.textSecondary}
+                  />
+                  {editFormData.address.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.clearButton}
+                      onPress={() => setEditFormData({ ...editFormData, address: '' })}
+                    >
+                      <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Emoji Input */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>Emoji</Text>
+                <View style={styles.emojiInputContainer}>
+                  <View style={styles.emojiInputWrapper}>
+                    <TextInput
+                      style={[styles.editFormInput, styles.emojiInput, { 
+                        backgroundColor: theme.colors.background,
+                        color: theme.colors.text,
+                        borderColor: theme.colors.border,
+                        fontSize: 32,
+                        textAlign: 'center',
+                        textAlignVertical: 'center',
+                      }]}
+                      value={editFormData.emoji}
+                      onChangeText={(text) => setEditFormData({ ...editFormData, emoji: text.slice(0, 2) })}
+                      placeholder=""
+                      placeholderTextColor={theme.colors.textSecondary}
+                      maxLength={2}
+                    />
+                    {editFormData.emoji.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.emojiClearButton}
+                        onPress={() => setEditFormData({ ...editFormData, emoji: '' })}
+                      >
+                        <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </View>
+
+              {/* Description Input */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>
+                  Description {editFormData.description.length > 0 && (
+                    <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
+                      ({editFormData.description.length}/500)
+                    </Text>
+                  )}
+                </Text>
+                <View style={styles.inputWithClearContainer}>
+                  <TextInput
+                    style={[styles.editFormInput, styles.editFormTextArea, styles.inputWithClear, { 
+                      backgroundColor: theme.colors.background,
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                    }]}
+                    value={editFormData.description}
+                    onChangeText={(text) => setEditFormData({ ...editFormData, description: text.slice(0, 500) })}
+                    placeholder="Describe this location..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                    maxLength={500}
+                  />
+                  {editFormData.description.length > 0 && (
+                    <TouchableOpacity
+                      style={[styles.clearButton, styles.textAreaClearButton]}
+                      onPress={() => setEditFormData({ ...editFormData, description: '' })}
+                    >
+                      <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Contact Information Section */}
+              <View style={[styles.formSection, { borderTopColor: theme.colors.border }]}>
+                <Text style={[styles.formSectionTitle, { color: theme.colors.text }]}>Contact Information</Text>
+                
+                {/* Phone Number Input */}
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelWithIcon}>
+                    <Ionicons name="call-outline" size={18} color={theme.colors.primary} />
+                    <Text style={[styles.editFormLabel, { color: theme.colors.text, marginTop: 0 }]}>Phone Number</Text>
+                  </View>
+                  <View style={styles.inputWithClearContainer}>
+                    <TextInput
+                      style={[styles.editFormInput, styles.inputWithClear, { 
+                        backgroundColor: theme.colors.background,
+                        color: theme.colors.text,
+                        borderColor: theme.colors.border,
+                      }]}
+                      value={editFormData.phoneNumber}
+                      onChangeText={(text) => setEditFormData({ ...editFormData, phoneNumber: text })}
+                      placeholder="(555) 123-4567"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      keyboardType="phone-pad"
+                    />
+                    {editFormData.phoneNumber.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.clearButton}
+                        onPress={() => setEditFormData({ ...editFormData, phoneNumber: '' })}
+                      >
+                        <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                {/* Website URL Input */}
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelWithIcon}>
+                    <Ionicons name="globe-outline" size={18} color={theme.colors.primary} />
+                    <Text style={[styles.editFormLabel, { color: theme.colors.text, marginTop: 0 }]}>Website</Text>
+                  </View>
+                  <View style={styles.inputWithClearContainer}>
+                    <TextInput
+                      style={[styles.editFormInput, styles.inputWithClear, { 
+                        backgroundColor: theme.colors.background,
+                        color: theme.colors.text,
+                        borderColor: theme.colors.border,
+                      }]}
+                      value={editFormData.websiteUrl}
+                      onChangeText={(text) => setEditFormData({ ...editFormData, websiteUrl: text })}
+                      placeholder="www.example.com"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      keyboardType="url"
+                      autoCapitalize="none"
+                    />
+                    {editFormData.websiteUrl.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.clearButton}
+                        onPress={() => setEditFormData({ ...editFormData, websiteUrl: '' })}
+                      >
+                        <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Fixed Footer Buttons */}
+            <View style={[styles.editModalFooter, { 
+              backgroundColor: theme.colors.surface,
+            }]}>
+              <TouchableOpacity
+                style={[styles.editModalButton, styles.cancelButton, { 
+                  backgroundColor: 'transparent',
+                  borderWidth: 2,
+                  borderColor: theme.colors.border,
+                }]}
+                onPress={handleCancelEdit}
+                disabled={isSavingEdit}
+              >
+                <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.editModalButton, styles.saveButton, { 
+                  backgroundColor: theme.colors.primary,
+                  opacity: isSavingEdit ? 0.7 : 1,
+                }]}
+                onPress={handleSaveEdit}
+                disabled={isSavingEdit}
+              >
+                {isSavingEdit ? (
+                  <View style={styles.savingContainer}>
+                    <Text style={[styles.saveButtonText, { color: '#FFFFFF' }]}>Saving</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.saveButtonText, { color: '#FFFFFF' }]}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -681,12 +1065,32 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroSection: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#835858',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   heroContent: {
     alignItems: 'center',
+  },
+  actionIconsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
+    marginTop: 12,
+  },
+  actionIcon: {
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   locationName: {
     fontSize: 28,
@@ -709,8 +1113,8 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 15,
-    paddingVertical: 20,
-    marginTop: 10,
+    paddingVertical: 12,
+    marginTop: 0,
   },
   sectionTitle: {
     fontSize: 20,
@@ -761,7 +1165,7 @@ const styles = StyleSheet.create({
   videoNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#835858',
+    color: '#666666',
   },
   videoTitle: {
     fontSize: 14,
@@ -827,7 +1231,7 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   directionsButtonText: {
-    color: '#FFF0F0',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
@@ -844,7 +1248,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#FFF0F0',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -869,7 +1273,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButtonText: {
-    color: '#FFF0F0',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -923,5 +1327,217 @@ const styles = StyleSheet.create({
   loginPromptButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 10,
+    gap: 8,
+  },
+  editButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 10,
+    gap: 8,
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  editModalContent: {
+    width: '100%',
+    height: '92%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 16,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  editModalHeader: {
+    paddingTop: 12,
+    paddingBottom: 16,
+    paddingHorizontal: 24,
+    flexShrink: 0,
+  },
+  editModalHandleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#CBD5E0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  editModalHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  editModalTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  editModalCloseButton: {
+    position: 'absolute',
+    right: 0,
+    padding: 4,
+  },
+  editModalScrollView: {
+    flex: 1,
+    flexGrow: 1,
+  },
+  editModalScrollContent: {
+    padding: 24,
+    paddingTop: 8,
+    paddingBottom: 40,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  editFormLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 10,
+    marginTop: 4,
+    letterSpacing: 0.2,
+  },
+  characterCount: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  editFormInput: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  editFormTextArea: {
+    minHeight: 120,
+    textAlignVertical: 'top',
+    paddingTop: 16,
+  },
+  emojiInputContainer: {
+    alignItems: 'center',
+  },
+  emojiInputWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+  },
+  emojiInput: {
+    width: 100,
+    height: 100,
+    padding: 0,
+  },
+  emojiClearButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+  },
+  inputWithClearContainer: {
+    position: 'relative',
+  },
+  inputWithClear: {
+    paddingRight: 45,
+  },
+  clearButton: {
+    position: 'absolute',
+    right: 12,
+    top: '50%',
+    transform: [{ translateY: -10 }],
+    padding: 4,
+  },
+  textAreaClearButton: {
+    top: 16,
+    transform: [{ translateY: 0 }],
+  },
+  formSection: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+  },
+  formSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
+    letterSpacing: -0.3,
+  },
+  labelWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  editModalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 24,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+    flexShrink: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  editModalButton: {
+    flex: 1,
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
+  },
+  cancelButton: {
+    borderWidth: 2,
+  },
+  cancelButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  saveButton: {
+    shadowColor: '#4E8886',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  saveButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  savingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

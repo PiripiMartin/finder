@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
@@ -14,6 +14,7 @@ import { useShare } from '../context/ShareContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTutorial } from '../context/TutorialContext';
 import { MapPoint } from '../mapData';
+import { Folder, loadFolders } from '../utils/folderStorage';
 
 import { videoUrls } from '../videoData';
 
@@ -76,6 +77,9 @@ export default function Index() {
   // Filter state
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
+  
+  // Folder state
+  const [folders, setFolders] = useState<Folder[]>([]);
   
   // API state
   const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
@@ -444,6 +448,30 @@ export default function Index() {
     }
   }, [userLocation, isGuest, sessionToken]);
 
+  // Load folders function
+  const loadFoldersData = useCallback(async () => {
+    try {
+      const loadedFolders = await loadFolders();
+      setFolders(loadedFolders);
+      console.log('📂 [Map] Loaded folders:', loadedFolders.length);
+    } catch (error) {
+      console.error('❌ [Map] Error loading folders:', error);
+    }
+  }, []);
+
+  // Load folders on mount
+  useEffect(() => {
+    loadFoldersData();
+  }, [loadFoldersData]);
+
+  // Reload folders when screen comes into focus (e.g., returning from saved tab)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📂 [Map] Screen focused, reloading folders...');
+      loadFoldersData();
+    }, [loadFoldersData])
+  );
+
   // Load map points when user location is available
   useEffect(() => {
     console.log('📍 [Map] useEffect triggered - userLocation:', userLocation, 'isGuest:', isGuest);
@@ -507,9 +535,17 @@ export default function Index() {
   const filteredMapPoints = useMemo(() => {
     let filtered = mapPoints;
     
-    // Apply emoji filter
+    // Apply folder filter
     if (activeFilter) {
-      filtered = filtered.filter(point => point.emoji === activeFilter);
+      const selectedFolder = folders.find(f => f.id === activeFilter);
+      if (selectedFolder) {
+        console.log('🔍 [Filter] Applying folder filter:', selectedFolder.title);
+        filtered = filtered.filter(point => {
+          const pointId = Number(point.id);
+          return selectedFolder.locationIds.includes(pointId);
+        });
+        console.log('🔍 [Filter] Folder filtered points count:', filtered.length);
+      }
     }
     
     // Apply saved locations filter
@@ -537,7 +573,7 @@ export default function Index() {
     }
     
     return filtered;
-  }, [mapPoints, activeFilter, showSavedOnly, savedLocations]);
+  }, [mapPoints, activeFilter, showSavedOnly, savedLocations, folders]);
 
   // Function to clear all filters
   const clearAllFilters = () => {
@@ -545,44 +581,15 @@ export default function Index() {
     setShowSavedOnly(false);
   };
 
-  // Get unique marker types from emojis - only show emojis of currently visible points
-  const markerTypes = useMemo(() => {
-    const emojiCounts: { [key: string]: number } = {};
-    
-    // Use filteredMapPoints instead of mapPoints to only show emojis of visible locations
-    const pointsToAnalyze = filteredMapPoints.length > 0 ? filteredMapPoints : mapPoints;
-    
-    pointsToAnalyze.forEach(point => {
-      if (emojiCounts[point.emoji]) {
-        emojiCounts[point.emoji]++;
-      } else {
-        emojiCounts[point.emoji] = 1;
-      }
-    });
-    
-    // Convert to array format and add some default types if needed
-    const types = Object.entries(emojiCounts).map(([emoji, count]) => ({
-      emoji,
-      label: getEmojiLabel(emoji),
-      count
+  // Get folders with location counts for display
+  const foldersWithCounts = useMemo(() => {
+    return folders.map(folder => ({
+      ...folder,
+      count: folder.locationIds.filter(id => 
+        mapPoints.some(point => Number(point.id) === id)
+      ).length
     }));
-    
-    // Add default types if no data yet
-    if (types.length === 0) {
-      return [
-        { emoji: '☕', label: 'Coffee', count: 0 },
-        { emoji: '🧋', label: 'Bubble Tea', count: 0 },
-        { emoji: '𫖖', label: 'Tea', count: 0 },
-        { emoji: '🍰', label: 'Dessert', count: 0 },
-        { emoji: '🍕', label: 'Pizza', count: 0 },
-        { emoji: '🍜', label: 'Noodles', count: 0 },
-        { emoji: '🍣', label: 'Sushi', count: 0 },
-        { emoji: '🍔', label: 'Burgers', count: 0 },
-      ];
-    }
-    
-    return types;
-  }, [filteredMapPoints, mapPoints]);
+  }, [folders, mapPoints]);
 
   // Clear selection if selected marker is no longer visible after filtering
   useEffect(() => {
@@ -927,7 +934,7 @@ export default function Index() {
           setSelectedMarkerId(null);
         }}
       >
-        <Ionicons name="navigate" size={28} color="#4E8886" />
+        <Ionicons name="navigate" size={28} color="#A8C3A0" />
       </TouchableOpacity>
 
       {/* Tutorial Button - Below Location Button (only if feature enabled) */}
@@ -945,7 +952,7 @@ export default function Index() {
             setShowManualTutorial(true);
           }}
         >
-          <Ionicons name="help-circle-outline" size={28} color="#4E8886" />
+          <Ionicons name="help-circle-outline" size={28} color="#A8C3A0" />
         </TouchableOpacity>
       )}
 
@@ -961,7 +968,7 @@ export default function Index() {
           ]}
           onPress={() => router.push('/auth/login')}
         >
-          <Ionicons name="log-in" size={20} color="#4E8886" />
+          <Ionicons name="log-in" size={20} color="#A8C3A0" />
           <Text style={styles.guestLoginButtonText}>Login</Text>
         </TouchableOpacity>
       )}
@@ -980,7 +987,7 @@ export default function Index() {
           ]}
           onPress={handleLogout}
         >
-          <Ionicons name="log-out" size={20} color="#4E8886" />
+          <Ionicons name="log-out" size={20} color="#A8C3A0" />
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
       )}
@@ -999,46 +1006,46 @@ export default function Index() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterScrollContent}
         >
-          {/* Saved Locations Filter Button */}
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              {
-                backgroundColor: showSavedOnly ? theme.colors.primary : theme.colors.surface,
-                borderColor: showSavedOnly ? theme.colors.primary : theme.colors.border,
-              }
-            ]}
-            onPress={() => {
-              const newShowSavedOnly = !showSavedOnly;
-              console.log('🔍 [Filter Toggle] Toggling saved locations filter:', { 
-                from: showSavedOnly, 
-                to: newShowSavedOnly,
-                savedLocationsCount: savedLocations.length,
-                mapPointsCount: mapPoints.length
-              });
-              setShowSavedOnly(newShowSavedOnly);
-              setActiveFilter(null); // Clear emoji filter when toggling saved filter
-            }}
-          >
-            <Text style={styles.filterButtonText}>Saved</Text>
-          </TouchableOpacity>
-          
-
-          
-          {/* Type-specific Filter Buttons */}
-          {markerTypes.map((type) => (
+          {/* Folder Filter Buttons */}
+          {foldersWithCounts.map((folder) => (
             <TouchableOpacity
-              key={type.emoji}
+              key={folder.id}
               style={[
                 styles.filterButton,
                 {
-                  backgroundColor: activeFilter === type.emoji ? theme.colors.primary : theme.colors.surface,
-                  borderColor: activeFilter === type.emoji ? theme.colors.primary : theme.colors.border,
+                  backgroundColor: activeFilter === folder.id ? folder.color : theme.colors.surface,
+                  borderColor: activeFilter === folder.id ? folder.color : theme.colors.border,
                 }
               ]}
-              onPress={() => setActiveFilter(activeFilter === type.emoji ? null : type.emoji)}
+              onPress={() => {
+                setActiveFilter(activeFilter === folder.id ? null : folder.id);
+              }}
             >
-              <Text style={styles.filterEmoji}>{type.emoji}</Text>
+              <Ionicons 
+                name="folder" 
+                size={16} 
+                color={activeFilter === folder.id ? '#FFFFFF' : folder.color} 
+                style={{ marginRight: 4 }}
+              />
+              <Text style={[
+                styles.filterButtonText,
+                { color: activeFilter === folder.id ? '#FFFFFF' : theme.colors.text }
+              ]}>
+                {folder.title}
+              </Text>
+              {folder.count > 0 && (
+                <View style={[
+                  styles.filterBadge,
+                  { backgroundColor: activeFilter === folder.id ? '#FFFFFF' : folder.color }
+                ]}>
+                  <Text style={[
+                    styles.filterBadgeText,
+                    { color: activeFilter === folder.id ? folder.color : '#FFFFFF' }
+                  ]}>
+                    {folder.count}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -1058,7 +1065,7 @@ export default function Index() {
         >
           {/* Shop Button with Arrow */}
           <TouchableOpacity
-            style={[styles.shopButton, { backgroundColor: '#FFF0F0' }]}
+            style={[styles.shopButton, { backgroundColor: '#FFFFFF' }]}
             onPress={() => {
               // Log the "Check it out" process
               console.log('=== "Check it out" Button Tapped ===');
@@ -1184,6 +1191,45 @@ export default function Index() {
           )}
         </View>
       )}
+
+      {/* Progress Goal Banner - Show when user has less than 3 saved locations */}
+      {!isGuest && savedLocations.length < 3 && (
+        <View style={[
+          styles.progressBanner,
+          {
+            backgroundColor: theme.colors.primary,
+            bottom: insets.bottom - 10, // Position very close to the nav bar
+          }
+        ]}>
+          <View style={styles.progressBannerTop}>
+            <View style={styles.progressContent}>
+              <Ionicons name="flag-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.progressText}>
+                Goal: Save {savedLocations.length}/3 TikToks
+              </Text>
+            </View>
+            {tutorialFeatureEnabled && (
+              <TouchableOpacity
+                style={styles.howButton}
+                onPress={() => {
+                  console.log('🎓 [Map] Opening tutorial from goal banner');
+                  setShowManualTutorial(true);
+                }}
+              >
+                <Text style={styles.howButtonText}>How?</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View 
+              style={[
+                styles.progressBarFill, 
+                { width: `${(savedLocations.length / 3) * 100}%` }
+              ]} 
+            />
+          </View>
+        </View>
+      )}
       
     </View>
   );
@@ -1198,11 +1244,11 @@ const styles = StyleSheet.create({
     height: Dimensions.get('window').height,
   },
   customMarker: {
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 6,
     borderWidth: 1,
-            borderColor: '#4E8886',
+            borderColor: '#A8C3A0',
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1296,7 +1342,7 @@ const styles = StyleSheet.create({
   },
   locationButton: {
     position: 'absolute',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 25,
     width: 50,
     height: 50,
@@ -1310,7 +1356,7 @@ const styles = StyleSheet.create({
   },
   tutorialButton: {
     position: 'absolute',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 25,
     width: 50,
     height: 50,
@@ -1371,7 +1417,7 @@ const styles = StyleSheet.create({
 
   customLabel: {
     position: 'absolute',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     padding: 8,
     borderRadius: 6,
     zIndex: 1000,
@@ -1382,7 +1428,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
     borderWidth: 1,
-            borderColor: '#835858',
+            borderColor: '#FFFFFF',
   },
   labelTitle: {
     color: '#000000',
@@ -1392,14 +1438,14 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   labelDescription: {
-            color: '#835858',
+    color: '#666666',
     fontSize: 8, // Smaller font
     textAlign: 'center',
     lineHeight: 10,
   },
   guestLoginButton: {
     position: 'absolute',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1413,13 +1459,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   guestLoginButtonText: {
-    color: '#4E8886',
+    color: '#A8C3A0',
     fontSize: 14,
     fontWeight: '600',
   },
   logoutButton: {
     position: 'absolute',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1433,7 +1479,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   logoutButtonText: {
-    color: '#4E8886',
+    color: '#A8C3A0',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1472,6 +1518,71 @@ const styles = StyleSheet.create({
   sharedContentUrl: {
     fontSize: 12,
     fontFamily: 'monospace',
+  },
+  filterBadge: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  progressBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 100,
+  },
+  progressBannerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  progressText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  howButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginLeft: 12,
+  },
+  howButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressBarContainer: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 3,
   },
 
 });

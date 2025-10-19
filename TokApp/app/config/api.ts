@@ -32,3 +32,8 @@ export const getMapPointsUrl = (locationId: number): string => {
 export const getGuestPostsUrl = (latitude: number, longitude: number): string => {
   return `${API_CONFIG.BASE_URL}/map/guest-posts?lat=${latitude}&lon=${longitude}`;
 };
+
+// Helper function to get edit location URL with specific location ID
+export const getEditLocationUrl = (locationId: number): string => {
+  return `${API_CONFIG.BASE_URL}/map/edit/${locationId}`;
+};

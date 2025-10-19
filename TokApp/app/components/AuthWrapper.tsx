@@ -15,7 +15,7 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
     return (
       <View style={[
         styles.loadingContainer,
-        { backgroundColor: theme === 'dark' ? '#1a1a1a' : '#FFF0F0' }
+        { backgroundColor: theme === 'dark' ? '#1a1a1a' : '#FFFFFF' }
       ]}>
         <ActivityIndicator 
           size="large" 

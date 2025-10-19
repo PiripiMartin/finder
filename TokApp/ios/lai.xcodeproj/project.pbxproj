@@ -8,37 +8,45 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		246C07A3E823785C98AF6830 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537810D93BB19E58A88C6B9D /* ExpoModulesProvider.swift */; };
+		26E9E2086DD34B29B0856E21 /* libPods-lai.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4BBFE6AD8ACD6820540E09F5 /* libPods-lai.a */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		428A6763D9D757A0568FC533 /* libPods-lai.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D345AE08610CBD5F2F0EAC57 /* libPods-lai.a */; };
-		7525B9D88C706156C1E051A9 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3AEEA54F24DBC647B2323C3E /* PrivacyInfo.xcprivacy */; };
-		78C9DD952E68007800F7437C /* share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 78C9DD8B2E68007800F7437C /* share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		78C9DD9D2E68016100F7437C /* ShareExtensionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78C9DD9C2E68016100F7437C /* ShareExtensionBridge.swift */; };
-		78C9DD9E2E68016100F7437C /* ShareExtensionBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 78C9DD9B2E68016100F7437C /* ShareExtensionBridge.m */; };
-		78C9DDA42E68095E00F7437C /* SharedUserDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78C9DDA32E68095E00F7437C /* SharedUserDefaults.swift */; };
-		78C9DDA52E68095E00F7437C /* SharedUserDefaults.m in Sources */ = {isa = PBXBuildFile; fileRef = 78C9DDA22E68095E00F7437C /* SharedUserDefaults.m */; };
+		65464ED0EBABF4D86BBAC355 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 424656854121788C6D124353 /* ExpoModulesProvider.swift */; };
+		78E8BBD62EA197AC0094FF3E /* sharevids.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 78E8BBCC2EA197AC0094FF3E /* sharevids.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		78E8BBDF2EA19A510094FF3E /* ShareExtensionBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 78E8BBDD2EA19A510094FF3E /* ShareExtensionBridge.m */; };
+		78E8BBE02EA19A510094FF3E /* ShareExtensionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E8BBDE2EA19A510094FF3E /* ShareExtensionBridge.swift */; };
+		78E8BBE72EA19D5B0094FF3E /* UniformTypeIdentifiers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 78E8BBE62EA19D5B0094FF3E /* UniformTypeIdentifiers.framework */; };
+		78E8BBF32EA19D5B0094FF3E /* Add to lai.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 78E8BBE52EA19D5B0094FF3E /* Add to lai.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9BA4216ACE5AD9538C137BEB /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8387DD1688B9625FBE449485 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		78C9DD932E68007800F7437C /* PBXContainerItemProxy */ = {
+		78E8BBD42EA197AC0094FF3E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 78C9DD8A2E68007800F7437C;
-			remoteInfo = share;
+			remoteGlobalIDString = 78E8BBCB2EA197AC0094FF3E;
+			remoteInfo = sharevids;
+		};
+		78E8BBF12EA19D5B0094FF3E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 78E8BBE42EA19D5B0094FF3E;
+			remoteInfo = actionshare;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		78C9DD962E68007800F7437C /* Embed Foundation Extensions */ = {
+		78E8BBD72EA197AC0094FF3E /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				78C9DD952E68007800F7437C /* share.appex in Embed Foundation Extensions */,
+				78E8BBF32EA19D5B0094FF3E /* Add to lai.appex in Embed Foundation Extensions */,
+				78E8BBD62EA197AC0094FF3E /* sharevids.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -46,38 +54,46 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		0B7C217431694214ADB0C1DF /* Pods-lai.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-lai.release.xcconfig"; path = "Target Support Files/Pods-lai/Pods-lai.release.xcconfig"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* lai.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = lai.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = lai/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = lai/Info.plist; sourceTree = "<group>"; };
-		3AEEA54F24DBC647B2323C3E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = lai/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		537810D93BB19E58A88C6B9D /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-lai/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		78C9DD8B2E68007800F7437C /* share.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = share.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		78C9DD9B2E68016100F7437C /* ShareExtensionBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ShareExtensionBridge.m; sourceTree = "<group>"; };
-		78C9DD9C2E68016100F7437C /* ShareExtensionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareExtensionBridge.swift; sourceTree = "<group>"; };
-		78C9DDA22E68095E00F7437C /* SharedUserDefaults.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SharedUserDefaults.m; sourceTree = "<group>"; };
-		78C9DDA32E68095E00F7437C /* SharedUserDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedUserDefaults.swift; sourceTree = "<group>"; };
+		424656854121788C6D124353 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-lai/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		4BBFE6AD8ACD6820540E09F5 /* libPods-lai.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-lai.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		78E8BBCC2EA197AC0094FF3E /* sharevids.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = sharevids.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		78E8BBDD2EA19A510094FF3E /* ShareExtensionBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ShareExtensionBridge.m; sourceTree = "<group>"; };
+		78E8BBDE2EA19A510094FF3E /* ShareExtensionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareExtensionBridge.swift; sourceTree = "<group>"; };
+		78E8BBE52EA19D5B0094FF3E /* Add to lai.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Add to lai.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		78E8BBE62EA19D5B0094FF3E /* UniformTypeIdentifiers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UniformTypeIdentifiers.framework; path = System/Library/Frameworks/UniformTypeIdentifiers.framework; sourceTree = SDKROOT; };
+		806EE7DFF321D24C73EBCD68 /* Pods-lai.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-lai.debug.xcconfig"; path = "Target Support Files/Pods-lai/Pods-lai.debug.xcconfig"; sourceTree = "<group>"; };
+		8387DD1688B9625FBE449485 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = lai/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = lai/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		D345AE08610CBD5F2F0EAC57 /* libPods-lai.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-lai.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		DDB2A65EC0E853B96A738048 /* Pods-lai.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-lai.debug.xcconfig"; path = "Target Support Files/Pods-lai/Pods-lai.debug.xcconfig"; sourceTree = "<group>"; };
+		D7655DEC6F09EADB05FA3FF8 /* Pods-lai.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-lai.release.xcconfig"; path = "Target Support Files/Pods-lai/Pods-lai.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = lai/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* lai-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "lai-Bridging-Header.h"; path = "lai/lai-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		78C9DD992E68007800F7437C /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		78E8BBDA2EA197AC0094FF3E /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 78C9DD8A2E68007800F7437C /* share */;
+			target = 78E8BBCB2EA197AC0094FF3E /* sharevids */;
+		};
+		78E8BBF42EA19D5B0094FF3E /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 78E8BBE42EA19D5B0094FF3E /* actionshare */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		78C9DD8C2E68007800F7437C /* share */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (78C9DD992E68007800F7437C /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = share; sourceTree = "<group>"; };
+		78E8BBCD2EA197AC0094FF3E /* sharevids */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (78E8BBDA2EA197AC0094FF3E /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = sharevids; sourceTree = "<group>"; };
+		78E8BBE82EA19D5B0094FF3E /* actionshare */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (78E8BBF42EA19D5B0094FF3E /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = actionshare; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,14 +101,22 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				428A6763D9D757A0568FC533 /* libPods-lai.a in Frameworks */,
+				26E9E2086DD34B29B0856E21 /* libPods-lai.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		78C9DD882E68007800F7437C /* Frameworks */ = {
+		78E8BBC92EA197AC0094FF3E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		78E8BBE22EA19D5B0094FF3E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				78E8BBE72EA19D5B0094FF3E /* UniformTypeIdentifiers.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -102,34 +126,24 @@
 		13B07FAE1A68108700A75B9A /* lai */ = {
 			isa = PBXGroup;
 			children = (
-				78C9DDA22E68095E00F7437C /* SharedUserDefaults.m */,
-				78C9DDA32E68095E00F7437C /* SharedUserDefaults.swift */,
-				78C9DD9B2E68016100F7437C /* ShareExtensionBridge.m */,
-				78C9DD9C2E68016100F7437C /* ShareExtensionBridge.swift */,
+				78E8BBDD2EA19A510094FF3E /* ShareExtensionBridge.m */,
+				78E8BBDE2EA19A510094FF3E /* ShareExtensionBridge.swift */,
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				F11748442D0722820044C1D9 /* lai-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				3AEEA54F24DBC647B2323C3E /* PrivacyInfo.xcprivacy */,
+				8387DD1688B9625FBE449485 /* PrivacyInfo.xcprivacy */,
 			);
 			name = lai;
 			sourceTree = "<group>";
 		};
-		19F92868F7982497D30D4F6A /* lai */ = {
+		15527048752C3914E873B2CC /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				537810D93BB19E58A88C6B9D /* ExpoModulesProvider.swift */,
-			);
-			name = lai;
-			sourceTree = "<group>";
-		};
-		2728B98F8CE6D11DE1A00712 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				DDB2A65EC0E853B96A738048 /* Pods-lai.debug.xcconfig */,
-				0B7C217431694214ADB0C1DF /* Pods-lai.release.xcconfig */,
+				806EE7DFF321D24C73EBCD68 /* Pods-lai.debug.xcconfig */,
+				D7655DEC6F09EADB05FA3FF8 /* Pods-lai.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -138,7 +152,8 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				D345AE08610CBD5F2F0EAC57 /* libPods-lai.a */,
+				4BBFE6AD8ACD6820540E09F5 /* libPods-lai.a */,
+				78E8BBE62EA19D5B0094FF3E /* UniformTypeIdentifiers.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -155,11 +170,12 @@
 			children = (
 				13B07FAE1A68108700A75B9A /* lai */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
-				78C9DD8C2E68007800F7437C /* share */,
+				78E8BBCD2EA197AC0094FF3E /* sharevids */,
+				78E8BBE82EA19D5B0094FF3E /* actionshare */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				2728B98F8CE6D11DE1A00712 /* Pods */,
-				EF7F6EDFE098FA7A58FF239E /* ExpoModulesProviders */,
+				15527048752C3914E873B2CC /* Pods */,
+				ADF8FE5442827E32D22027B9 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -170,9 +186,18 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* lai.app */,
-				78C9DD8B2E68007800F7437C /* share.appex */,
+				78E8BBCC2EA197AC0094FF3E /* sharevids.appex */,
+				78E8BBE52EA19D5B0094FF3E /* Add to lai.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		ADF8FE5442827E32D22027B9 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				F68B9EF25F849547E0D0F421 /* lai */,
+			);
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -184,12 +209,12 @@
 			path = lai/Supporting;
 			sourceTree = "<group>";
 		};
-		EF7F6EDFE098FA7A58FF239E /* ExpoModulesProviders */ = {
+		F68B9EF25F849547E0D0F421 /* lai */ = {
 			isa = PBXGroup;
 			children = (
-				19F92868F7982497D30D4F6A /* lai */,
+				424656854121788C6D124353 /* ExpoModulesProvider.swift */,
 			);
-			name = ExpoModulesProviders;
+			name = lai;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -200,45 +225,68 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "lai" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				CA762194BE1CE5FD8497D61E /* [Expo] Configure project */,
+				9417761D5BD6FBDD6D9A1FAB /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				739776825DAA0F3879045592 /* [CP] Embed Pods Frameworks */,
-				78C9DD962E68007800F7437C /* Embed Foundation Extensions */,
+				6CFCCCFC8B5E1AD00DEF13F7 /* [CP] Embed Pods Frameworks */,
+				78E8BBD72EA197AC0094FF3E /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				78C9DD942E68007800F7437C /* PBXTargetDependency */,
+				78E8BBD52EA197AC0094FF3E /* PBXTargetDependency */,
+				78E8BBF22EA19D5B0094FF3E /* PBXTargetDependency */,
 			);
 			name = lai;
 			productName = lai;
 			productReference = 13B07F961A680F5B00A75B9A /* lai.app */;
 			productType = "com.apple.product-type.application";
 		};
-		78C9DD8A2E68007800F7437C /* share */ = {
+		78E8BBCB2EA197AC0094FF3E /* sharevids */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 78C9DD9A2E68007800F7437C /* Build configuration list for PBXNativeTarget "share" */;
+			buildConfigurationList = 78E8BBDB2EA197AC0094FF3E /* Build configuration list for PBXNativeTarget "sharevids" */;
 			buildPhases = (
-				78C9DD872E68007800F7437C /* Sources */,
-				78C9DD882E68007800F7437C /* Frameworks */,
-				78C9DD892E68007800F7437C /* Resources */,
+				78E8BBC82EA197AC0094FF3E /* Sources */,
+				78E8BBC92EA197AC0094FF3E /* Frameworks */,
+				78E8BBCA2EA197AC0094FF3E /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				78C9DD8C2E68007800F7437C /* share */,
+				78E8BBCD2EA197AC0094FF3E /* sharevids */,
 			);
-			name = share;
+			name = sharevids;
 			packageProductDependencies = (
 			);
-			productName = share;
-			productReference = 78C9DD8B2E68007800F7437C /* share.appex */;
+			productName = sharevids;
+			productReference = 78E8BBCC2EA197AC0094FF3E /* sharevids.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		78E8BBE42EA19D5B0094FF3E /* actionshare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 78E8BBF52EA19D5B0094FF3E /* Build configuration list for PBXNativeTarget "actionshare" */;
+			buildPhases = (
+				78E8BBE12EA19D5B0094FF3E /* Sources */,
+				78E8BBE22EA19D5B0094FF3E /* Frameworks */,
+				78E8BBE32EA19D5B0094FF3E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				78E8BBE82EA19D5B0094FF3E /* actionshare */,
+			);
+			name = actionshare;
+			packageProductDependencies = (
+			);
+			productName = actionshare;
+			productReference = 78E8BBE52EA19D5B0094FF3E /* Add to lai.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -253,7 +301,10 @@
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1250;
 					};
-					78C9DD8A2E68007800F7437C = {
+					78E8BBCB2EA197AC0094FF3E = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					78E8BBE42EA19D5B0094FF3E = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
@@ -272,7 +323,8 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* lai */,
-				78C9DD8A2E68007800F7437C /* share */,
+				78E8BBCB2EA197AC0094FF3E /* sharevids */,
+				78E8BBE42EA19D5B0094FF3E /* actionshare */,
 			);
 		};
 /* End PBXProject section */
@@ -285,11 +337,18 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				7525B9D88C706156C1E051A9 /* PrivacyInfo.xcprivacy in Resources */,
+				9BA4216ACE5AD9538C137BEB /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		78C9DD892E68007800F7437C /* Resources */ = {
+		78E8BBCA2EA197AC0094FF3E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		78E8BBE32EA19D5B0094FF3E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -336,7 +395,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		739776825DAA0F3879045592 /* [CP] Embed Pods Frameworks */ = {
+		6CFCCCFC8B5E1AD00DEF13F7 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -394,7 +453,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-lai/Pods-lai-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		CA762194BE1CE5FD8497D61E /* [Expo] Configure project */ = {
+		9417761D5BD6FBDD6D9A1FAB /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -421,15 +480,20 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				78C9DD9D2E68016100F7437C /* ShareExtensionBridge.swift in Sources */,
-				78C9DD9E2E68016100F7437C /* ShareExtensionBridge.m in Sources */,
-				246C07A3E823785C98AF6830 /* ExpoModulesProvider.swift in Sources */,
-				78C9DDA42E68095E00F7437C /* SharedUserDefaults.swift in Sources */,
-				78C9DDA52E68095E00F7437C /* SharedUserDefaults.m in Sources */,
+				65464ED0EBABF4D86BBAC355 /* ExpoModulesProvider.swift in Sources */,
+				78E8BBDF2EA19A510094FF3E /* ShareExtensionBridge.m in Sources */,
+				78E8BBE02EA19A510094FF3E /* ShareExtensionBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		78C9DD872E68007800F7437C /* Sources */ = {
+		78E8BBC82EA197AC0094FF3E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		78E8BBE12EA19D5B0094FF3E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -439,17 +503,22 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		78C9DD942E68007800F7437C /* PBXTargetDependency */ = {
+		78E8BBD52EA197AC0094FF3E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 78C9DD8A2E68007800F7437C /* share */;
-			targetProxy = 78C9DD932E68007800F7437C /* PBXContainerItemProxy */;
+			target = 78E8BBCB2EA197AC0094FF3E /* sharevids */;
+			targetProxy = 78E8BBD42EA197AC0094FF3E /* PBXContainerItemProxy */;
+		};
+		78E8BBF22EA19D5B0094FF3E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 78E8BBE42EA19D5B0094FF3E /* actionshare */;
+			targetProxy = 78E8BBF12EA19D5B0094FF3E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = DDB2A65EC0E853B96A738048 /* Pods-lai.debug.xcconfig */;
+			baseConfigurationReference = 806EE7DFF321D24C73EBCD68 /* Pods-lai.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -467,7 +536,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -486,7 +555,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 0B7C217431694214ADB0C1DF /* Pods-lai.release.xcconfig */;
+			baseConfigurationReference = D7655DEC6F09EADB05FA3FF8 /* Pods-lai.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -499,7 +568,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -515,7 +584,7 @@
 			};
 			name = Release;
 		};
-		78C9DD972E68007800F7437C /* Debug */ = {
+		78E8BBD82EA197AC0094FF3E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -526,7 +595,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_ENTITLEMENTS = share/share.entitlements;
+				CODE_SIGN_ENTITLEMENTS = sharevids/sharevids.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
@@ -534,8 +603,8 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = share/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = share;
+				INFOPLIST_FILE = sharevids/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = sharevids;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -544,10 +613,10 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.piripimartin.dew.share;
+				PRODUCT_BUNDLE_IDENTIFIER = com.piripimartin.dew.sharevids;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -558,7 +627,7 @@
 			};
 			name = Debug;
 		};
-		78C9DD982E68007800F7437C /* Release */ = {
+		78E8BBD92EA197AC0094FF3E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -569,7 +638,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_ENTITLEMENTS = share/share.entitlements;
+				CODE_SIGN_ENTITLEMENTS = sharevids/sharevids.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
@@ -578,8 +647,8 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = share/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = share;
+				INFOPLIST_FILE = sharevids/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = sharevids;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -588,10 +657,101 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.piripimartin.dew.share;
+				PRODUCT_BUNDLE_IDENTIFIER = com.piripimartin.dew.sharevids;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		78E8BBF62EA19D5B0094FF3E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon2;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = actionshare/actionshare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 55DF58ZM2W;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = actionshare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Add to lai!";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.piripimartin.dew.actionshare;
+				PRODUCT_NAME = "Add to lai";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		78E8BBF72EA19D5B0094FF3E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon2;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = actionshare/actionshare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 55DF58ZM2W;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = actionshare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Add to lai!";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.piripimartin.dew.actionshare;
+				PRODUCT_NAME = "Add to lai";
 				SKIP_INSTALL = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -730,11 +890,20 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		78C9DD9A2E68007800F7437C /* Build configuration list for PBXNativeTarget "share" */ = {
+		78E8BBDB2EA197AC0094FF3E /* Build configuration list for PBXNativeTarget "sharevids" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				78C9DD972E68007800F7437C /* Debug */,
-				78C9DD982E68007800F7437C /* Release */,
+				78E8BBD82EA197AC0094FF3E /* Debug */,
+				78E8BBD92EA197AC0094FF3E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		78E8BBF52EA19D5B0094FF3E /* Build configuration list for PBXNativeTarget "actionshare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				78E8BBF62EA19D5B0094FF3E /* Debug */,
+				78E8BBF72EA19D5B0094FF3E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

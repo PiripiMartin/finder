@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { ResizeMode, Video } from 'expo-av';
+import React, { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -18,8 +20,41 @@ interface TutorialProps {
 
 const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
+  const videoRef = useRef<Video>(null);
 
   const tutorialSteps = [
+    {
+      title: "Welcome to lai!",
+      content: (
+        <View style={styles.videoStepContent}>
+          <Text style={styles.stepDescription}>
+            This is how you setup to save tiktoks to lai!
+          </Text>
+          <View style={styles.videoContainer}>
+            {isVideoLoading && (
+              <View style={styles.videoLoadingOverlay}>
+                <ActivityIndicator size="large" color="#A8C3A0" />
+              </View>
+            )}
+            <Video
+              ref={videoRef}
+              source={require('../../tutorial.mov')}
+              style={styles.video}
+              useNativeControls
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay={currentStep === 0}
+              isLooping
+              onLoad={() => setIsVideoLoading(false)}
+              onError={(error) => {
+                console.error('Video error:', error);
+                setIsVideoLoading(false);
+              }}
+            />
+          </View>
+        </View>
+      ),
+    },
     {
       title: "How to Share from TikTok",
       content: (
@@ -56,7 +91,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           </View>
           
           <View style={styles.illustrationContainer}>
-            <Ionicons name="share-outline" size={60} color="#4E8886" />
+            <Ionicons name="share-outline" size={60} color="#A8C3A0" />
             <Text style={styles.illustrationText}>Share from any TikTok video!</Text>
           </View>
         </View>
@@ -108,13 +143,13 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           
           <View style={styles.illustrationContainer}>
             <View style={styles.iconRow}>
-              <Ionicons name="share-outline" size={40} color="#4E8886" />
+              <Ionicons name="share-outline" size={40} color="#A8C3A0" />
               <Ionicons name="chevron-forward" size={30} color="#999" />
-              <Ionicons name="ellipsis-horizontal" size={40} color="#4E8886" />
+              <Ionicons name="ellipsis-horizontal" size={40} color="#A8C3A0" />
               <Ionicons name="chevron-forward" size={30} color="#999" />
-              <Ionicons name="create-outline" size={40} color="#4E8886" />
+              <Ionicons name="create-outline" size={40} color="#A8C3A0" />
               <Ionicons name="chevron-forward" size={30} color="#999" />
-              <Ionicons name="add-circle-outline" size={40} color="#4E8886" />
+              <Ionicons name="add-circle-outline" size={40} color="#A8C3A0" />
             </View>
             <Text style={styles.illustrationText}>
               Share → More → Edit → Add lai
@@ -133,7 +168,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           
           <View style={styles.featureCard}>
             <View style={styles.featureIcon}>
-              <Ionicons name="bookmark" size={32} color="#4E8886" />
+              <Ionicons name="bookmark" size={32} color="#A8C3A0" />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>Save to Your Collection</Text>
@@ -145,7 +180,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
 
           <View style={styles.featureCard}>
             <View style={styles.featureIcon}>
-              <Ionicons name="location" size={32} color="#4E8886" />
+              <Ionicons name="location" size={32} color="#A8C3A0" />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>Pin on the Map</Text>
@@ -157,7 +192,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
 
           <View style={styles.featureCard}>
             <View style={styles.featureIcon}>
-              <Ionicons name="star" size={32} color="#4E8886" />
+              <Ionicons name="star" size={32} color="#A8C3A0" />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>Smart Organization</Text>
@@ -176,7 +211,12 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
     },
   ];
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // Pause video when leaving the first step
+    if (currentStep === 0 && videoRef.current) {
+      await videoRef.current.pauseAsync();
+    }
+    
     if (currentStep < tutorialSteps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -210,8 +250,8 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
         <View style={styles.skipButton} />
       </View>
 
-      <View style={styles.content}>
-        <Text style={styles.title}>{tutorialSteps[currentStep].title}</Text>
+      <View style={[styles.content, currentStep === 0 && styles.videoContent]}>
+        <Text style={[styles.title, currentStep === 0 && styles.videoTitle]}>{tutorialSteps[currentStep].title}</Text>
         {tutorialSteps[currentStep].content}
       </View>
 
@@ -239,7 +279,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -252,7 +292,7 @@ const styles = StyleSheet.create({
     width: 60,
   },
   skipText: {
-    color: '#4E8886',
+    color: '#A8C3A0',
     fontSize: 16,
     fontWeight: '500',
   },
@@ -266,7 +306,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   progressDotActive: {
-    backgroundColor: '#4E8886',
+    backgroundColor: '#A8C3A0',
   },
   progressDotInactive: {
     backgroundColor: '#E0E0E0',
@@ -275,6 +315,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
+  videoContent: {
+    paddingHorizontal: 10,
+    paddingTop: 0,
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -282,15 +326,46 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 30,
   },
+  videoTitle: {
+    fontSize: 24,
+    marginBottom: 10,
+    marginTop: 5,
+  },
   stepContent: {
     flex: 1,
   },
+  videoStepContent: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 0,
+  },
+  videoContainer: {
+    width: '100%',
+    height: '90%',
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    overflow: 'hidden',
+    marginTop: 0,
+    position: 'relative',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'transparent',
+  },
+  videoLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
   stepDescription: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 22,
+    marginBottom: 5,
+    lineHeight: 18,
   },
   instructionStep: {
     flexDirection: 'row',
@@ -302,7 +377,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#4E8886',
+    backgroundColor: '#A8C3A0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
@@ -320,7 +395,7 @@ const styles = StyleSheet.create({
   },
   boldText: {
     fontWeight: 'bold',
-    color: '#4E8886',
+    color: '#A8C3A0',
   },
   illustrationContainer: {
     alignItems: 'center',
@@ -386,7 +461,7 @@ const styles = StyleSheet.create({
   finalText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#4E8886',
+    color: '#A8C3A0',
     marginTop: 10,
   },
   footer: {
@@ -401,7 +476,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   nextButton: {
-    backgroundColor: '#4E8886',
+    backgroundColor: '#A8C3A0',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
