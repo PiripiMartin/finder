@@ -11,7 +11,11 @@ export interface LocationAndPost {
 }
 
 /**
- * Fetches saved locations for a user from the user_saved_locations table along with their most recent post.
+ * Fetches saved locations for a user including:
+ * - Directly saved locations (user_saved_locations table)
+ * - Locations in folders created by the user
+ * - Locations in folders followed by the user
+ * 
  * These are locations the user has personally posted to and should not appear in recommendations.
  *
  * @param userId - The ID of the user whose saved locations are to be fetched.
@@ -19,7 +23,7 @@ export interface LocationAndPost {
  */
 export async function getSavedLocationsWithTopPost(userId: number): Promise<LocationAndPost[]> {
     const query = `
-        SELECT 
+        SELECT DISTINCT
             mp.id,
             mp.google_place_id,
             mp.title,
@@ -35,9 +39,9 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             p.id as post_id,
             p.url as post_url,
             p.posted_by as post_posted_by,
-            p.posted_at as post_posted_at
-        FROM user_saved_locations usl
-        INNER JOIN map_points mp ON usl.map_point_id = mp.id
+            p.posted_at as post_posted_at,
+            COALESCE(usl.created_at, f.created_at) as sort_date
+        FROM map_points mp
         INNER JOIN (
             -- Find the most recent post for each location by the user
             SELECT DISTINCT
@@ -49,11 +53,19 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             FROM posts
             WHERE posted_by = ?
         ) p ON mp.id = p.map_point_id
-        WHERE usl.user_id = ?
-        ORDER BY usl.created_at DESC
+        LEFT JOIN user_saved_locations usl ON mp.id = usl.map_point_id AND usl.user_id = ?
+        LEFT JOIN folder_locations fl ON mp.id = fl.map_point_id
+        LEFT JOIN folders f ON fl.folder_id = f.id AND f.creator_id = ?
+        LEFT JOIN folder_follows ff ON fl.folder_id = ff.folder_id AND ff.user_id = ?
+        WHERE (
+            usl.user_id = ? OR  -- Directly saved locations
+            f.creator_id = ? OR  -- Locations in folders created by user
+            ff.user_id = ?       -- Locations in folders followed by user
+        )
+        ORDER BY sort_date DESC
     `;
 
-    const [rows] = await db.execute(query, [userId, userId]) as [any[], any];
+    const [rows] = await db.execute(query, [userId, userId, userId, userId, userId, userId, userId]) as [any[], any];
     const results = toCamelCase(rows) as any[];
 
     const userEdits = await fetchUserLocationEdits(userId);
