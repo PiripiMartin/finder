@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { db } from "../database";
 import { verifySessionToken } from "../user/session";
-import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, getSavedLocationsWithTopPost } from "./queries";
+import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getPersonalFolderIds, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost } from "./queries";
 import { removeSavedLocationForUser } from "../posts/queries";
 
 /**
@@ -53,8 +53,84 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
     }
 
     try {
-        const savedLocations = await getSavedLocationsWithTopPost(accountId);
-        return new Response(JSON.stringify(savedLocations), { status: 200, headers: { "Content-Type": "application/json" } });
+        const personalFolderIds = await getPersonalFolderIds(accountId);
+        const followedFolderIds = await getFollowedFolderIds(accountId);
+
+        // Helper: fetch locations with top post for a given folder id
+        const fetchFolderLocations = async (folderId: number) => getFolderLocationsWithTopPost(folderId);
+
+        // Helper: fetch uncategorised (in user_saved_locations but not in any folder)
+        const fetchUncategorised = async () => getUncategorisedSavedLocationsWithTopPost(accountId);
+
+        // Fetch user location edits once to apply to all results
+        const userEdits = await fetchUserLocationEdits(accountId);
+        const editsMap = new Map(userEdits.map(edit => [edit.mapPointId, edit]));
+
+        const formatRows = (rows: any[]) => rows.map(row => {
+            const location = {
+                id: row.id,
+                googlePlaceId: row.google_place_id,
+                title: row.title,
+                description: row.description,
+                emoji: row.emoji,
+                latitude: row.latitude,
+                longitude: row.longitude,
+                recommendable: row.recommendable,
+                isValidLocation: row.is_valid_location,
+                websiteUrl: row.website_url,
+                phoneNumber: row.phone_number,
+                address: row.address,
+                createdAt: row.created_at
+            } as any;
+
+            const edit = editsMap.get(row.id);
+            const addressUpdated = edit?.googlePlaceId != location.googlePlaceId;
+            if (edit) {
+                location.title = edit.title ?? location.title;
+                location.description = edit.description ?? location.description;
+                location.emoji = edit.emoji ?? location.emoji;
+                location.websiteUrl = edit.websiteUrl ?? location.websiteUrl;
+                location.phoneNumber = edit.phoneNumber ?? location.phoneNumber;
+                location.address = edit.address ?? location.address;
+                location.googlePlaceId = edit.googlePlaceId ?? location.googlePlaceId;
+                location.latitude = edit.latitude ?? location.latitude;
+                location.longitude = edit.longitude ?? location.longitude;
+                if (addressUpdated) {
+                    location.websiteUrl = edit.websiteUrl ?? "";
+                    location.phoneNumber = edit.phoneNumber ?? "";
+                }
+            }
+
+            return {
+                location,
+                topPost: {
+                    id: row.post_id ?? null,
+                    url: row.post_url ?? null,
+                    postedBy: row.post_posted_by ?? null,
+                    mapPointId: row.id,
+                    postedAt: row.post_posted_at ?? null,
+                }
+            };
+        });
+
+        // Build personal folders object
+        const personal: any = { uncategorised: [] };
+        for (const folderId of personalFolderIds) {
+            const rows = await fetchFolderLocations(folderId);
+            personal[folderId] = formatRows(rows);
+        }
+        const uncategorisedRows = await fetchUncategorised();
+        personal.uncategorised = formatRows(uncategorisedRows);
+
+        // Build followed folders object
+        const followed: any = {};
+        for (const folderId of followedFolderIds) {
+            const rows = await fetchFolderLocations(folderId);
+            followed[folderId] = formatRows(rows);
+        }
+
+        const payload = { personal, followed };
+        return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
     } catch (error) {
         console.error(`Error fetching saved locations for account ${accountId}:`, error);
         return new Response("Internal server error", { status: 500 });

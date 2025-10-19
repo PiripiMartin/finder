@@ -23,7 +23,7 @@ export interface LocationAndPost {
  */
 export async function getSavedLocationsWithTopPost(userId: number): Promise<LocationAndPost[]> {
     const query = `
-        SELECT DISTINCT
+        SELECT 
             mp.id,
             mp.google_place_id,
             mp.title,
@@ -39,11 +39,10 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
             p.id as post_id,
             p.url as post_url,
             p.posted_by as post_posted_by,
-            p.posted_at as post_posted_at,
-            COALESCE(usl.created_at, f.created_at) as sort_date
-        FROM map_points mp
-        INNER JOIN (
-            -- Find the most recent post for each location by the user
+            p.posted_at as post_posted_at
+        FROM user_saved_locations usl
+        INNER JOIN map_points mp ON usl.map_point_id = mp.id
+        LEFT JOIN (
             SELECT DISTINCT
                 map_point_id,
                 FIRST_VALUE(id) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as id,
@@ -51,21 +50,12 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
                 FIRST_VALUE(posted_by) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_by,
                 FIRST_VALUE(posted_at) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_at
             FROM posts
-            WHERE posted_by = ?
         ) p ON mp.id = p.map_point_id
-        LEFT JOIN user_saved_locations usl ON mp.id = usl.map_point_id AND usl.user_id = ?
-        LEFT JOIN folder_locations fl ON mp.id = fl.map_point_id
-        LEFT JOIN folders f ON fl.folder_id = f.id AND f.creator_id = ?
-        LEFT JOIN folder_follows ff ON fl.folder_id = ff.folder_id AND ff.user_id = ?
-        WHERE (
-            usl.user_id = ? OR  -- Directly saved locations
-            f.creator_id = ? OR  -- Locations in folders created by user
-            ff.user_id = ?       -- Locations in folders followed by user
-        )
-        ORDER BY sort_date DESC
+        WHERE usl.user_id = ?
+        ORDER BY usl.created_at DESC
     `;
 
-    const [rows] = await db.execute(query, [userId, userId, userId, userId, userId, userId, userId]) as [any[], any];
+    const [rows] = await db.execute(query, [userId]) as [any[], any];
     const results = toCamelCase(rows) as any[];
 
     const userEdits = await fetchUserLocationEdits(userId);
@@ -124,6 +114,109 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
     });
 }
 
+/**
+ * Returns folder IDs created by the given user, ordered by creation date (desc).
+ */
+export async function getPersonalFolderIds(userId: number): Promise<number[]> {
+    const [rows] = await db.execute(
+        "SELECT id FROM folders WHERE creator_id = ? ORDER BY created_at DESC",
+        [userId]
+    ) as [any[], any];
+    return rows.map(r => r.id as number);
+}
+
+/**
+ * Returns folder IDs followed by the given user.
+ */
+export async function getFollowedFolderIds(userId: number): Promise<number[]> {
+    const [rows] = await db.execute(
+        "SELECT folder_id FROM folder_follows WHERE user_id = ?",
+        [userId]
+    ) as [any[], any];
+    return rows.map(r => r.folder_id as number);
+}
+
+/**
+ * Fetches locations in a specific folder with their latest top post (any user).
+ */
+export async function getFolderLocationsWithTopPost(folderId: number): Promise<any[]> {
+    const query = `
+        SELECT DISTINCT
+            mp.id,
+            mp.google_place_id,
+            mp.title,
+            mp.description,
+            mp.emoji,
+            mp.website_url,
+            mp.phone_number,
+            mp.address,
+            mp.created_at,
+            mp.is_valid_location,
+            ST_X(mp.location) as longitude,
+            ST_Y(mp.location) as latitude,
+            p.id as post_id,
+            p.url as post_url,
+            p.posted_by as post_posted_by,
+            p.posted_at as post_posted_at
+        FROM folder_locations fl
+        INNER JOIN map_points mp ON fl.map_point_id = mp.id
+        LEFT JOIN (
+            SELECT DISTINCT
+                map_point_id,
+                FIRST_VALUE(id) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as id,
+                FIRST_VALUE(url) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as url,
+                FIRST_VALUE(posted_by) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_by,
+                FIRST_VALUE(posted_at) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_at
+            FROM posts
+        ) p ON mp.id = p.map_point_id
+        WHERE fl.folder_id = ?
+        ORDER BY COALESCE(p.posted_at, mp.created_at) DESC
+    `;
+    const [rows] = await db.execute(query, [folderId]) as [any[], any];
+    return rows;
+}
+
+/**
+ * Fetches locations that are saved by user but not attributed to any folder, with latest top post.
+ */
+export async function getUncategorisedSavedLocationsWithTopPost(userId: number): Promise<any[]> {
+    const query = `
+        SELECT DISTINCT
+            mp.id,
+            mp.google_place_id,
+            mp.title,
+            mp.description,
+            mp.emoji,
+            mp.website_url,
+            mp.phone_number,
+            mp.address,
+            mp.created_at,
+            mp.is_valid_location,
+            ST_X(mp.location) as longitude,
+            ST_Y(mp.location) as latitude,
+            p.id as post_id,
+            p.url as post_url,
+            p.posted_by as post_posted_by,
+            p.posted_at as post_posted_at
+        FROM user_saved_locations usl
+        INNER JOIN map_points mp ON usl.map_point_id = mp.id
+        LEFT JOIN folder_locations fl ON fl.map_point_id = mp.id
+        LEFT JOIN (
+            SELECT DISTINCT
+                map_point_id,
+                FIRST_VALUE(id) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as id,
+                FIRST_VALUE(url) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as url,
+                FIRST_VALUE(posted_by) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_by,
+                FIRST_VALUE(posted_at) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_at
+            FROM posts
+        ) p ON mp.id = p.map_point_id
+        WHERE usl.user_id = ?
+          AND fl.map_point_id IS NULL
+        ORDER BY usl.created_at DESC
+    `;
+    const [rows] = await db.execute(query, [userId]) as [any[], any];
+    return rows;
+}
 /**
  * Fetches recommended locations near a user's coordinates with their most recent post.
  * Excludes locations where the user has already posted.
