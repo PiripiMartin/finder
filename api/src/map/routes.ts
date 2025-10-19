@@ -102,36 +102,6 @@ export async function getSavedAndRecommendedLocations(req: BunRequest): Promise<
     }
 }
 
-/**
- * Blocks a location, preventing it from being recommended to the user.
- *
- * @param req - The Bun request, containing the session token and the location ID.
- * @returns A response indicating success or failure.
- */
-export async function blockLocation(req: BunRequest): Promise<Response> {
-    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
-    if (!sessionToken) {
-        return new Response("Missing or malformed session token", { status: 401 });
-    }
-
-    const accountId = await verifySessionToken(sessionToken);
-    if (accountId === null) {
-        return new Response("Invalid or expired session token", { status: 401 });
-    }
-
-    const id = parseInt((req.params as any).id, 10);
-    if (isNaN(id)) {
-        return new Response("Invalid map point ID", { status: 400 });
-    }
-
-    try {
-        await db.execute("UPDATE map_points SET recommendable = FALSE WHERE id = ?", [id]);
-        return new Response(null, { status: 204 });
-    } catch (error) {
-        console.error(`Error blocking location ${id} for account ${accountId}:`, error);
-        return new Response("Internal server error", { status: 500 });
-    }
-}
 
 /**
  * Deletes a location for the authenticated user by removing it from saved locations
