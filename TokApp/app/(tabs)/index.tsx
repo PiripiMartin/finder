@@ -6,6 +6,7 @@ import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, Touchable
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import ProfileModal from '../components/ProfileModal';
 import Tutorial from '../components/Tutorial';
 import { getApiUrl, getGuestPostsUrl, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
@@ -72,6 +73,7 @@ export default function Index() {
   const { sharedContent, clearSharedContent } = useShare();
   const { shouldShowTutorial, completeTutorial, tutorialFeatureEnabled } = useTutorial();
   const [showManualTutorial, setShowManualTutorial] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const insets = useSafeAreaInsets();
 
   // Filter state
@@ -956,6 +958,22 @@ export default function Index() {
         </TouchableOpacity>
       )}
 
+      {/* Profile Button - Top Right (only show when authenticated) */}
+      {!isGuest && (
+        <TouchableOpacity 
+          style={[
+            styles.profileButton,
+            {
+              top: insets.top + 30,
+              right: insets.right + 30,
+            }
+          ]}
+          onPress={() => setShowProfileModal(true)}
+        >
+          <Ionicons name="person" size={28} color="#A8C3A0" />
+        </TouchableOpacity>
+      )}
+
       {/* Guest Login Button - Top Right (only show when in guest mode) */}
       {isGuest && (
         <TouchableOpacity 
@@ -970,25 +988,6 @@ export default function Index() {
         >
           <Ionicons name="log-in" size={20} color="#A8C3A0" />
           <Text style={styles.guestLoginButtonText}>Login</Text>
-        </TouchableOpacity>
-      )}
-
-
-
-      {/* Logout Button - Top Right (only show when authenticated) */}
-      {!isGuest && sessionToken && (
-        <TouchableOpacity 
-          style={[
-            styles.logoutButton,
-            {
-              top: insets.top + 30,
-              right: insets.right + 30,
-            }
-          ]}
-          onPress={handleLogout}
-        >
-          <Ionicons name="log-out" size={20} color="#A8C3A0" />
-          <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
       )}
 
@@ -1230,6 +1229,12 @@ export default function Index() {
           </View>
         </View>
       )}
+
+      {/* Profile Modal */}
+      <ProfileModal 
+        visible={showProfileModal} 
+        onClose={() => setShowProfileModal(false)} 
+      />
       
     </View>
   );
@@ -1443,6 +1448,20 @@ const styles = StyleSheet.create({
     fontSize: 8, // Smaller font
     textAlign: 'center',
     lineHeight: 10,
+  },
+  profileButton: {
+    position: 'absolute',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   guestLoginButton: {
     position: 'absolute',
