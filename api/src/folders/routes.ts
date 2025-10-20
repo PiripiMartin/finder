@@ -18,7 +18,9 @@ import {
     removeFolderOwner,
     isFolderOwner,
     getFolderOwners,
-    type CreateFolderRequest
+    type CreateFolderRequest,
+    updateFolder,
+    deleteFolder
 } from "./queries";
 
 /**
@@ -76,6 +78,110 @@ export async function createFolderEndpoint(req: BunRequest): Promise<Response> {
         );
     } catch (error) {
         console.error(`Error creating folder for user ${userId}:`, error);
+        return new Response("Internal server error", { status: 500 });
+    }
+}
+
+/**
+ * Updates a folder (name/color). Only the creator can edit.
+ */
+export async function editFolderEndpoint(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing or malformed session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const folderId = parseInt((req.params as any).folderId, 10);
+    if (isNaN(folderId)) {
+        return new Response("Invalid folder ID", { status: 400 });
+    }
+
+    const data = await checkedExtractBody(req, []);
+    if (!data) {
+        return new Response("Missing body", { status: 400 });
+    }
+
+    const updates: Partial<CreateFolderRequest> = {};
+    if (typeof data.name === "string") {
+        const name = data.name.trim();
+        if (name.length === 0 || name.length > 100) {
+            return new Response("Name must be 1-100 characters", { status: 400 });
+        }
+        updates.name = name;
+    }
+    if (typeof data.color === "string") {
+        const color = data.color.trim();
+        if (color.length === 0 || color.length > 16) {
+            return new Response("Color must be 1-16 characters", { status: 400 });
+        }
+        updates.color = color;
+    }
+
+    if (Object.keys(updates).length === 0) {
+        return new Response("No valid fields to update", { status: 400 });
+    }
+
+    try {
+        const folder = await getFolderById(folderId);
+        if (!folder) {
+            return new Response("Folder not found", { status: 404 });
+        }
+
+        // Only creator can edit
+        if (folder.creatorId !== userId) {
+            return new Response("Only the creator can edit this folder", { status: 403 });
+        }
+
+        await updateFolder(folderId, updates);
+        const updated = await getFolderById(folderId);
+        return new Response(
+            JSON.stringify(updated),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+    } catch (error) {
+        console.error(`Error editing folder ${folderId}:`, error);
+        return new Response("Internal server error", { status: 500 });
+    }
+}
+
+/**
+ * Deletes a folder. Only the creator can delete.
+ */
+export async function deleteFolderEndpoint(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing or malformed session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const folderId = parseInt((req.params as any).folderId, 10);
+    if (isNaN(folderId)) {
+        return new Response("Invalid folder ID", { status: 400 });
+    }
+
+    try {
+        const folder = await getFolderById(folderId);
+        if (!folder) {
+            return new Response("Folder not found", { status: 404 });
+        }
+
+        if (folder.creatorId !== userId) {
+            return new Response("Only the creator can delete this folder", { status: 403 });
+        }
+
+        await deleteFolder(folderId);
+        return new Response(null, { status: 204 });
+    } catch (error) {
+        console.error(`Error deleting folder ${folderId}:`, error);
         return new Response("Internal server error", { status: 500 });
     }
 }

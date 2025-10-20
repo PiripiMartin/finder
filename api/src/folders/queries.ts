@@ -8,6 +8,7 @@ export interface Folder {
     name: string;
     color: string;
     createdAt: Date;
+    creatorId?: number;
 }
 
 /**
@@ -220,10 +221,10 @@ export async function getLocationsInFolder(folderId: number): Promise<number[]> 
  */
 export async function createFolder(userId: number, folderData: CreateFolderRequest): Promise<Folder> {
     const query = `
-        INSERT INTO folders (name, color)
-        VALUES (?, ?)
+        INSERT INTO folders (name, color, creator_id)
+        VALUES (?, ?, ?)
     `;
-    await db.execute(query, [folderData.name, folderData.color]);
+    await db.execute(query, [folderData.name, folderData.color, userId]);
 
     const [idRows] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
     const folderId = idRows[0].id;
@@ -233,6 +234,48 @@ export async function createFolder(userId: number, folderData: CreateFolderReque
 
     // Return the folder
     return await getFolderById(folderId) as Folder;
+}
+
+/**
+ * Updates a folder's editable fields.
+ *
+ * @param folderId - The ID of the folder to update.
+ * @param data - Partial data to update (name/color).
+ */
+export async function updateFolder(folderId: number, data: Partial<CreateFolderRequest>): Promise<void> {
+    const fields: string[] = [];
+    const params: any[] = [];
+
+    if (typeof data.name === "string") {
+        fields.push("name = ?");
+        params.push(data.name);
+    }
+    if (typeof data.color === "string") {
+        fields.push("color = ?");
+        params.push(data.color);
+    }
+
+    if (fields.length === 0) {
+        return;
+    }
+
+    const query = `
+        UPDATE folders
+        SET ${fields.join(", ")}
+        WHERE id = ?
+    `;
+    params.push(folderId);
+    await db.execute(query, params);
+}
+
+/**
+ * Deletes a folder by id.
+ */
+export async function deleteFolder(folderId: number): Promise<void> {
+    const query = `
+        DELETE FROM folders WHERE id = ?
+    `;
+    await db.execute(query, [folderId]);
 }
 
 /**
