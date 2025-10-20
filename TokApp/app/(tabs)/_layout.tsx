@@ -48,7 +48,7 @@ export default function TabLayout() {
         options={{
           title: "",
           tabBarIcon: ({ color }) => (
-            <Ionicons name="person" size={20} color={color} />
+            <Ionicons name="people" size={20} color={color} />
           ),
           href: isGuest ? null : '/profile',
         }}

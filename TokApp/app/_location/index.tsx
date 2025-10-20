@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Dimensions, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
 import { API_CONFIG, getMapPointsUrl, getEditLocationUrl } from '../config/api';
@@ -82,10 +83,13 @@ const mockLocationData: { [key: string]: LocationData } = {
 
 export default function Location() {
   const router = useRouter();
-  const { id, needsCoordinates } = useLocalSearchParams();
+  const { id, needsCoordinates, readonly, source } = useLocalSearchParams();
   const { theme } = useTheme();
   const { sessionToken } = useAuth();
   const { findLocationById, removeLocation, addBlockedLocation, refreshLocations } = useLocationContext();
+  
+  // Check if this is a readonly view (from followed folders)
+  const isReadOnly = readonly === 'true';
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [videos, setVideos] = useState<VideoPost[]>([]);
@@ -258,16 +262,26 @@ export default function Location() {
     setSelectedVideo(null);
   };
 
-  const openDirections = () => {
-    if (locationData && locationData.address) {
-      const address = encodeURIComponent(locationData.address);
-      
+  const openDirections = async () => {
+    if (!locationData || !locationData.address) return;
+    
+    const address = encodeURIComponent(locationData.address);
+    try {
+      const pref = await AsyncStorage.getItem('DEFAULT_MAPS_APP');
+      const useGoogle = pref === 'google';
+      if (useGoogle) {
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${address}`;
+        Linking.openURL(url);
+      } else {
+        const url = `http://maps.apple.com/?daddr=${address}`;
+        Linking.openURL(url);
+      }
+    } catch {
+      // Fallback to platform default
       if (Platform.OS === 'ios') {
-        // Use Apple Maps on iOS
         const url = `http://maps.apple.com/?daddr=${address}`;
         Linking.openURL(url);
       } else {
-        // Use Google Maps on Android
         const url = `https://www.google.com/maps/dir/?api=1&destination=${address}`;
         Linking.openURL(url);
       }
@@ -559,18 +573,22 @@ export default function Location() {
               >
                 <Ionicons name="navigate" size={28} color={theme.colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionIcon}
-                onPress={handleEditPress}
-              >
-                <Ionicons name="pencil" size={28} color={theme.colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionIcon}
-                onPress={handleDeleteLocation}
-              >
-                <Ionicons name="trash-outline" size={28} color="#ff6b6b" />
-              </TouchableOpacity>
+              {!isReadOnly && (
+                <TouchableOpacity 
+                  style={styles.actionIcon}
+                  onPress={handleEditPress}
+                >
+                  <Ionicons name="pencil" size={28} color={theme.colors.primary} />
+                </TouchableOpacity>
+              )}
+              {!isReadOnly && (
+                <TouchableOpacity 
+                  style={styles.actionIcon}
+                  onPress={handleDeleteLocation}
+                >
+                  <Ionicons name="trash-outline" size={28} color="#ff6b6b" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -694,9 +712,9 @@ export default function Location() {
       {/* Full Screen Video Modal */}
       {selectedVideo && (
         <View style={styles.videoModal}>
-          <View style={[styles.videoModalContent, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.videoModalContent}>
             <TouchableOpacity style={styles.closeVideoButton} onPress={closeVideo}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Ionicons name="close" size={24} color="#FFFFFF" />
             </TouchableOpacity>
             <WebView
               key={selectedVideo}
@@ -740,6 +758,19 @@ export default function Location() {
               javaScriptEnabled={true}
               domStorageEnabled={true}
             />
+            <View style={styles.videoLinkContainer}>
+              <TouchableOpacity 
+                style={[styles.videoLinkButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => {
+                  if (selectedVideo) {
+                    Linking.openURL(selectedVideo);
+                  }
+                }}
+              >
+                <Ionicons name="link" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.videoLinkText}>Open in TikTok</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
@@ -1188,6 +1219,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
+    backgroundColor: 'transparent',
   },
   closeVideoButton: {
     position: 'absolute',
@@ -1203,6 +1235,23 @@ const styles = StyleSheet.create({
   },
   fullScreenVideo: {
     flex: 1,
+  },
+  videoLinkContainer: {
+    padding: 16,
+    backgroundColor: 'transparent',
+  },
+  videoLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  videoLinkText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   loadingText: {
     fontSize: 16,

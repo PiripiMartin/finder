@@ -6,6 +6,7 @@ import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, Touchable
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import ProfileModal from '../components/ProfileModal';
 import Tutorial from '../components/Tutorial';
 import { getApiUrl, getGuestPostsUrl, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
@@ -14,9 +15,17 @@ import { useShare } from '../context/ShareContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTutorial } from '../context/TutorialContext';
 import { MapPoint } from '../mapData';
-import { Folder, loadFolders } from '../utils/folderStorage';
+import { API_CONFIG } from '../config/api';
 
 import { videoUrls } from '../videoData';
+
+interface Folder {
+  id: number;
+  name: string;
+  color: string;
+  locationIds: number[];
+  title: string;
+}
 
 // Function to calculate distance between two coordinates in meters
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -72,10 +81,11 @@ export default function Index() {
   const { sharedContent, clearSharedContent } = useShare();
   const { shouldShowTutorial, completeTutorial, tutorialFeatureEnabled } = useTutorial();
   const [showManualTutorial, setShowManualTutorial] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const insets = useSafeAreaInsets();
 
   // Filter state
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<number | null>(null);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   
   // Folder state
@@ -267,6 +277,60 @@ export default function Index() {
         // Authenticated API format
         savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
         recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+        
+        // Also fetch shared and followed locations from /map/saved-new
+        try {
+          const savedNewResponse = await fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionToken || ''}`,
+            },
+          });
+          
+          if (savedNewResponse.ok) {
+            const savedNewData = await savedNewResponse.json();
+            console.log('📂 [fetchMapPoints] Fetched saved-new data:', savedNewData);
+            
+            // Collect all additional locations
+            const additionalLocations: any[] = [];
+            
+            // Extract locations from shared folders
+            if (savedNewData.shared) {
+              Object.keys(savedNewData.shared).forEach((folderId) => {
+                const folderLocations = savedNewData.shared[folderId];
+                if (Array.isArray(folderLocations)) {
+                  additionalLocations.push(...folderLocations);
+                }
+              });
+            }
+            
+            // Extract locations from followed folders
+            if (savedNewData.followed) {
+              Object.keys(savedNewData.followed).forEach((folderId) => {
+                const folderLocations = savedNewData.followed[folderId];
+                if (Array.isArray(folderLocations)) {
+                  additionalLocations.push(...folderLocations);
+                }
+              });
+            }
+            
+            // Deduplicate: only add locations that aren't already in savedLocationsData
+            const existingLocationIds = new Set(
+              savedLocationsData.map((loc: any) => loc.location?.id).filter(Boolean)
+            );
+            
+            const uniqueAdditionalLocations = additionalLocations.filter(
+              (loc: any) => loc.location?.id && !existingLocationIds.has(loc.location.id)
+            );
+            
+            savedLocationsData = [...savedLocationsData, ...uniqueAdditionalLocations];
+            
+            console.log('📂 [fetchMapPoints] After adding shared/followed, total saved locations:', savedLocationsData.length);
+            console.log('📂 [fetchMapPoints] Added unique locations:', uniqueAdditionalLocations.length);
+          }
+        } catch (error) {
+          console.error('❌ [fetchMapPoints] Error fetching shared/followed locations:', error);
+        }
       }
       
       // Safely extract and validate the data
@@ -448,16 +512,99 @@ export default function Index() {
     }
   }, [userLocation, isGuest, sessionToken]);
 
-  // Load folders function
+  // Load folders function - fetch from API and process with location data
   const loadFoldersData = useCallback(async () => {
+    if (!sessionToken) {
+      console.log('📂 [Map] No session token, skipping folder load');
+      return;
+    }
+
     try {
-      const loadedFolders = await loadFolders();
-      setFolders(loadedFolders);
-      console.log('📂 [Map] Loaded folders:', loadedFolders.length);
+      // Fetch owned folders, followed folders, and saved locations
+      const [ownedFoldersResponse, followedFoldersResponse, locationsResponse] = await Promise.all([
+        fetch(`${API_CONFIG.BASE_URL}/folders/owned`, {
+          headers: {
+            'Authorization': `Bearer ${sessionToken}`,
+          },
+        }),
+        fetch(`${API_CONFIG.BASE_URL}/folders/followed`, {
+          headers: {
+            'Authorization': `Bearer ${sessionToken}`,
+          },
+        }),
+        fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
+          headers: {
+            'Authorization': `Bearer ${sessionToken}`,
+          },
+        }),
+      ]);
+
+      if (!ownedFoldersResponse.ok || !followedFoldersResponse.ok || !locationsResponse.ok) {
+        throw new Error('Failed to fetch folders or locations');
+      }
+
+      const ownedFoldersData = await ownedFoldersResponse.json();
+      const followedFoldersData = await followedFoldersResponse.json();
+      const locationsData = await locationsResponse.json();
+
+      console.log('📂 [Map] Owned folders:', ownedFoldersData);
+      console.log('📂 [Map] Followed folders:', followedFoldersData);
+      console.log('📂 [Map] Locations data:', locationsData);
+
+      // Combine owned and followed folders
+      const allFolders = [...ownedFoldersData, ...followedFoldersData];
+
+      // Build folder objects with location IDs from both personal and shared sections
+      const foldersWithLocations = allFolders.map((folder: any) => {
+        const locationIds: number[] = [];
+        
+        // Get locations from personal section for this folder
+        if (locationsData.personal && locationsData.personal[folder.id]) {
+          const folderLocations = locationsData.personal[folder.id];
+          folderLocations.forEach((item: any) => {
+            if (item.location && item.location.id) {
+              locationIds.push(item.location.id);
+            }
+          });
+        }
+
+        // Get locations from shared section for this folder
+        if (locationsData.shared && locationsData.shared[folder.id]) {
+          const folderLocations = locationsData.shared[folder.id];
+          folderLocations.forEach((item: any) => {
+            if (item.location && item.location.id) {
+              locationIds.push(item.location.id);
+            }
+          });
+        }
+
+        // Get locations from followed section for this folder
+        if (locationsData.followed && locationsData.followed[folder.id]) {
+          const folderLocations = locationsData.followed[folder.id];
+          folderLocations.forEach((item: any) => {
+            if (item.location && item.location.id) {
+              locationIds.push(item.location.id);
+            }
+          });
+        }
+
+        return {
+          id: folder.id,
+          name: folder.name,
+          title: folder.name, // For compatibility with existing filter code
+          color: folder.color,
+          locationIds,
+        };
+      });
+
+      setFolders(foldersWithLocations);
+      console.log('📂 [Map] Loaded folders from API:', foldersWithLocations.length);
+      console.log('📂 [Map] Folders with locations:', foldersWithLocations);
     } catch (error) {
       console.error('❌ [Map] Error loading folders:', error);
+      setFolders([]);
     }
-  }, []);
+  }, [sessionToken]);
 
   // Load folders on mount
   useEffect(() => {
@@ -956,6 +1103,22 @@ export default function Index() {
         </TouchableOpacity>
       )}
 
+      {/* Profile Button - Top Right (only show when authenticated) */}
+      {!isGuest && (
+        <TouchableOpacity 
+          style={[
+            styles.profileButton,
+            {
+              top: insets.top + 30,
+              right: insets.right + 30,
+            }
+          ]}
+          onPress={() => setShowProfileModal(true)}
+        >
+          <Ionicons name="person" size={28} color="#A8C3A0" />
+        </TouchableOpacity>
+      )}
+
       {/* Guest Login Button - Top Right (only show when in guest mode) */}
       {isGuest && (
         <TouchableOpacity 
@@ -970,25 +1133,6 @@ export default function Index() {
         >
           <Ionicons name="log-in" size={20} color="#A8C3A0" />
           <Text style={styles.guestLoginButtonText}>Login</Text>
-        </TouchableOpacity>
-      )}
-
-
-
-      {/* Logout Button - Top Right (only show when authenticated) */}
-      {!isGuest && sessionToken && (
-        <TouchableOpacity 
-          style={[
-            styles.logoutButton,
-            {
-              top: insets.top + 30,
-              right: insets.right + 30,
-            }
-          ]}
-          onPress={handleLogout}
-        >
-          <Ionicons name="log-out" size={20} color="#A8C3A0" />
-          <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
       )}
 
@@ -1230,6 +1374,12 @@ export default function Index() {
           </View>
         </View>
       )}
+
+      {/* Profile Modal */}
+      <ProfileModal 
+        visible={showProfileModal} 
+        onClose={() => setShowProfileModal(false)} 
+      />
       
     </View>
   );
@@ -1443,6 +1593,20 @@ const styles = StyleSheet.create({
     fontSize: 8, // Smaller font
     textAlign: 'center',
     lineHeight: 10,
+  },
+  profileButton: {
+    position: 'absolute',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   guestLoginButton: {
     position: 'absolute',
