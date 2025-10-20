@@ -609,7 +609,6 @@ export default function Location() {
         {/* TikTok Videos Section - Only show for authenticated users */}
         {sessionToken && (
           <View style={[styles.section, { backgroundColor: theme.colors.background }]}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>TikTok Videos</Text>
             <View style={styles.videoGrid}>
               {isLoadingVideos ? (
                 <View style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow, justifyContent: 'center', alignItems: 'center' }]}>
