@@ -291,12 +291,15 @@ export default function Index() {
             const savedNewData = await savedNewResponse.json();
             console.log('📂 [fetchMapPoints] Fetched saved-new data:', savedNewData);
             
+            // Collect all additional locations
+            const additionalLocations: any[] = [];
+            
             // Extract locations from shared folders
             if (savedNewData.shared) {
               Object.keys(savedNewData.shared).forEach((folderId) => {
                 const folderLocations = savedNewData.shared[folderId];
                 if (Array.isArray(folderLocations)) {
-                  savedLocationsData = [...savedLocationsData, ...folderLocations];
+                  additionalLocations.push(...folderLocations);
                 }
               });
             }
@@ -306,12 +309,24 @@ export default function Index() {
               Object.keys(savedNewData.followed).forEach((folderId) => {
                 const folderLocations = savedNewData.followed[folderId];
                 if (Array.isArray(folderLocations)) {
-                  savedLocationsData = [...savedLocationsData, ...folderLocations];
+                  additionalLocations.push(...folderLocations);
                 }
               });
             }
             
+            // Deduplicate: only add locations that aren't already in savedLocationsData
+            const existingLocationIds = new Set(
+              savedLocationsData.map((loc: any) => loc.location?.id).filter(Boolean)
+            );
+            
+            const uniqueAdditionalLocations = additionalLocations.filter(
+              (loc: any) => loc.location?.id && !existingLocationIds.has(loc.location.id)
+            );
+            
+            savedLocationsData = [...savedLocationsData, ...uniqueAdditionalLocations];
+            
             console.log('📂 [fetchMapPoints] After adding shared/followed, total saved locations:', savedLocationsData.length);
+            console.log('📂 [fetchMapPoints] Added unique locations:', uniqueAdditionalLocations.length);
           }
         } catch (error) {
           console.error('❌ [fetchMapPoints] Error fetching shared/followed locations:', error);

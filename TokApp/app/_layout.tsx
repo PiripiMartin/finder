@@ -48,35 +48,65 @@ function DeepLinkListener() {
         
         // Check if it's a folder share link first
         if (url.startsWith('lai://folder/')) {
-          // Navigate to a valid route first to prevent unmatched route error
-          router.replace('/(tabs)');
+          console.log('📂 [DeepLinkListener] Detected folder share link');
           
-          // Then show the folder follow dialog after a brief delay
+          // Wait a bit to ensure the app is ready, then navigate to tabs
           setTimeout(() => {
-            DeepLinkHandler.handleFolderShare(url, sessionToken, router);
-          }, 300);
+            console.log('📂 [DeepLinkListener] Navigating to main app');
+            router.replace('/(tabs)');
+            
+            // Then show the folder follow dialog after a brief delay
+            setTimeout(() => {
+              console.log('📂 [DeepLinkListener] Handling folder share');
+              DeepLinkHandler.handleFolderShare(url, sessionToken, router);
+            }, 500);
+          }, 100);
           return true;
         }
         
-        // Use the DeepLinkHandler to parse and handle TikTok shares
-        await DeepLinkHandler.handleTikTokShare(url);
+        // Check if it's a TikTok share link
+        if (url.includes('tiktok.com') || url.includes('vm.tiktok.com')) {
+          console.log('🎵 [DeepLinkListener] Detected TikTok share link');
+          await DeepLinkHandler.handleTikTokShare(url);
+          return true;
+        }
+        
+        // For any other deep link, navigate to main app
+        console.log('🔗 [DeepLinkListener] Unknown deep link format, navigating to main app');
+        router.replace('/(tabs)');
         return false;
       } catch (error) {
         console.error('❌ [DeepLinkListener] Error handling deep link:', error);
+        // On error, try to navigate to a safe route
+        try {
+          router.replace('/(tabs)');
+        } catch (navError) {
+          console.error('❌ [DeepLinkListener] Failed to navigate to fallback route:', navError);
+        }
         return false;
       }
     };
 
-    // Check initial URL immediately
+    // Check initial URL when app opens from a deep link
     Linking.getInitialURL().then((url) => {
-      if (url && url.startsWith('lai://folder/')) {
-        handleDeepLink(url);
+      if (url) {
+        console.log('🔗 [DeepLinkListener] Initial URL:', url);
+        // Only handle custom scheme URLs (lai://)
+        if (url.startsWith('lai://')) {
+          handleDeepLink(url);
+        }
       }
+    }).catch((error) => {
+      console.error('❌ [DeepLinkListener] Error getting initial URL:', error);
     });
 
-    // Listen for incoming links
+    // Listen for incoming links while app is running
     const subscription = Linking.addEventListener('url', (event) => {
-      handleDeepLink(event.url);
+      console.log('🔗 [DeepLinkListener] URL event:', event.url);
+      // Only handle custom scheme URLs (lai://)
+      if (event.url.startsWith('lai://')) {
+        handleDeepLink(event.url);
+      }
     });
 
     return () => {
@@ -95,7 +125,6 @@ export default function RootLayout() {
       'AsyncStorage has been extracted from react-native core',
       'ViewPropTypes will be removed from React Native',
       'ColorPropType will be removed from React Native',
-      'Unmatched Route',
     ]);
   }, []);
 
