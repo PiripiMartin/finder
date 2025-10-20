@@ -11,7 +11,9 @@ import {
     getFolderLocations,
     createFolderEndpoint,
     editFolderEndpoint,
-    deleteFolderEndpoint
+    deleteFolderEndpoint,
+    joinFolderAsOwnerEndpoint,
+    leaveFolderAsOwnerEndpoint
 } from "./folders/routes";
 import { refresh, toggleRefreshStatus } from "./utils";
 import { startSessionCleanupTask } from "./background-tasks";
@@ -58,6 +60,8 @@ Bun.serve({
         "/api/folders/:folderId/locations/:mapPointId": { DELETE: removeLocationFromFolderEndpoint },
         "/api/folders/:folderId/follow": { POST: followFolderEndpoint },
         "/api/folders/:folderId/unfollow": { DELETE: unfollowFolderEndpoint },
+        "/api/folders/:folderId/join-as-owner": { POST: joinFolderAsOwnerEndpoint },
+        "/api/folders/:folderId/leave-as-owner": { POST: leaveFolderAsOwnerEndpoint },
 
         // Miscellaneous
         "/api/refresh": { GET: refresh },

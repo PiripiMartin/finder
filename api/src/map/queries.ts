@@ -225,6 +225,31 @@ export async function getPersonalFolderIds(userId: number): Promise<number[]> {
 }
 
 /**
+ * Returns folder IDs created by the given user.
+ */
+export async function getCreatedFolderIds(userId: number): Promise<number[]> {
+    const [rows] = await db.execute(
+        "SELECT id FROM folders WHERE creator_id = ?",
+        [userId]
+    ) as [any[], any];
+    return rows.map(r => r.id as number);
+}
+
+/**
+ * Returns folder IDs the user co-owns but did not create.
+ */
+export async function getCoOwnedFolderIds(userId: number): Promise<number[]> {
+    const query = `
+        SELECT fo.folder_id AS id
+        FROM folder_owners fo
+        INNER JOIN folders f ON f.id = fo.folder_id
+        WHERE fo.user_id = ? AND (f.creator_id IS NULL OR f.creator_id <> ?)
+    `;
+    const [rows] = await db.execute(query, [userId, userId]) as [any[], any];
+    return rows.map(r => r.id as number);
+}
+
+/**
  * Returns folder IDs followed by the given user.
  */
 export async function getFollowedFolderIds(userId: number): Promise<number[]> {

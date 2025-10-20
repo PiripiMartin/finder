@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { db } from "../database";
 import { verifySessionToken } from "../user/session";
-import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getPersonalFolderIds, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld } from "./queries";
+import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld, getCreatedFolderIds, getCoOwnedFolderIds } from "./queries";
 import { removeSavedLocationForUser } from "../posts/queries";
 
 /**
@@ -53,8 +53,11 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
     }
 
     try {
-        const personalFolderIds = await getPersonalFolderIds(accountId);
-        const followedFolderIds = await getFollowedFolderIds(accountId);
+        const [createdFolderIds, coOwnedFolderIds, followedFolderIds] = await Promise.all([
+            getCreatedFolderIds(accountId),
+            getCoOwnedFolderIds(accountId),
+            getFollowedFolderIds(accountId)
+        ]);
 
         // Helper: fetch locations with top post for a given folder id
         const fetchFolderLocations = async (folderId: number) => getFolderLocationsWithTopPost(folderId);
@@ -113,14 +116,21 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
             };
         });
 
-        // Build personal folders object
+        // Build personal folders object (folders created by the user)
         const personal: any = { uncategorised: [] };
-        for (const folderId of personalFolderIds) {
+        for (const folderId of createdFolderIds) {
             const rows = await fetchFolderLocations(folderId);
             personal[folderId] = formatRows(rows);
         }
         const uncategorisedRows = await fetchUncategorised();
         personal.uncategorised = formatRows(uncategorisedRows);
+
+        // Build shared folders object (folders co-owned but not created by user)
+        const shared: any = {};
+        for (const folderId of coOwnedFolderIds) {
+            const rows = await fetchFolderLocations(folderId);
+            shared[folderId] = formatRows(rows);
+        }
 
         // Build followed folders object
         const followed: any = {};
@@ -129,7 +139,7 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
             followed[folderId] = formatRows(rows);
         }
 
-        const payload = { personal, followed };
+        const payload = { personal, shared, followed };
         return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
     } catch (error) {
         console.error(`Error fetching saved locations for account ${accountId}:`, error);
