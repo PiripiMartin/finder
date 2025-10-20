@@ -1,5 +1,5 @@
 import { createPost, deletePost } from "./posts/routes";
-import { getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations } from "./map/routes";
+import { getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations, deleteLocationForUser } from "./map/routes";
 import { login, validateSessionToken, signup, getProfileData, deleteUserAccount, editUserLocation } from "./user/routes";
 import { refresh, toggleRefreshStatus } from "./utils";
 import { startSessionCleanupTask } from "./background-tasks";
@@ -26,6 +26,7 @@ Bun.serve({
         "/api/map/guest-posts": { GET: getGuestRecommendations },
         "/api/map/saved": { GET: getSavedLocations },
         "/api/map/:id/posts": { GET: getPostsForLocation },
+        "/api/map/:id": { DELETE: deleteLocationForUser },
         "/api/map/edit/:id": { POST: editUserLocation },
 
         // Post management
