@@ -128,12 +128,21 @@ CREATE TABLE IF NOT EXISTS user_saved_locations (
 */
 CREATE TABLE IF NOT EXISTS folders (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    creator_id INT NULL,
     name VARCHAR(100) NOT NULL,
     color VARCHAR(16) NOT NULL, -- Assuming we can just serialize the color to a string
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+);
 
-    FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE SET NULL
+/*
+  Folder owners (allows many to many relationship between folders and users with edit permissions)
+*/
+CREATE TABLE IF NOT EXISTS folder_owners (
+    folder_id INT NOT NULL,
+    user_id INT NOT NULL,
+
+    PRIMARY KEY (folder_id, user_id),
+    FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 /*
