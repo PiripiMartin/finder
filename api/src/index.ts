@@ -9,7 +9,9 @@ import {
     getOwnedFolders,
     getFollowedFoldersEndpoint,
     getFolderLocations,
-    createFolderEndpoint
+    createFolderEndpoint,
+    editFolderEndpoint,
+    deleteFolderEndpoint
 } from "./folders/routes";
 import { refresh, toggleRefreshStatus } from "./utils";
 import { startSessionCleanupTask } from "./background-tasks";
@@ -46,6 +48,7 @@ Bun.serve({
 
         // Folder management
         "/api/folders": { POST: createFolderEndpoint },
+        "/api/folders/:folderId": { PATCH: editFolderEndpoint, DELETE: deleteFolderEndpoint },
         "/api/folders/owned": { GET: getOwnedFolders },
         "/api/folders/followed": { GET: getFollowedFoldersEndpoint },
         "/api/folders/:folderId/locations": { 
