@@ -657,27 +657,19 @@ export default function Saved() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
-        {selectedFolderId && currentFolder ? (
-          // Folder view header
-          <>
-            <TouchableOpacity onPress={handleBackToMain} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-            </TouchableOpacity>
-            <View style={styles.folderHeaderInfo}>
-              <View style={[styles.folderHeaderColorBar, { backgroundColor: currentFolder.color }]} />
-              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{currentFolder.name}</Text>
-            </View>
-            <View style={styles.folderHeaderButtons}>
-              {!isFolderReorderMode && !isFolderEditMode && (
-                <TouchableOpacity
-                  style={[styles.shareButton, { backgroundColor: theme.colors.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }]}
-                  onPress={handleShareFolder}
-                >
-                  <Ionicons name="share-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>Share or Collaborate</Text>
-                </TouchableOpacity>
-              )}
+      <>
+        <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
+          {selectedFolderId && currentFolder ? (
+            // Folder view header
+            <>
+              <TouchableOpacity onPress={handleBackToMain} style={styles.backButton}>
+                <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+              <View style={styles.folderHeaderInfo}>
+                <View style={[styles.folderHeaderColorBar, { backgroundColor: currentFolder.color }]} />
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{currentFolder.name}</Text>
+              </View>
+              <View style={styles.folderHeaderButtons}>
               {!isFolderReorderMode && !isFolderEditMode && (
                 isSharedFolder ? (
                   <TouchableOpacity
@@ -791,6 +783,27 @@ export default function Saved() {
           </>
         )}
       </View>
+      
+      {/* Share Button - Full Width Below Header */}
+      {selectedFolderId && !isFolderReorderMode && !isFolderEditMode && (
+        <View style={{ backgroundColor: theme.colors.background, paddingHorizontal: 16, paddingBottom: 12 }}>
+          <TouchableOpacity
+            style={{
+              backgroundColor: theme.colors.primary,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: 14,
+              borderRadius: 12,
+            }}
+            onPress={handleShareFolder}
+          >
+            <Ionicons name="share-outline" size={22} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>Share or Collaborate on Folder</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </>
 
       {/* Search Bar - Show in main view and folder view */}
       {savedLocations.length > 0 && !isReorderMode && !isFolderReorderMode && (

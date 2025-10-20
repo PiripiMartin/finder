@@ -8,6 +8,9 @@ import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
+const PROFILE_PHOTO_KEY = '@profile_photo';
+const AVAILABLE_AVATARS = ['🐶', '🐱', '🐼', '🦊', '🐨', '🐯', '🦁', '🐷', '🐸', '🐵', '🦄', '🦋', '🐙', '🦖', '🌻', '🌈', '⭐', '🌙', '🔥', '⚡'];
+
 interface ProfileData {
   username: string;
   email: string;
@@ -30,6 +33,32 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [mapsPref, setMapsPref] = useState<'apple' | 'google'>('apple');
   const MAPS_PREF_KEY = 'DEFAULT_MAPS_APP';
+  const [profilePhoto, setProfilePhoto] = useState<string>('🐶');
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+
+  // Load profile photo from AsyncStorage
+  const loadProfilePhoto = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(PROFILE_PHOTO_KEY);
+      if (saved) {
+        setProfilePhoto(saved);
+      }
+    } catch (error) {
+      console.error('Error loading profile photo:', error);
+    }
+  };
+
+  // Save profile photo to AsyncStorage
+  const saveProfilePhoto = async (emoji: string) => {
+    try {
+      await AsyncStorage.setItem(PROFILE_PHOTO_KEY, emoji);
+      setProfilePhoto(emoji);
+      setShowAvatarPicker(false);
+    } catch (error) {
+      console.error('Error saving profile photo:', error);
+      Alert.alert('Error', 'Failed to save profile photo');
+    }
+  };
 
   // Fetch profile data from API
   const fetchProfileData = async () => {
@@ -141,6 +170,7 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
     if (visible && sessionToken) {
       console.log('👤 [Profile] Modal opened, fetching profile data...');
       fetchProfileData();
+      loadProfilePhoto();
     }
     // Load maps preference
     (async () => {

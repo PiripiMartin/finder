@@ -277,6 +277,45 @@ export default function Index() {
         // Authenticated API format
         savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
         recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+        
+        // Also fetch shared and followed locations from /map/saved-new
+        try {
+          const savedNewResponse = await fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionToken || ''}`,
+            },
+          });
+          
+          if (savedNewResponse.ok) {
+            const savedNewData = await savedNewResponse.json();
+            console.log('📂 [fetchMapPoints] Fetched saved-new data:', savedNewData);
+            
+            // Extract locations from shared folders
+            if (savedNewData.shared) {
+              Object.keys(savedNewData.shared).forEach((folderId) => {
+                const folderLocations = savedNewData.shared[folderId];
+                if (Array.isArray(folderLocations)) {
+                  savedLocationsData = [...savedLocationsData, ...folderLocations];
+                }
+              });
+            }
+            
+            // Extract locations from followed folders
+            if (savedNewData.followed) {
+              Object.keys(savedNewData.followed).forEach((folderId) => {
+                const folderLocations = savedNewData.followed[folderId];
+                if (Array.isArray(folderLocations)) {
+                  savedLocationsData = [...savedLocationsData, ...folderLocations];
+                }
+              });
+            }
+            
+            console.log('📂 [fetchMapPoints] After adding shared/followed, total saved locations:', savedLocationsData.length);
+          }
+        } catch (error) {
+          console.error('❌ [fetchMapPoints] Error fetching shared/followed locations:', error);
+        }
       }
       
       // Safely extract and validate the data
@@ -466,9 +505,14 @@ export default function Index() {
     }
 
     try {
-      // Fetch both folders and saved locations
-      const [foldersResponse, locationsResponse] = await Promise.all([
+      // Fetch owned folders, followed folders, and saved locations
+      const [ownedFoldersResponse, followedFoldersResponse, locationsResponse] = await Promise.all([
         fetch(`${API_CONFIG.BASE_URL}/folders/owned`, {
+          headers: {
+            'Authorization': `Bearer ${sessionToken}`,
+          },
+        }),
+        fetch(`${API_CONFIG.BASE_URL}/folders/followed`, {
           headers: {
             'Authorization': `Bearer ${sessionToken}`,
           },
@@ -480,20 +524,48 @@ export default function Index() {
         }),
       ]);
 
-      if (!foldersResponse.ok || !locationsResponse.ok) {
+      if (!ownedFoldersResponse.ok || !followedFoldersResponse.ok || !locationsResponse.ok) {
         throw new Error('Failed to fetch folders or locations');
       }
 
-      const foldersData = await foldersResponse.json();
+      const ownedFoldersData = await ownedFoldersResponse.json();
+      const followedFoldersData = await followedFoldersResponse.json();
       const locationsData = await locationsResponse.json();
 
-      // Build folder objects with location IDs from personal section only
-      const foldersWithLocations = foldersData.map((folder: any) => {
+      console.log('📂 [Map] Owned folders:', ownedFoldersData);
+      console.log('📂 [Map] Followed folders:', followedFoldersData);
+      console.log('📂 [Map] Locations data:', locationsData);
+
+      // Combine owned and followed folders
+      const allFolders = [...ownedFoldersData, ...followedFoldersData];
+
+      // Build folder objects with location IDs from both personal and shared sections
+      const foldersWithLocations = allFolders.map((folder: any) => {
         const locationIds: number[] = [];
         
         // Get locations from personal section for this folder
         if (locationsData.personal && locationsData.personal[folder.id]) {
           const folderLocations = locationsData.personal[folder.id];
+          folderLocations.forEach((item: any) => {
+            if (item.location && item.location.id) {
+              locationIds.push(item.location.id);
+            }
+          });
+        }
+
+        // Get locations from shared section for this folder
+        if (locationsData.shared && locationsData.shared[folder.id]) {
+          const folderLocations = locationsData.shared[folder.id];
+          folderLocations.forEach((item: any) => {
+            if (item.location && item.location.id) {
+              locationIds.push(item.location.id);
+            }
+          });
+        }
+
+        // Get locations from followed section for this folder
+        if (locationsData.followed && locationsData.followed[folder.id]) {
+          const folderLocations = locationsData.followed[folder.id];
           folderLocations.forEach((item: any) => {
             if (item.location && item.location.id) {
               locationIds.push(item.location.id);
@@ -512,6 +584,7 @@ export default function Index() {
 
       setFolders(foldersWithLocations);
       console.log('📂 [Map] Loaded folders from API:', foldersWithLocations.length);
+      console.log('📂 [Map] Folders with locations:', foldersWithLocations);
     } catch (error) {
       console.error('❌ [Map] Error loading folders:', error);
       setFolders([]);
