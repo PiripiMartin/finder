@@ -400,6 +400,95 @@ export async function unfollowFolderEndpoint(req: BunRequest): Promise<Response>
 }
 
 /**
+ * Adds the authenticated user as a co-owner of a folder.
+ * The user must already have a valid session. If they are already an owner, this is a no-op.
+ */
+export async function joinFolderAsOwnerEndpoint(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing or malformed session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const folderId = parseInt((req.params as any).folderId, 10);
+    if (isNaN(folderId)) {
+        return new Response("Invalid folder ID", { status: 400 });
+    }
+
+    try {
+        const folder = await getFolderById(folderId);
+        if (!folder) {
+            return new Response("Folder not found", { status: 404 });
+        }
+
+        const alreadyOwner = await isFolderOwner(userId, folderId);
+        if (!alreadyOwner) {
+            await addFolderOwner(folderId, userId);
+        }
+
+        return new Response(
+            JSON.stringify({ success: true, message: "Joined folder as owner" }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+    } catch (error) {
+        console.error(`Error joining folder ${folderId} as owner:`, error);
+        return new Response("Internal server error", { status: 500 });
+    }
+}
+
+/**
+ * Removes the authenticated user as an owner of a folder.
+ * Prevents removing the last remaining owner.
+ */
+export async function leaveFolderAsOwnerEndpoint(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing or malformed session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const folderId = parseInt((req.params as any).folderId, 10);
+    if (isNaN(folderId)) {
+        return new Response("Invalid folder ID", { status: 400 });
+    }
+
+    try {
+        const folder = await getFolderById(folderId);
+        if (!folder) {
+            return new Response("Folder not found", { status: 404 });
+        }
+
+        const isOwner = await isFolderOwner(userId, folderId);
+        if (!isOwner) {
+            return new Response("You are not an owner of this folder", { status: 403 });
+        }
+
+        const owners = await getFolderOwners(folderId);
+        if (owners.length <= 1) {
+            return new Response("Cannot remove the last owner from a folder", { status: 400 });
+        }
+
+        await removeFolderOwner(folderId, userId);
+
+        return new Response(
+            JSON.stringify({ success: true, message: "Left folder as owner" }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+    } catch (error) {
+        console.error(`Error leaving folder ${folderId} as owner:`, error);
+        return new Response("Internal server error", { status: 500 });
+    }
+}
+
+/**
  * Gets all folders owned by the user.
  *
  * @param req - The Bun request, containing the session token.
@@ -505,135 +594,6 @@ export async function getFolderLocations(req: BunRequest): Promise<Response> {
     }
 }
 
-/**
- * Adds an owner to a folder.
- *
- * @param req - The Bun request, containing the session token, folder ID, and user ID.
- * @returns A response indicating success or failure.
- */
-export async function addFolderOwnerEndpoint(req: BunRequest): Promise<Response> {
-    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
-    if (!sessionToken) {
-        return new Response("Missing or malformed session token", { status: 401 });
-    }
-
-    const userId = await verifySessionToken(sessionToken);
-    if (userId === null) {
-        return new Response("Invalid or expired session token", { status: 401 });
-    }
-
-    const folderId = parseInt((req.params as any).folderId, 10);
-    if (isNaN(folderId)) {
-        return new Response("Invalid folder ID", { status: 400 });
-    }
-
-    const data = await checkedExtractBody(req, ["newOwnerId"]);
-    if (!data) {
-        return new Response("Missing newOwnerId in request body", { status: 400 });
-    }
-
-    const newOwnerId = parseInt(data.newOwnerId, 10);
-    if (isNaN(newOwnerId)) {
-        return new Response("Invalid newOwnerId", { status: 400 });
-    }
-
-    try {
-        // Verify the folder exists and user is an owner
-        const folder = await getFolderById(folderId);
-        if (!folder) {
-            return new Response("Folder not found", { status: 404 });
-        }
-
-        const isOwner = await isFolderOwner(userId, folderId);
-        if (!isOwner) {
-            return new Response("You don't have permission to add owners to this folder", { status: 403 });
-        }
-
-        // Check if the new owner is already an owner
-        const isAlreadyOwner = await isFolderOwner(newOwnerId, folderId);
-        if (isAlreadyOwner) {
-            return new Response("User is already an owner of this folder", { status: 400 });
-        }
-
-        await addFolderOwner(folderId, newOwnerId);
-        
-        return new Response(
-            JSON.stringify({ success: true, message: "Owner added to folder" }),
-            { status: 200, headers: { "Content-Type": "application/json" } }
-        );
-    } catch (error) {
-        console.error(`Error adding owner ${newOwnerId} to folder ${folderId}:`, error);
-        return new Response("Internal server error", { status: 500 });
-    }
-}
-
-/**
- * Removes an owner from a folder.
- *
- * @param req - The Bun request, containing the session token, folder ID, and user ID.
- * @returns A response indicating success or failure.
- */
-export async function removeFolderOwnerEndpoint(req: BunRequest): Promise<Response> {
-    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
-    if (!sessionToken) {
-        return new Response("Missing or malformed session token", { status: 401 });
-    }
-
-    const userId = await verifySessionToken(sessionToken);
-    if (userId === null) {
-        return new Response("Invalid or expired session token", { status: 401 });
-    }
-
-    const folderId = parseInt((req.params as any).folderId, 10);
-    if (isNaN(folderId)) {
-        return new Response("Invalid folder ID", { status: 400 });
-    }
-
-    const data = await checkedExtractBody(req, ["ownerId"]);
-    if (!data) {
-        return new Response("Missing ownerId in request body", { status: 400 });
-    }
-
-    const ownerId = parseInt(data.ownerId, 10);
-    if (isNaN(ownerId)) {
-        return new Response("Invalid ownerId", { status: 400 });
-    }
-
-    try {
-        // Verify the folder exists and user is an owner
-        const folder = await getFolderById(folderId);
-        if (!folder) {
-            return new Response("Folder not found", { status: 404 });
-        }
-
-        const isOwner = await isFolderOwner(userId, folderId);
-        if (!isOwner) {
-            return new Response("You don't have permission to remove owners from this folder", { status: 403 });
-        }
-
-        // Check if the owner to remove is actually an owner
-        const isTargetOwner = await isFolderOwner(ownerId, folderId);
-        if (!isTargetOwner) {
-            return new Response("User is not an owner of this folder", { status: 400 });
-        }
-
-        // Prevent removing the last owner
-        const owners = await getFolderOwners(folderId);
-        if (owners.length <= 1) {
-            return new Response("Cannot remove the last owner from a folder", { status: 400 });
-        }
-
-        await removeFolderOwner(folderId, ownerId);
-        
-        return new Response(
-            JSON.stringify({ success: true, message: "Owner removed from folder" }),
-            { status: 200, headers: { "Content-Type": "application/json" } }
-        );
-    } catch (error) {
-        console.error(`Error removing owner ${ownerId} from folder ${folderId}:`, error);
-        return new Response("Internal server error", { status: 500 });
-    }
-}
 
 /**
  * Gets all owners of a folder.
