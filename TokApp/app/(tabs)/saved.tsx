@@ -671,10 +671,11 @@ export default function Saved() {
             <View style={styles.folderHeaderButtons}>
               {!isFolderReorderMode && !isFolderEditMode && (
                 <TouchableOpacity
-                  style={styles.shareButton}
+                  style={[styles.shareButton, { backgroundColor: theme.colors.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }]}
                   onPress={handleShareFolder}
                 >
-                  <Ionicons name="share-outline" size={24} color={theme.colors.text} />
+                  <Ionicons name="share-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>Share or Collaborate</Text>
                 </TouchableOpacity>
               )}
               {!isFolderReorderMode && !isFolderEditMode && (
