@@ -1099,7 +1099,7 @@ export default function Index() {
           
           <View style={[styles.videoContainer, { backgroundColor: theme.colors.surface }]}>
             <TouchableOpacity style={styles.closeButton} onPress={closeVideo}>
-              <Text style={[styles.closeButtonText, { color: theme.colors.text }]}>✕</Text>
+              <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
             <WebView
               key={`${selectedVideo}-${Date.now()}`}
@@ -1294,17 +1294,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
   },
   closeButtonText: {
-    fontSize: 12,
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   shopButton: {
     width: 165,
