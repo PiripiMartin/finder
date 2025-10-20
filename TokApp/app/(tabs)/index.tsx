@@ -6,6 +6,7 @@ import { Animated, Dimensions, Platform, ScrollView, StyleSheet, Text, Touchable
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import ProfileModal from '../components/ProfileModal';
 import Tutorial from '../components/Tutorial';
 import { getApiUrl, getGuestPostsUrl, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
@@ -72,6 +73,7 @@ export default function Index() {
   const { sharedContent, clearSharedContent } = useShare();
   const { shouldShowTutorial, completeTutorial, tutorialFeatureEnabled } = useTutorial();
   const [showManualTutorial, setShowManualTutorial] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const insets = useSafeAreaInsets();
 
   // Filter state
@@ -917,12 +919,29 @@ export default function Index() {
         })}
       </MapView>
 
-      {/* Custom Location Button - Top Left */}
+      {/* Profile Button - Top Left */}
+      <TouchableOpacity 
+        style={[
+          styles.profileButton,
+          {
+            top: insets.top + 30,
+            left: insets.left + 30,
+          }
+        ]}
+        onPress={() => {
+          console.log('👤 [Profile] Opening profile modal');
+          setShowProfileModal(true);
+        }}
+      >
+        <Ionicons name="person-circle-outline" size={28} color="#A8C3A0" />
+      </TouchableOpacity>
+
+      {/* Custom Location Button - Below Profile Button */}
       <TouchableOpacity 
         style={[
           styles.locationButton,
           {
-            top: insets.top + 30,
+            top: insets.top + 90, // 60px below profile button
             left: insets.left + 30,
           }
         ]}
@@ -943,7 +962,7 @@ export default function Index() {
           style={[
             styles.tutorialButton,
             {
-              top: insets.top + 90, // 60px below location button (30 + 60)
+              top: insets.top + 150, // 60px below location button
               left: insets.left + 30,
             }
           ]}
@@ -1230,6 +1249,12 @@ export default function Index() {
           </View>
         </View>
       )}
+
+      {/* Profile Modal */}
+      <ProfileModal 
+        visible={showProfileModal} 
+        onClose={() => setShowProfileModal(false)} 
+      />
       
     </View>
   );
@@ -1340,6 +1365,20 @@ const styles = StyleSheet.create({
   debugText: {
     fontSize: 12,
     color: '#ffffff',
+  },
+  profileButton: {
+    position: 'absolute',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   locationButton: {
     position: 'absolute',
