@@ -1,10 +1,16 @@
-
+import { Alert } from 'react-native';
+import { API_CONFIG } from '../config/api';
 
 export interface TikTokShareData {
   videoId?: string;
   username?: string;
   url?: string;
   type: 'video' | 'profile' | 'unknown';
+}
+
+export interface FolderShareData {
+  folderId: string;
+  type: 'folder';
 }
 
 export class DeepLinkHandler {
@@ -104,6 +110,98 @@ export class DeepLinkHandler {
       console.log('Share extension callback received');
     } catch (error) {
       console.error('Error handling share extension callback:', error);
+    }
+  }
+
+  static parseFolderShare(url: string): FolderShareData | null {
+    try {
+      if (url.startsWith('lai://folder/')) {
+        const folderId = url.replace('lai://folder/', '');
+        if (folderId && !isNaN(Number(folderId))) {
+          return {
+            folderId,
+            type: 'folder'
+          };
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error parsing folder share URL:', error);
+      return null;
+    }
+  }
+
+  static async handleFolderShare(url: string, sessionToken: string | null, router?: any): Promise<void> {
+    try {
+      const folderData = this.parseFolderShare(url);
+      if (!folderData) {
+        console.log('Not a folder share link');
+        return;
+      }
+
+      if (!sessionToken) {
+        Alert.alert(
+          'Login Required',
+          'Please login to follow folders',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Call API to follow the folder
+      const response = await fetch(`${API_CONFIG.BASE_URL}/folders/${folderData.folderId}/follow`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+      });
+
+      if (response.ok) {
+        Alert.alert(
+          'Success',
+          'You are now following this folder!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigate to followed folders page
+                if (router) {
+                  router.push('/(tabs)/profile');
+                }
+              }
+            }
+          ]
+        );
+      } else if (response.status === 400) {
+        const text = await response.text();
+        if (text.includes('already following')) {
+          Alert.alert(
+            'Info',
+            'You are already following this folder',
+            [
+              {
+                text: 'View Folder',
+                onPress: () => {
+                  if (router) {
+                    router.push('/(tabs)/profile');
+                  }
+                }
+              },
+              { text: 'Cancel', style: 'cancel' }
+            ]
+          );
+        } else {
+          Alert.alert('Error', 'Failed to follow folder');
+        }
+      } else if (response.status === 404) {
+        Alert.alert('Error', 'Folder not found');
+      } else {
+        Alert.alert('Error', 'Failed to follow folder');
+      }
+    } catch (error) {
+      console.error('Error handling folder share:', error);
+      Alert.alert('Error', 'Something went wrong');
     }
   }
 

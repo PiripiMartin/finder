@@ -486,6 +486,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     padding: 0,
   },
+  mapsPrefContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  mapsPrefRow: {
+    paddingTop: 8,
+    paddingHorizontal: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  mapsPrefLabel: {
+    fontSize: 12,
+  },
+  mapsPrefButtons: {
+    flexDirection: 'row',
+  },
+  mapsPrefButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    marginLeft: 8,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)'
+  },
+  mapsPrefButtonText: {
+    fontSize: 12,
+    marginLeft: 6,
+    fontWeight: '600'
+  },
   scrollView: {
     flex: 1,
   },

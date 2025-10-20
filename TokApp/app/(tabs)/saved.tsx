@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import DraggableGrid from 'react-native-draggable-grid';
 import { API_CONFIG } from '../config/api';
 import CreateFolderModal from '../components/CreateFolderModal';
@@ -413,6 +413,26 @@ export default function Saved() {
   };
 
   // Handle deleting folder with confirmation
+  const handleShareFolder = useCallback(async () => {
+    if (!selectedFolderId) return;
+    
+    const folder = folders.find(f => f.id === selectedFolderId);
+    if (!folder) return;
+    
+    try {
+      const shareUrl = `lai://folder/${selectedFolderId}`;
+      const message = `Check out my folder "${folder.name}" on Lai!`;
+      
+      await Share.share({
+        message: `${message}\n${shareUrl}`,
+        url: shareUrl,
+        title: folder.name,
+      });
+    } catch (error) {
+      console.error('❌ [Saved] Error sharing folder:', error);
+    }
+  }, [selectedFolderId, folders]);
+
   const handleDeleteFolder = async (folderId: number) => {
     const folder = folders.find(f => f.id === folderId);
     if (!folder) return;
@@ -639,7 +659,15 @@ export default function Saved() {
             <View style={styles.folderHeaderButtons}>
               {!isFolderReorderMode && !isFolderEditMode && (
                 <TouchableOpacity
-                  style={[styles.reorderButton, { backgroundColor: '#ff6b6b' }]}
+                  style={styles.shareButton}
+                  onPress={handleShareFolder}
+                >
+                  <Ionicons name="share-outline" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+              )}
+              {!isFolderReorderMode && !isFolderEditMode && (
+                <TouchableOpacity
+                  style={[styles.reorderButton, { backgroundColor: '#ff6b6b', marginLeft: 8 }]}
                   onPress={() => handleDeleteFolder(selectedFolderId)}
                 >
                   <Ionicons name="trash-outline" size={24} color="#FFFFFF" />
@@ -1231,6 +1259,9 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     marginRight: 12,
+  },
+  shareButton: {
+    padding: 8,
   },
   folderHeaderInfo: {
     flex: 1,

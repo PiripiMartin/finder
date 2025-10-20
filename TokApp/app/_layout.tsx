@@ -2,7 +2,7 @@ import { Stack, useRouter } from "expo-router";
 import { useEffect, useRef } from 'react';
 import { AppState, Linking, LogBox } from 'react-native';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { LocationProvider, useLocationContext } from './context/LocationContext';
 import { ShareProvider } from './context/ShareContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -36,9 +36,58 @@ function AppStateHandler() {
   return null; // This component doesn't render anything
 }
 
-export default function RootLayout() {
+// Component to handle deep links with access to AuthContext
+function DeepLinkListener() {
+  const { sessionToken } = useAuth();
   const router = useRouter();
 
+  useEffect(() => {
+    const handleDeepLink = async (url: string) => {
+      try {
+        console.log('🔗 [DeepLinkListener] Deep link received:', url);
+        
+        // Check if it's a folder share link first
+        if (url.startsWith('lai://folder/')) {
+          // Navigate to a valid route first to prevent unmatched route error
+          router.replace('/(tabs)');
+          
+          // Then show the folder follow dialog after a brief delay
+          setTimeout(() => {
+            DeepLinkHandler.handleFolderShare(url, sessionToken, router);
+          }, 300);
+          return true;
+        }
+        
+        // Use the DeepLinkHandler to parse and handle TikTok shares
+        await DeepLinkHandler.handleTikTokShare(url);
+        return false;
+      } catch (error) {
+        console.error('❌ [DeepLinkListener] Error handling deep link:', error);
+        return false;
+      }
+    };
+
+    // Check initial URL immediately
+    Linking.getInitialURL().then((url) => {
+      if (url && url.startsWith('lai://folder/')) {
+        handleDeepLink(url);
+      }
+    });
+
+    // Listen for incoming links
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [sessionToken, router]);
+
+  return null;
+}
+
+export default function RootLayout() {
   useEffect(() => {
     // Ignore specific warnings that can cause crashes on iOS
     LogBox.ignoreLogs([
@@ -46,38 +95,9 @@ export default function RootLayout() {
       'AsyncStorage has been extracted from react-native core',
       'ViewPropTypes will be removed from React Native',
       'ColorPropType will be removed from React Native',
+      'Unmatched Route',
     ]);
-
-    // Handle deep links when app is already running
-    const handleDeepLink = async (url: string) => {
-      try {
-        console.log('Deep link received:', url);
-        
-        // Use the DeepLinkHandler to parse and handle TikTok shares
-        await DeepLinkHandler.handleTikTokShare(url);
-      } catch (error) {
-        console.error('Error handling deep link:', error);
-      }
-    };
-
-    // Listen for incoming links
-    const subscription = Linking.addEventListener('url', (event) => {
-      handleDeepLink(event.url);
-    });
-
-    // Handle initial URL if app was opened via deep link
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink(url);
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
   }, []);
-
-  // Moved app state handling to separate component that has access to LocationContext
 
   return (
     <ErrorBoundary>
@@ -85,9 +105,13 @@ export default function RootLayout() {
         <AuthProvider>
           <TutorialProvider>
             <LocationProvider>
+              <DeepLinkListener />
               <AppStateHandler />
               <ShareProvider>
-                <Stack screenOptions={{ headerShown: false }}>
+                <Stack 
+                  screenOptions={{ headerShown: false }}
+                >
+                  <Stack.Screen name="index" />
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="_location" />
                   <Stack.Screen name="auth" />
@@ -100,3 +124,7 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+
+
+

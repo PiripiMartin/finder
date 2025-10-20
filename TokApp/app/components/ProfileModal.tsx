@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +28,8 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mapsPref, setMapsPref] = useState<'apple' | 'google'>('apple');
+  const MAPS_PREF_KEY = 'DEFAULT_MAPS_APP';
 
   // Fetch profile data from API
   const fetchProfileData = async () => {
@@ -139,6 +142,13 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
       console.log('👤 [Profile] Modal opened, fetching profile data...');
       fetchProfileData();
     }
+    // Load maps preference
+    (async () => {
+      try {
+        const value = await AsyncStorage.getItem(MAPS_PREF_KEY);
+        if (value === 'google' || value === 'apple') setMapsPref(value);
+      } catch {}
+    })();
   }, [visible, sessionToken]);
 
   return (
@@ -252,6 +262,43 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
                       trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                       thumbColor={isDarkMode ? theme.colors.surface : theme.colors.surface}
                     />
+                  </View>
+                </View>
+              </View>
+
+              {/* Directions Preference */}
+              <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Directions</Text>
+                <View style={styles.settingsList}>
+                  <View style={[styles.settingItem, { backgroundColor: theme.colors.background }]}> 
+                    <View style={styles.settingLeft}>
+                      <Ionicons name="navigate" size={20} color={theme.colors.textSecondary} />
+                      <Text style={[styles.settingText, { color: theme.colors.text }]}>Default maps app</Text>
+                    </View>
+                  </View>
+                  <View style={styles.mapsButtonsContainer}>
+                    <TouchableOpacity
+                      onPress={async () => { await AsyncStorage.setItem(MAPS_PREF_KEY, 'apple'); setMapsPref('apple'); }}
+                      style={[
+                        styles.mapsButton,
+                        { borderColor: theme.colors.border },
+                        mapsPref === 'apple' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+                      ]}
+                    >
+                      <Ionicons name="logo-apple" size={18} color={mapsPref === 'apple' ? '#FFFFFF' : theme.colors.textSecondary} />
+                      <Text style={[styles.mapsButtonText, { color: mapsPref === 'apple' ? '#FFFFFF' : theme.colors.text }]}>Apple Maps</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={async () => { await AsyncStorage.setItem(MAPS_PREF_KEY, 'google'); setMapsPref('google'); }}
+                      style={[
+                        styles.mapsButton,
+                        { borderColor: theme.colors.border },
+                        mapsPref === 'google' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+                      ]}
+                    >
+                      <Ionicons name="logo-google" size={18} color={mapsPref === 'google' ? '#FFFFFF' : theme.colors.textSecondary} />
+                      <Text style={[styles.mapsButtonText, { color: mapsPref === 'google' ? '#FFFFFF' : theme.colors.text }]}>Google Maps</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
@@ -499,6 +546,27 @@ const styles = StyleSheet.create({
   },
   createAccountButtonText: {
     fontSize: 16,
+    fontWeight: '600',
+  },
+  mapsButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+  },
+  mapsButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  mapsButtonText: {
+    fontSize: 14,
     fontWeight: '600',
   },
 });
