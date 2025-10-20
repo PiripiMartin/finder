@@ -10,8 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTutorial } from '../context/TutorialContext';
-import { addLocationToFolder, createFolder as createFolderStorage, deleteFolder, Folder, getFiledLocationIds, loadFolders, removeLocationFromFolder, saveFolders } from '../utils/folderStorage';
-import { applySavedOrder, loadFolderOrder, loadLocationOrder, saveFolderOrder, saveLocationOrder } from '../utils/locationOrderStorage';
+import { applySavedOrder, loadLocationOrder, saveLocationOrder } from '../utils/locationOrderStorage';
 
 const { width } = Dimensions.get('window');
 const locationCardWidth = (width - 36) / 2; // Two cards per row with padding
@@ -39,6 +38,23 @@ interface SavedLocation {
   };
 }
 
+interface ApiFolder {
+  id: number;
+  name: string;
+  color: string;
+  createdAt: string;
+}
+
+interface ApiResponse {
+  personal: {
+    uncategorised: SavedLocation[];
+    [folderId: string]: SavedLocation[];
+  };
+  followed: {
+    [folderId: string]: SavedLocation[];
+  };
+}
+
 export default function Saved() {
   const router = useRouter();
   const { theme } = useTheme();
@@ -47,6 +63,8 @@ export default function Saved() {
   const { showTutorial, tutorialFeatureEnabled } = useTutorial();
   
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
+  const [uncategorisedLocations, setUncategorisedLocations] = useState<SavedLocation[]>([]);
+  const [folderLocationsMap, setFolderLocationsMap] = useState<{ [folderId: number]: SavedLocation[] }>({});
   const [filteredLocations, setFilteredLocations] = useState<SavedLocation[]>([]);
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -57,8 +75,8 @@ export default function Saved() {
   const [isDragging, setIsDragging] = useState(false);
   
   // Folder state
-  const [folders, setFolders] = useState<Folder[]>([]);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [folders, setFolders] = useState<ApiFolder[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [showLocationSelectorModal, setShowLocationSelectorModal] = useState(false);
   const [folderDragTarget, setFolderDragTarget] = useState<string | null>(null);
@@ -68,6 +86,32 @@ export default function Saved() {
 
 
 
+  // Fetch owned folders from API
+  const fetchOwnedFolders = useCallback(async () => {
+    try {
+      console.log('📂 [Saved] Fetching owned folders...');
+      const response = await fetch(`${API_CONFIG.BASE_URL}/folders/owned`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const folders = await response.json();
+      console.log('📂 [Saved] Fetched folders:', folders.length);
+      setFolders(folders);
+      return folders;
+    } catch (error) {
+      console.error('📂 [Saved] Error fetching folders:', error);
+      return [];
+    }
+  }, [sessionToken]);
+
   // Fetch saved locations from API
   const fetchSavedLocations = useCallback(async () => {
     try {
@@ -75,20 +119,8 @@ export default function Saved() {
       setError(null);
       
       console.log('📚 [Saved] Fetching saved locations...');
-      const apiUrl = `${API_CONFIG.BASE_URL}/map/saved`;
+      const apiUrl = `${API_CONFIG.BASE_URL}/map/saved-new`;
       console.log('🌐 [Saved] API URL:', apiUrl);
-      
-      // Log the complete request details
-      console.log('📤 [Saved] Request Details:', {
-        method: 'GET',
-        url: apiUrl,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken ? sessionToken.substring(0, 20) + '...' : 'NO_TOKEN'}`,
-        },
-        sessionTokenLength: sessionToken ? sessionToken.length : 0,
-        timestamp: new Date().toISOString()
-      });
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -98,13 +130,10 @@ export default function Saved() {
         },
       });
       
-      // Log response details
       console.log('📥 [Saved] Response Details:', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries()),
-        url: response.url,
         timestamp: new Date().toISOString()
       });
       
@@ -112,20 +141,37 @@ export default function Saved() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data = await response.json();
+      const data: ApiResponse = await response.json();
       console.log('📚 [Saved] API response data:', data);
       
-      // Extract locations - the API returns an array directly, not wrapped in savedLocations
-      const locations = Array.isArray(data) ? data : [];
-      console.log('📚 [Saved] Found saved locations:', locations.length);
+      // Extract uncategorised locations
+      const uncategorised = data.personal.uncategorised || [];
+      setUncategorisedLocations(uncategorised);
+      console.log('📚 [Saved] Uncategorised locations:', uncategorised.length);
       
-      // Store all locations without reordering
-      // The ordering will be applied when displaying unfiled locations
-      setSavedLocations(locations);
-      setFilteredLocations(locations);
-      setReorderedLocations(locations);
-      // Start with no filter selected (show all locations)
-      setSelectedEmoji(null);
+      // Extract folder locations (ignore 'uncategorised' key and 'followed')
+      const folderMap: { [folderId: number]: SavedLocation[] } = {};
+      Object.keys(data.personal).forEach(key => {
+        if (key !== 'uncategorised') {
+          const folderId = parseInt(key);
+          if (!isNaN(folderId)) {
+            folderMap[folderId] = data.personal[key];
+          }
+        }
+      });
+      setFolderLocationsMap(folderMap);
+      console.log('📂 [Saved] Folder locations map:', Object.keys(folderMap).length, 'folders');
+      
+      // Build flat list of all locations for search/filtering
+      const allLocations: SavedLocation[] = [
+        ...uncategorised,
+        ...Object.values(folderMap).flat()
+      ];
+      setSavedLocations(allLocations);
+      setFilteredLocations(allLocations);
+      setReorderedLocations(uncategorised);
+      
+      console.log('📚 [Saved] Total locations:', allLocations.length);
       
     } catch (error) {
       console.error('📚 [Saved] Error fetching saved locations:', error);
@@ -202,7 +248,6 @@ export default function Saved() {
       await saveLocationOrder(unfiledLocationIds);
       
       // Don't replace savedLocations - just update the filtered view
-      // savedLocations should remain unchanged as it contains ALL locations
       setFilteredLocations(savedLocations);
       setIsReorderMode(false);
       console.log('✅ [Saved] Exited reorder mode, saved unfiled locations order');
@@ -211,12 +256,8 @@ export default function Saved() {
       setSearchQuery('');
       setSelectedEmoji(null);
       
-      // Get unfiled locations without search filter for reordering
-      const filedIds = new Set<number>();
-      folders.forEach(folder => {
-        folder.locationIds.forEach(id => filedIds.add(id));
-      });
-      const unfiled = savedLocations.filter(loc => !filedIds.has(loc.location.id));
+      // Get uncategorised locations for reordering
+      const unfiled = [...uncategorisedLocations];
       
       // Apply saved order to unfiled locations before showing them in reorder mode
       const savedOrder = await loadLocationOrder();
@@ -246,30 +287,44 @@ export default function Saved() {
     console.log('🔄 [Saved] Locations reordered:', validData.length);
   };
 
-  // Load folders from storage
-  const loadFoldersData = async () => {
-    try {
-      const loadedFolders = await loadFolders();
-      setFolders(loadedFolders);
-      console.log('📂 [Saved] Loaded folders:', loadedFolders.length);
-    } catch (error) {
-      console.error('❌ [Saved] Error loading folders:', error);
-    }
+  // Refresh all data from API
+  const refreshData = async () => {
+    await Promise.all([
+      fetchOwnedFolders(),
+      fetchSavedLocations()
+    ]);
   };
 
   // Handle folder creation
-  const handleCreateFolder = async (title: string, color: string) => {
+  const handleCreateFolder = async (name: string, color: string) => {
     try {
-      const newFolder = await createFolderStorage(title, color);
-      await loadFoldersData(); // Reload all folders to ensure consistency
+      console.log('📂 [Saved] Creating folder:', name);
+      const response = await fetch(`${API_CONFIG.BASE_URL}/folders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        },
+        body: JSON.stringify({ name, color }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const newFolder = await response.json();
       console.log('✅ [Saved] Created folder:', newFolder.id);
+      
+      // Refresh data
+      await refreshData();
     } catch (error) {
       console.error('❌ [Saved] Error creating folder:', error);
+      Alert.alert('Error', 'Failed to create folder');
     }
   };
 
   // Handle folder tap - navigate into folder view
-  const handleFolderPress = (folderId: string) => {
+  const handleFolderPress = (folderId: number) => {
     if (isReorderMode) return; // Don't navigate in reorder mode
     setSelectedFolderId(folderId);
     setSearchQuery(''); // Clear search when entering folder
@@ -288,17 +343,10 @@ export default function Saved() {
   // Toggle folder reorder mode
   const toggleFolderReorderMode = () => {
     if (isFolderReorderMode) {
-      // Exiting reorder mode - save the order
-      if (selectedFolderId) {
-        const folder = folders.find(f => f.id === selectedFolderId);
-        if (folder) {
-          const newLocationIds = reorderedFolderLocations.map(loc => loc.location.id);
-          folder.locationIds = newLocationIds;
-          saveFolders(folders);
-          console.log('✅ [Saved] Saved folder location order');
-        }
-      }
+      // Exiting reorder mode - Note: folder ordering is not yet persisted to API
+      // This would require a new API endpoint to save location order within folders
       setIsFolderReorderMode(false);
+      console.log('✅ [Saved] Exited folder reorder mode (order not persisted)');
     } else {
       // Entering reorder mode
       if (selectedFolderId) {
@@ -322,7 +370,7 @@ export default function Saved() {
   };
 
   // Handle removing location from folder
-  const handleRemoveFromFolder = async (folderId: string, locationId: number) => {
+  const handleRemoveFromFolder = async (folderId: number, locationId: number) => {
     const location = savedLocations.find(loc => loc.location.id === locationId);
     const locationTitle = location?.location.title || 'this location';
     
@@ -339,12 +387,24 @@ export default function Saved() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await removeLocationFromFolder(folderId, locationId);
-              // Reload folders to get updated data
-              await loadFoldersData();
-              console.log('➖ [Saved] Removed location from folder');
+              console.log('➖ [Saved] Removing location from folder via API');
+              const response = await fetch(`${API_CONFIG.BASE_URL}/folders/${folderId}/locations/${locationId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${sessionToken || ''}`,
+                },
+              });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              console.log('✅ [Saved] Removed location from folder');
+              await refreshData();
             } catch (error) {
               console.error('❌ [Saved] Error removing from folder:', error);
+              Alert.alert('Error', 'Failed to remove location from folder');
             }
           },
         },
@@ -353,13 +413,13 @@ export default function Saved() {
   };
 
   // Handle deleting folder with confirmation
-  const handleDeleteFolder = async (folderId: string) => {
+  const handleDeleteFolder = async (folderId: number) => {
     const folder = folders.find(f => f.id === folderId);
     if (!folder) return;
     
     Alert.alert(
       'Delete Folder',
-      `Are you sure you want to delete "${folder.title}"? All locations will be moved back to your unfiled locations.`,
+      `Are you sure you want to delete "${folder.name}"? All locations will be moved back to your unfiled locations.`,
       [
         {
           text: 'Cancel',
@@ -370,16 +430,31 @@ export default function Saved() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteFolder(folderId);
-              setFolders(folders.filter(f => f.id !== folderId));
-              console.log('🗑️ [Saved] Deleted folder:', folderId);
+              console.log('🗑️ [Saved] Deleting folder via API:', folderId);
+              const response = await fetch(`${API_CONFIG.BASE_URL}/folders/${folderId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${sessionToken || ''}`,
+                },
+              });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              console.log('✅ [Saved] Folder deleted successfully');
               
               // Navigate back to main view if we're currently viewing this folder
               if (selectedFolderId === folderId) {
                 handleBackToMain();
               }
+              
+              // Refresh data
+              await refreshData();
             } catch (error) {
               console.error('❌ [Saved] Error deleting folder:', error);
+              Alert.alert('Error', 'Failed to delete folder');
             }
           },
         },
@@ -387,17 +462,11 @@ export default function Saved() {
     );
   };
 
-  // Get unfiled locations (not in any folder), respecting saved order and applying search
+  // Get unfiled locations (uncategorised from API), respecting saved order and applying search
   const getUnfiledLocations = (): SavedLocation[] => {
-    const filedIds = new Set<number>();
-    folders.forEach(folder => {
-      folder.locationIds.forEach(id => filedIds.add(id));
-    });
-    
-    let unfiled = savedLocations.filter(loc => !filedIds.has(loc.location.id));
+    let unfiled = [...uncategorisedLocations];
     
     // Apply saved order to unfiled locations
-    // We need to use the reorderedLocations state to maintain order
     if (!isReorderMode && reorderedLocations.length > 0) {
       // Create a map of current unfiled location IDs
       const unfiledIds = new Set(unfiled.map(loc => loc.location.id));
@@ -425,18 +494,8 @@ export default function Saved() {
   };
 
   // Get locations in a specific folder, applying search filter
-  const getFolderLocations = (folderId: string): SavedLocation[] => {
-    const folder = folders.find(f => f.id === folderId);
-    if (!folder) return [];
-    
-    const locationMap = new Map<number, SavedLocation>();
-    savedLocations.forEach(loc => {
-      locationMap.set(loc.location.id, loc);
-    });
-    
-    let folderLocations = folder.locationIds
-      .map(id => locationMap.get(id))
-      .filter(loc => loc !== undefined) as SavedLocation[];
+  const getFolderLocations = (folderId: number): SavedLocation[] => {
+    let folderLocations = folderLocationsMap[folderId] || [];
     
     // Apply search filter if there's a search query
     if (searchQuery.trim()) {
@@ -455,16 +514,25 @@ export default function Saved() {
     if (!selectedFolderId) return;
     
     try {
-      // Add each location to the folder
-      for (const locationId of locationIds) {
-        await addLocationToFolder(selectedFolderId, locationId);
+      console.log('➕ [Saved] Adding locations to folder via API');
+      const response = await fetch(`${API_CONFIG.BASE_URL}/folders/${selectedFolderId}/locations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken || ''}`,
+        },
+        body: JSON.stringify({ locationIds }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      // Reload folders to get updated data
-      await loadFoldersData();
-      console.log('➕ [Saved] Added', locationIds.length, 'locations to folder');
+      console.log('✅ [Saved] Added', locationIds.length, 'locations to folder');
+      await refreshData();
     } catch (error) {
       console.error('❌ [Saved] Error adding locations to folder:', error);
+      Alert.alert('Error', 'Failed to add locations to folder');
     }
   };
 
@@ -472,20 +540,19 @@ export default function Saved() {
 
 
   useEffect(() => {
-    console.log('📚 [Saved] Page loaded, fetching saved locations...');
-    fetchSavedLocations();
-    loadFoldersData();
-  }, [sessionToken, fetchSavedLocations]);
+    console.log('📚 [Saved] Page loaded, fetching data...');
+    refreshData();
+  }, [sessionToken, fetchSavedLocations, fetchOwnedFolders]);
 
   // Register refresh callback with LocationContext
   useEffect(() => {
     const unregister = registerRefreshCallback(() => {
       console.log('🔄 [Saved] Refresh triggered by LocationContext');
-      fetchSavedLocations();
+      refreshData();
     });
 
     return unregister;
-  }, [registerRefreshCallback, fetchSavedLocations]);
+  }, [registerRefreshCallback]);
 
   // Apply filters when search query, emoji, or locations change
   useEffect(() => {
@@ -567,7 +634,7 @@ export default function Saved() {
             </TouchableOpacity>
             <View style={styles.folderHeaderInfo}>
               <View style={[styles.folderHeaderColorBar, { backgroundColor: currentFolder.color }]} />
-              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{currentFolder.title}</Text>
+              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{currentFolder.name}</Text>
             </View>
             <View style={styles.folderHeaderButtons}>
               {!isFolderReorderMode && !isFolderEditMode && (
@@ -858,11 +925,11 @@ export default function Saved() {
                   <View style={styles.folderCardContent}>
                     <Ionicons name="folder" size={32} color={folder.color} />
                     <Text style={[styles.folderTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                      {folder.title}
+                      {folder.name}
                     </Text>
                   </View>
                   <View style={[styles.folderCount, { backgroundColor: folder.color }]}>
-                    <Text style={styles.folderCountText}>{folder.locationIds.length}</Text>
+                    <Text style={styles.folderCountText}>{(folderLocationsMap[folder.id] || []).length}</Text>
                   </View>
                 </TouchableOpacity>
               ))}

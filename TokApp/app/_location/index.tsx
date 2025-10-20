@@ -82,10 +82,13 @@ const mockLocationData: { [key: string]: LocationData } = {
 
 export default function Location() {
   const router = useRouter();
-  const { id, needsCoordinates } = useLocalSearchParams();
+  const { id, needsCoordinates, readonly, source } = useLocalSearchParams();
   const { theme } = useTheme();
   const { sessionToken } = useAuth();
   const { findLocationById, removeLocation, addBlockedLocation, refreshLocations } = useLocationContext();
+  
+  // Check if this is a readonly view (from followed folders)
+  const isReadOnly = readonly === 'true';
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [videos, setVideos] = useState<VideoPost[]>([]);
@@ -559,18 +562,22 @@ export default function Location() {
               >
                 <Ionicons name="navigate" size={28} color={theme.colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionIcon}
-                onPress={handleEditPress}
-              >
-                <Ionicons name="pencil" size={28} color={theme.colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionIcon}
-                onPress={handleDeleteLocation}
-              >
-                <Ionicons name="trash-outline" size={28} color="#ff6b6b" />
-              </TouchableOpacity>
+              {!isReadOnly && (
+                <TouchableOpacity 
+                  style={styles.actionIcon}
+                  onPress={handleEditPress}
+                >
+                  <Ionicons name="pencil" size={28} color={theme.colors.primary} />
+                </TouchableOpacity>
+              )}
+              {!isReadOnly && (
+                <TouchableOpacity 
+                  style={styles.actionIcon}
+                  onPress={handleDeleteLocation}
+                >
+                  <Ionicons name="trash-outline" size={28} color="#ff6b6b" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
