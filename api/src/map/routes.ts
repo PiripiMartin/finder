@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { db } from "../database";
 import { verifySessionToken } from "../user/session";
-import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getPersonalFolderIds, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost } from "./queries";
+import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getPersonalFolderIds, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld } from "./queries";
 import { removeSavedLocationForUser } from "../posts/queries";
 
 /**
@@ -131,6 +131,26 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
 
         const payload = { personal, followed };
         return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
+    } catch (error) {
+        console.error(`Error fetching saved locations for account ${accountId}:`, error);
+        return new Response("Internal server error", { status: 500 });
+    }
+}
+
+export async function getSavedLocationsOld(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing or malformed session token", { status: 401 });
+    }
+
+    const accountId = await verifySessionToken(sessionToken);
+    if (accountId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    try {
+        const savedLocations = await getSavedLocationsWithTopPostOld(accountId);
+        return new Response(JSON.stringify(savedLocations), { status: 200, headers: { "Content-Type": "application/json" } });
     } catch (error) {
         console.error(`Error fetching saved locations for account ${accountId}:`, error);
         return new Response("Internal server error", { status: 500 });

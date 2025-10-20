@@ -114,12 +114,111 @@ export async function getSavedLocationsWithTopPost(userId: number): Promise<Loca
     });
 }
 
+export async function getSavedLocationsWithTopPostOld(userId: number): Promise<any[]> {
+    const query = `
+        SELECT 
+            mp.id,
+            mp.google_place_id,
+            mp.title,
+            mp.description,
+            mp.emoji,
+            mp.website_url,
+            mp.phone_number,
+            mp.address,
+            mp.created_at,
+            mp.is_valid_location,
+            ST_X(mp.location) as longitude,
+            ST_Y(mp.location) as latitude,
+            p.id as post_id,
+            p.url as post_url,
+            p.posted_by as post_posted_by,
+            p.posted_at as post_posted_at
+        FROM map_points mp
+        INNER JOIN (
+            -- Find the most recent post for each location by the user
+            SELECT DISTINCT
+                map_point_id,
+                FIRST_VALUE(id) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as id,
+                FIRST_VALUE(url) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as url,
+                FIRST_VALUE(posted_by) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_by,
+                FIRST_VALUE(posted_at) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_at
+            FROM posts
+            WHERE posted_by = ?
+        ) p ON mp.id = p.map_point_id
+        -- Exclude locations the user has soft-deleted
+        WHERE mp.id NOT IN (
+            SELECT map_point_id FROM user_deleted_locations WHERE user_id = ?
+        )
+        ORDER BY p.posted_at DESC
+    `;
+    
+    const [rows] = await db.execute(query, [userId, userId]) as [any[], any];
+    const results = toCamelCase(rows) as any[];
+    
+    const userEdits = await fetchUserLocationEdits(userId);
+    const editsMap = new Map(userEdits.map(edit => [edit.mapPointId, edit]));
+    
+    return results.map(row => {
+        const location: MapPoint = {
+            id: row.id,
+            googlePlaceId: row.googlePlaceId,
+            title: row.title,
+            description: row.description,
+            emoji: row.emoji,
+            latitude: row.latitude,
+            longitude: row.longitude,
+            recommendable: row.recommendable,
+            isValidLocation: row.isValidLocation,
+            websiteUrl: row.websiteUrl,
+            phoneNumber: row.phoneNumber,
+            address: row.address,
+            createdAt: row.createdAt
+        };
+    
+        const edit = editsMap.get(row.id);
+    
+        const addressUpdated = edit?.googlePlaceId != location.googlePlaceId;
+    
+        if (edit) {
+            location.title = edit.title ?? location.title;
+            location.description = edit.description ?? location.description;
+            location.emoji = edit.emoji ?? location.emoji;
+            location.websiteUrl = edit.websiteUrl ?? location.websiteUrl;
+            location.phoneNumber = edit.phoneNumber ?? location.phoneNumber;
+            location.address = edit.address ?? location.address;
+            location.googlePlaceId = edit.googlePlaceId ?? location.googlePlaceId;
+            location.latitude = edit.latitude ?? location.latitude;
+            location.longitude = edit.longitude ?? location.longitude;
+        
+            if (addressUpdated) {
+                // If the location changed in Google Maps but the new website/phone number 
+                // wasn't found, make sure we're not just reporting the old website/phone.
+                location.websiteUrl = edit.websiteUrl ?? "";
+                location.phoneNumber = edit.phoneNumber ?? "";
+            }
+        }
+    
+        return {
+            location,
+            topPost: {
+                id: row.postId,
+                url: row.postUrl,
+                postedBy: row.postPostedBy,
+                mapPointId: parseInt(row.id),
+                postedAt: row.postPostedAt
+            }
+        };
+    });
+}
+
+
+
 /**
- * Returns folder IDs created by the given user, ordered by creation date (desc).
+ * Returns folder IDs owned by the given user, ordered by creation date (desc).
  */
 export async function getPersonalFolderIds(userId: number): Promise<number[]> {
     const [rows] = await db.execute(
-        "SELECT id FROM folders WHERE creator_id = ? ORDER BY created_at DESC",
+        "SELECT folder_id as id FROM folder_owners WHERE user_id = ?;",
         [userId]
     ) as [any[], any];
     return rows.map(r => r.id as number);

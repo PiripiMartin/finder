@@ -1,12 +1,12 @@
 import { createPost, deletePost } from "./posts/routes";
-import { getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations, deleteLocationForUser } from "./map/routes";
+import { getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations, deleteLocationForUser, getSavedLocationsOld } from "./map/routes";
 import { login, validateSessionToken, signup, getProfileData, deleteUserAccount, editUserLocation } from "./user/routes";
 import { 
     addLocationToFolderEndpoint, 
     removeLocationFromFolderEndpoint, 
     followFolderEndpoint, 
     unfollowFolderEndpoint,
-    getCreatedFolders,
+    getOwnedFolders,
     getFollowedFoldersEndpoint,
     getFolderLocations,
     createFolderEndpoint
@@ -34,7 +34,8 @@ Bun.serve({
         // Map data
         "/api/map/saved-and-recommended": { GET: getSavedAndRecommendedLocations },
         "/api/map/guest-posts": { GET: getGuestRecommendations },
-        "/api/map/saved": { GET: getSavedLocations },
+        "/api/map/saved-new": { GET: getSavedLocations },
+        "/api/map/saved": { GET: getSavedLocationsOld },
         "/api/map/:id/posts": { GET: getPostsForLocation },
         "/api/map/:id": { DELETE: deleteLocationForUser },
         "/api/map/edit/:id": { POST: editUserLocation },
@@ -45,7 +46,7 @@ Bun.serve({
 
         // Folder management
         "/api/folders": { POST: createFolderEndpoint },
-        "/api/folders/created": { GET: getCreatedFolders },
+        "/api/folders/owned": { GET: getOwnedFolders },
         "/api/folders/followed": { GET: getFollowedFoldersEndpoint },
         "/api/folders/:folderId/locations": { 
             GET: getFolderLocations,
