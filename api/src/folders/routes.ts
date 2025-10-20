@@ -3,6 +3,7 @@ import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
 import { 
     addLocationToFolder, 
+    addLocationsToFolder,
     removeLocationFromFolder, 
     followFolder, 
     unfollowFolder,
@@ -80,9 +81,9 @@ export async function createFolderEndpoint(req: BunRequest): Promise<Response> {
 }
 
 /**
- * Adds a location to a folder.
+ * Adds locations to a folder in bulk.
  *
- * @param req - The Bun request, containing the session token, folder ID, and location ID.
+ * @param req - The Bun request, containing the session token, folder ID in path, and locationIds array in body.
  * @returns A response indicating success or failure.
  */
 export async function addLocationToFolderEndpoint(req: BunRequest): Promise<Response> {
@@ -101,14 +102,24 @@ export async function addLocationToFolderEndpoint(req: BunRequest): Promise<Resp
         return new Response("Invalid folder ID", { status: 400 });
     }
 
-    const data = await checkedExtractBody(req, ["mapPointId"]);
+    const data = await checkedExtractBody(req, ["locationIds"]);
     if (!data) {
-        return new Response("Missing mapPointId in request body", { status: 400 });
+        return new Response("Missing locationIds in request body", { status: 400 });
     }
 
-    const mapPointId = parseInt(data.mapPointId, 10);
-    if (isNaN(mapPointId)) {
-        return new Response("Invalid mapPointId", { status: 400 });
+    // Validate locationIds is an array
+    if (!Array.isArray(data.locationIds)) {
+        return new Response("locationIds must be an array", { status: 400 });
+    }
+
+    // Validate that all locationIds are valid numbers
+    const locationIds = data.locationIds.map((id: any) => parseInt(id, 10));
+    if (locationIds.some(isNaN)) {
+        return new Response("All locationIds must be valid numbers", { status: 400 });
+    }
+
+    if (locationIds.length === 0) {
+        return new Response("At least one locationId must be provided", { status: 400 });
     }
 
     try {
@@ -125,14 +136,18 @@ export async function addLocationToFolderEndpoint(req: BunRequest): Promise<Resp
             return new Response("You don't have permission to add locations to this folder", { status: 403 });
         }
 
-        await addLocationToFolder(folderId, mapPointId);
+        await addLocationsToFolder(folderId, locationIds);
         
         return new Response(
-            JSON.stringify({ success: true, message: "Location added to folder" }),
+            JSON.stringify({ 
+                success: true, 
+                message: `${locationIds.length} location(s) added to folder`,
+                addedCount: locationIds.length
+            }),
             { status: 200, headers: { "Content-Type": "application/json" } }
         );
     } catch (error) {
-        console.error(`Error adding location ${mapPointId} to folder ${folderId}:`, error);
+        console.error(`Error adding locations to folder ${folderId}:`, error);
         return new Response("Internal server error", { status: 500 });
     }
 }

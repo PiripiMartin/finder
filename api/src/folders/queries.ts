@@ -58,6 +58,31 @@ export async function addLocationToFolder(folderId: number, mapPointId: number):
 }
 
 /**
+ * Adds multiple locations to a folder in bulk.
+ *
+ * @param folderId - The ID of the folder.
+ * @param mapPointIds - Array of map point IDs to add.
+ * @returns A promise that resolves when all locations are added.
+ */
+export async function addLocationsToFolder(folderId: number, mapPointIds: number[]): Promise<void> {
+    if (mapPointIds.length === 0) {
+        return;
+    }
+
+    // Create placeholders for the VALUES clause
+    const placeholders = mapPointIds.map(() => '(?, ?)').join(', ');
+    const query = `
+        INSERT IGNORE INTO folder_locations (folder_id, map_point_id)
+        VALUES ${placeholders}
+    `;
+    
+    // Flatten the parameters: [folderId, mapPointId1, folderId, mapPointId2, ...]
+    const params = mapPointIds.flatMap(mapPointId => [folderId, mapPointId]);
+    
+    await db.execute(query, params);
+}
+
+/**
  * Removes a location from a folder.
  *
  * @param folderId - The ID of the folder.
