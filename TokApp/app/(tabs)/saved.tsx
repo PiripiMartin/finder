@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Dimensions, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import DraggableGrid from 'react-native-draggable-grid';
 import { API_CONFIG } from '../config/api';
 import CreateFolderModal from '../components/CreateFolderModal';
 import LocationSelectorModal from '../components/LocationSelectorModal';
+import ShareFolderModal from '../components/ShareFolderModal';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
@@ -50,6 +51,9 @@ interface ApiResponse {
     uncategorised: SavedLocation[];
     [folderId: string]: SavedLocation[];
   };
+  shared: {
+    [folderId: string]: SavedLocation[];
+  };
   followed: {
     [folderId: string]: SavedLocation[];
   };
@@ -76,9 +80,11 @@ export default function Saved() {
   
   // Folder state
   const [folders, setFolders] = useState<ApiFolder[]>([]);
+  const [sharedFolderLocationsMap, setSharedFolderLocationsMap] = useState<{ [folderId: number]: SavedLocation[] }>({});
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [showLocationSelectorModal, setShowLocationSelectorModal] = useState(false);
+  const [showShareFolderModal, setShowShareFolderModal] = useState(false);
   const [folderDragTarget, setFolderDragTarget] = useState<string | null>(null);
   const [isFolderEditMode, setIsFolderEditMode] = useState(false);
   const [isFolderReorderMode, setIsFolderReorderMode] = useState(false);
@@ -162,10 +168,29 @@ export default function Saved() {
       setFolderLocationsMap(folderMap);
       console.log('📂 [Saved] Folder locations map:', Object.keys(folderMap).length, 'folders');
       
-      // Build flat list of all locations for search/filtering
+      // Process shared folders section - only process numeric folder IDs, skip invalid keys
+      const sharedLocMap: { [folderId: number]: SavedLocation[] } = {};
+      if (data.shared) {
+        Object.keys(data.shared).forEach(key => {
+          // Skip 'personal' or any non-numeric keys that shouldn't be in shared
+          if (key === 'personal' || key === 'uncategorised') {
+            console.log('⚠️ [Saved] Skipping invalid key in shared section:', key);
+            return;
+          }
+          const folderId = parseInt(key);
+          if (!isNaN(folderId)) {
+            sharedLocMap[folderId] = data.shared[key] || [];
+          }
+        });
+        setSharedFolderLocationsMap(sharedLocMap);
+        console.log('🤝 [Saved] Shared folder locations map:', Object.keys(sharedLocMap).length, 'folders');
+      }
+      
+      // Build flat list of all locations for search/filtering (include shared folders)
       const allLocations: SavedLocation[] = [
         ...uncategorised,
-        ...Object.values(folderMap).flat()
+        ...Object.values(folderMap).flat(),
+        ...Object.values(sharedLocMap).flat()
       ];
       setSavedLocations(allLocations);
       setFilteredLocations(allLocations);
@@ -412,26 +437,11 @@ export default function Saved() {
     );
   };
 
-  // Handle deleting folder with confirmation
-  const handleShareFolder = useCallback(async () => {
+  // Handle sharing folder - open modal for user to choose share type
+  const handleShareFolder = useCallback(() => {
     if (!selectedFolderId) return;
-    
-    const folder = folders.find(f => f.id === selectedFolderId);
-    if (!folder) return;
-    
-    try {
-      const shareUrl = `lai://folder/${selectedFolderId}`;
-      const message = `Check out my folder "${folder.name}" on Lai!`;
-      
-      await Share.share({
-        message: `${message}\n${shareUrl}`,
-        url: shareUrl,
-        title: folder.name,
-      });
-    } catch (error) {
-      console.error('❌ [Saved] Error sharing folder:', error);
-    }
-  }, [selectedFolderId, folders]);
+    setShowShareFolderModal(true);
+  }, [selectedFolderId]);
 
   const handleDeleteFolder = async (folderId: number) => {
     const folder = folders.find(f => f.id === folderId);
@@ -515,7 +525,8 @@ export default function Saved() {
 
   // Get locations in a specific folder, applying search filter
   const getFolderLocations = (folderId: number): SavedLocation[] => {
-    let folderLocations = folderLocationsMap[folderId] || [];
+    // Check both personal and shared folder location maps
+    let folderLocations = folderLocationsMap[folderId] || sharedFolderLocationsMap[folderId] || [];
     
     // Apply search filter if there's a search query
     if (searchQuery.trim()) {
@@ -641,6 +652,7 @@ export default function Saved() {
 
   // Get current folder for header display
   const currentFolder = selectedFolderId ? folders.find(f => f.id === selectedFolderId) : null;
+  const isSharedFolder = selectedFolderId ? !!sharedFolderLocationsMap[selectedFolderId] : false;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -666,12 +678,64 @@ export default function Saved() {
                 </TouchableOpacity>
               )}
               {!isFolderReorderMode && !isFolderEditMode && (
-                <TouchableOpacity
-                  style={[styles.reorderButton, { backgroundColor: '#ff6b6b', marginLeft: 8 }]}
-                  onPress={() => handleDeleteFolder(selectedFolderId)}
-                >
-                  <Ionicons name="trash-outline" size={24} color="#FFFFFF" />
-                </TouchableOpacity>
+                isSharedFolder ? (
+                  <TouchableOpacity
+                    style={[styles.reorderButton, { backgroundColor: '#ff6b6b', marginLeft: 8 }]}
+                    onPress={async () => {
+                      if (!selectedFolderId) return;
+                      const folder = folders.find(f => f.id === selectedFolderId);
+                      if (!folder) return;
+                      
+                      Alert.alert(
+                        'Leave Shared Folder',
+                        `Are you sure you want to leave "${folder.name}"?`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Leave',
+                            style: 'destructive',
+                            onPress: async () => {
+                              try {
+                                const response = await fetch(`${API_CONFIG.BASE_URL}/folders/${selectedFolderId}/leave-as-owner`, {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${sessionToken || ''}`,
+                                  },
+                                });
+                                
+                                if (!response.ok) {
+                                  const text = await response.text();
+                                  if (text.includes('last owner')) {
+                                    Alert.alert('Error', 'Cannot leave - you are the last owner');
+                                  } else {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                  }
+                                  return;
+                                }
+                                
+                                handleBackToMain();
+                                await refreshData();
+                              } catch (error) {
+                                console.error('Error leaving folder:', error);
+                                Alert.alert('Error', 'Failed to leave folder');
+                              }
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Ionicons name="exit-outline" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.reorderButton, { backgroundColor: '#ff6b6b', marginLeft: 8 }]}
+                    onPress={() => handleDeleteFolder(selectedFolderId)}
+                  >
+                    <Ionicons name="trash-outline" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                )
               )}
               {!isFolderReorderMode && (
                 <TouchableOpacity
@@ -939,28 +1003,30 @@ export default function Saved() {
             </View>
           ) : (
             <View style={styles.locationsList}>
-              {/* Render folders first */}
-              {folders.map((folder) => (
-                <TouchableOpacity 
-                  key={folder.id} 
-                  style={[
-                    styles.locationCard,
-                    styles.folderCard,
-                    { backgroundColor: folder.color + '20', borderColor: folder.color, shadowColor: theme.colors.shadow }
-                  ]}
-                  onPress={() => handleFolderPress(folder.id)}
-                >
-                  <View style={styles.folderCardContent}>
-                    <Ionicons name="folder" size={32} color={folder.color} />
-                    <Text style={[styles.folderTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                      {folder.name}
-                    </Text>
-                  </View>
-                  <View style={[styles.folderCount, { backgroundColor: folder.color }]}>
-                    <Text style={styles.folderCountText}>{(folderLocationsMap[folder.id] || []).length}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+              {/* Render folders first - only personal folders (those NOT in sharedFolderLocationsMap) */}
+              {folders
+                .filter(folder => !sharedFolderLocationsMap[folder.id])
+                .map((folder) => (
+                  <TouchableOpacity 
+                    key={folder.id} 
+                    style={[
+                      styles.locationCard,
+                      styles.folderCard,
+                      { backgroundColor: folder.color + '20', borderColor: folder.color, shadowColor: theme.colors.shadow }
+                    ]}
+                    onPress={() => handleFolderPress(folder.id)}
+                  >
+                    <View style={styles.folderCardContent}>
+                      <Ionicons name="folder" size={32} color={folder.color} />
+                      <Text style={[styles.folderTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                        {folder.name}
+                      </Text>
+                    </View>
+                    <View style={[styles.folderCount, { backgroundColor: folder.color }]}>
+                      <Text style={styles.folderCountText}>{(folderLocationsMap[folder.id] || []).length}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
 
               {/* Create folder card */}
               <TouchableOpacity 
@@ -978,6 +1044,45 @@ export default function Saved() {
                   </Text>
                 </View>
               </TouchableOpacity>
+
+              {/* Shared folders section - folders that appear in data.shared with locations */}
+              {Object.keys(sharedFolderLocationsMap).length > 0 && (
+                <View style={styles.sharedSection}>
+                  <View style={styles.sharedSectionHeader}>
+                    <Ionicons name="people-outline" size={20} color={theme.colors.textSecondary} />
+                    <Text style={[styles.sharedSectionTitle, { color: theme.colors.textSecondary }]}>
+                      Shared with Me
+                    </Text>
+                  </View>
+                  {Object.keys(sharedFolderLocationsMap).map(folderIdStr => {
+                    const folderId = parseInt(folderIdStr);
+                    const folder = folders.find(f => f.id === folderId);
+                    if (!folder) return null;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={folderId}
+                        style={[styles.sharedFolderCard, { 
+                          backgroundColor: theme.colors.surface,
+                          borderColor: folder.color,
+                        }]}
+                        onPress={() => handleFolderPress(folderId)}
+                      >
+                        <View style={[styles.folderColorBar, { backgroundColor: folder.color }]} />
+                        <View style={styles.folderInfo}>
+                          <Text style={[styles.folderName, { color: theme.colors.text }]} numberOfLines={1}>
+                            {folder.name}
+                          </Text>
+                          <Text style={[styles.folderCount, { color: theme.colors.textSecondary }]}>
+                            {(sharedFolderLocationsMap[folderId] || []).length} locations
+                          </Text>
+                        </View>
+                        <Ionicons name="people" size={18} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
 
               {/* Render unfiled locations */}
               {getUnfiledLocations().map((item) => (
@@ -1024,6 +1129,16 @@ export default function Saved() {
           onAddLocations={handleAddLocationsToFolder}
           availableLocations={getUnfiledLocations()}
           currentFolderLocationIds={[]}
+        />
+      )}
+
+      {/* Share Folder Modal */}
+      {selectedFolderId && (
+        <ShareFolderModal
+          visible={showShareFolderModal}
+          onClose={() => setShowShareFolderModal(false)}
+          folderName={folders.find(f => f.id === selectedFolderId)?.name || ''}
+          folderId={selectedFolderId}
         />
       )}
     </View>
@@ -1368,5 +1483,54 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  sharedSection: {
+    width: '100%',
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  sharedSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  sharedSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sharedFolderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderStyle: 'dashed',
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  folderColorBar: {
+    width: 4,
+    height: 40,
+    borderRadius: 2,
+    marginRight: 12,
+  },
+  folderInfo: {
+    flex: 1,
+  },
+  folderName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
   },
 }); 

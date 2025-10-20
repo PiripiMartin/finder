@@ -15,9 +15,17 @@ import { useShare } from '../context/ShareContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTutorial } from '../context/TutorialContext';
 import { MapPoint } from '../mapData';
-import { Folder, loadFolders } from '../utils/folderStorage';
+import { API_CONFIG } from '../config/api';
 
 import { videoUrls } from '../videoData';
+
+interface Folder {
+  id: number;
+  name: string;
+  color: string;
+  locationIds: number[];
+  title: string;
+}
 
 // Function to calculate distance between two coordinates in meters
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -77,7 +85,7 @@ export default function Index() {
   const insets = useSafeAreaInsets();
 
   // Filter state
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<number | null>(null);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   
   // Folder state
@@ -450,16 +458,65 @@ export default function Index() {
     }
   }, [userLocation, isGuest, sessionToken]);
 
-  // Load folders function
+  // Load folders function - fetch from API and process with location data
   const loadFoldersData = useCallback(async () => {
+    if (!sessionToken) {
+      console.log('📂 [Map] No session token, skipping folder load');
+      return;
+    }
+
     try {
-      const loadedFolders = await loadFolders();
-      setFolders(loadedFolders);
-      console.log('📂 [Map] Loaded folders:', loadedFolders.length);
+      // Fetch both folders and saved locations
+      const [foldersResponse, locationsResponse] = await Promise.all([
+        fetch(`${API_CONFIG.BASE_URL}/folders/owned`, {
+          headers: {
+            'Authorization': `Bearer ${sessionToken}`,
+          },
+        }),
+        fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
+          headers: {
+            'Authorization': `Bearer ${sessionToken}`,
+          },
+        }),
+      ]);
+
+      if (!foldersResponse.ok || !locationsResponse.ok) {
+        throw new Error('Failed to fetch folders or locations');
+      }
+
+      const foldersData = await foldersResponse.json();
+      const locationsData = await locationsResponse.json();
+
+      // Build folder objects with location IDs from personal section only
+      const foldersWithLocations = foldersData.map((folder: any) => {
+        const locationIds: number[] = [];
+        
+        // Get locations from personal section for this folder
+        if (locationsData.personal && locationsData.personal[folder.id]) {
+          const folderLocations = locationsData.personal[folder.id];
+          folderLocations.forEach((item: any) => {
+            if (item.location && item.location.id) {
+              locationIds.push(item.location.id);
+            }
+          });
+        }
+
+        return {
+          id: folder.id,
+          name: folder.name,
+          title: folder.name, // For compatibility with existing filter code
+          color: folder.color,
+          locationIds,
+        };
+      });
+
+      setFolders(foldersWithLocations);
+      console.log('📂 [Map] Loaded folders from API:', foldersWithLocations.length);
     } catch (error) {
       console.error('❌ [Map] Error loading folders:', error);
+      setFolders([]);
     }
-  }, []);
+  }, [sessionToken]);
 
   // Load folders on mount
   useEffect(() => {
