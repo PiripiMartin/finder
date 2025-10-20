@@ -992,27 +992,6 @@ export default function Index() {
         </TouchableOpacity>
       )}
 
-
-
-      {/* Logout Button - Top Right (only show when authenticated) */}
-      {!isGuest && sessionToken && (
-        <TouchableOpacity 
-          style={[
-            styles.logoutButton,
-            {
-              top: insets.top + 30,
-              right: insets.right + 30,
-            }
-          ]}
-          onPress={handleLogout}
-        >
-          <Ionicons name="log-out" size={20} color="#A8C3A0" />
-          <Text style={styles.logoutButtonText}>Logout</Text>
-        </TouchableOpacity>
-      )}
-
-
-
       {/* Filter Buttons - Bottom */}
       <View style={[
         styles.filterContainer,
