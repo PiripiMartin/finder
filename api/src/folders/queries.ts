@@ -5,7 +5,6 @@ import { db, toCamelCase } from "../database";
  */
 export interface Folder {
     id: number;
-    creatorId: number | null;
     name: string;
     color: string;
     createdAt: Date;
@@ -33,6 +32,14 @@ export interface FolderLocation {
 export interface FolderFollow {
     userId: number;
     folderId: number;
+}
+
+/**
+ * Interface for folder ownership relationship
+ */
+export interface FolderOwner {
+    folderId: number;
+    userId: number;
 }
 
 /**
@@ -130,16 +137,17 @@ export async function isLocationInFolder(folderId: number, mapPointId: number): 
 }
 
 /**
- * Gets all folders created by a user.
+ * Gets all folders owned by a user.
  *
  * @param userId - The ID of the user.
  * @returns A promise that resolves to an array of folders.
  */
-export async function getFoldersByCreator(userId: number): Promise<Folder[]> {
+export async function getFoldersByOwner(userId: number): Promise<Folder[]> {
     const query = `
-        SELECT * FROM folders 
-        WHERE creator_id = ?
-        ORDER BY created_at DESC
+        SELECT f.* FROM folders f
+        INNER JOIN folder_owners fo ON f.id = fo.folder_id
+        WHERE fo.user_id = ?
+        ORDER BY f.created_at DESC
     `;
     const [rows] = await db.execute(query, [userId]) as [any[], any];
     return toCamelCase(rows) as Folder[];
@@ -187,16 +195,19 @@ export async function getLocationsInFolder(folderId: number): Promise<number[]> 
  */
 export async function createFolder(userId: number, folderData: CreateFolderRequest): Promise<Folder> {
     const query = `
-        INSERT INTO folders (creator_id, name, color)
-        VALUES (?, ?, ?)
+        INSERT INTO folders (name, color)
+        VALUES (?, ?)
     `;
-    await db.execute(query, [userId, folderData.name, folderData.color]);
+    await db.execute(query, [folderData.name, folderData.color]);
 
     const [idRows] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
     const folderId = idRows[0].id;
 
-    const [rows] = await db.execute("SELECT * FROM folders WHERE id = ?", [folderId]) as [any[], any];
-    return toCamelCase(rows[0]) as Folder;
+    // Add the creator as the first owner
+    await addFolderOwner(folderId, userId);
+
+    // Return the folder
+    return await getFolderById(folderId) as Folder;
 }
 
 /**
@@ -215,4 +226,67 @@ export async function getFolderById(folderId: number): Promise<Folder | null> {
         return null;
     }
     return toCamelCase(rows[0]) as Folder;
+}
+
+/**
+ * Adds an owner to a folder.
+ *
+ * @param folderId - The ID of the folder.
+ * @param userId - The ID of the user to add as owner.
+ * @returns A promise that resolves when the owner is added.
+ */
+export async function addFolderOwner(folderId: number, userId: number): Promise<void> {
+    const query = `
+        INSERT IGNORE INTO folder_owners (folder_id, user_id)
+        VALUES (?, ?)
+    `;
+    await db.execute(query, [folderId, userId]);
+}
+
+/**
+ * Removes an owner from a folder.
+ *
+ * @param folderId - The ID of the folder.
+ * @param userId - The ID of the user to remove as owner.
+ * @returns A promise that resolves when the owner is removed.
+ */
+export async function removeFolderOwner(folderId: number, userId: number): Promise<void> {
+    const query = `
+        DELETE FROM folder_owners 
+        WHERE folder_id = ? AND user_id = ?
+    `;
+    await db.execute(query, [folderId, userId]);
+}
+
+/**
+ * Checks if a user is an owner of a folder.
+ *
+ * @param userId - The ID of the user.
+ * @param folderId - The ID of the folder.
+ * @returns A promise that resolves to true if the user is an owner, false otherwise.
+ */
+export async function isFolderOwner(userId: number, folderId: number): Promise<boolean> {
+    const query = `
+        SELECT 1 FROM folder_owners 
+        WHERE user_id = ? AND folder_id = ?
+        LIMIT 1
+    `;
+    const [rows] = await db.execute(query, [userId, folderId]) as [any[], any];
+    return rows.length > 0;
+}
+
+/**
+ * Gets all owners of a folder.
+ *
+ * @param folderId - The ID of the folder.
+ * @returns A promise that resolves to an array of user IDs.
+ */
+export async function getFolderOwners(folderId: number): Promise<number[]> {
+    const query = `
+        SELECT user_id FROM folder_owners 
+        WHERE folder_id = ?
+        ORDER BY user_id
+    `;
+    const [rows] = await db.execute(query, [folderId]) as [any[], any];
+    return rows.map(row => row.user_id);
 }
