@@ -23,8 +23,7 @@ const lightTheme: Theme = {
   colors: {
     background: '#FFFFFF',
     surface: '#F8F9FA',
-    text: '#333333',
-    textSecondary: '#a39e98',
+    text: '#333333',    textSecondary: '#a39e98',
     primary: '#A8C3A0',
     border: '#E5E7EB',
     shadow: '#463333',
