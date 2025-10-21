@@ -57,7 +57,7 @@ interface PlacesDetailsResponse {
  * @returns The embeddable URL for the TikTok player.
  */
 export function buildTikTokEmbedUrl(videoId: string): string {
-    return `https://www.tiktok.com/player/v1/${videoId}?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
+    return `https://www.tiktok.com/player/v1/${videoId}?loop=1&autoplay=1&controls=1&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
 }
 
 /**
