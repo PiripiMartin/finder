@@ -24,7 +24,7 @@ const lightTheme: Theme = {
     background: '#FFFFFF',
     surface: '#F8F9FA',
     text: '#333333',
-    textSecondary: '#835858',
+    textSecondary: '#a39e98',
     primary: '#A8C3A0',
     border: '#E5E7EB',
     shadow: '#463333',
