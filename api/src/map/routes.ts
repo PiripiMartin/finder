@@ -1,7 +1,8 @@
 import type { BunRequest } from "bun";
 import { db } from "../database";
 import { verifySessionToken } from "../user/session";
-import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld, getCreatedFolderIds, getCoOwnedFolderIds } from "./queries";
+import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld, getCreatedFolderIds, getCoOwnedFolderIds, fetchUserLocationEditsForUsersAndMapPoints } from "./queries";
+import { getFolderOwners, removeLocationFromFolder } from "../folders/queries";
 import { removeSavedLocationForUser } from "../posts/queries";
 
 /**
@@ -69,7 +70,7 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
         const userEdits = await fetchUserLocationEdits(accountId);
         const editsMap = new Map(userEdits.map(edit => [edit.mapPointId, edit]));
 
-        const formatRows = (rows: any[]) => rows.map(row => {
+        const formatRows = (rows: any[], ownerEditsMap?: Map<number, any>) => rows.map(row => {
             const location = {
                 id: row.id,
                 googlePlaceId: row.google_place_id,
@@ -86,7 +87,8 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
                 createdAt: row.created_at
             } as any;
 
-            const edit = editsMap.get(row.id);
+            // Prefer viewer's own edit; otherwise if provided, fall back to owner edit
+            const edit = editsMap.get(row.id) ?? ownerEditsMap?.get(row.id);
             const addressUpdated = edit?.googlePlaceId != location.googlePlaceId;
             if (edit) {
                 location.title = edit.title ?? location.title;
@@ -129,14 +131,55 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
         const shared: any = {};
         for (const folderId of coOwnedFolderIds) {
             const rows = await fetchFolderLocations(folderId);
-            shared[folderId] = formatRows(rows);
+
+            // Owners of this folder (including creator)
+            const ownerIds = await getFolderOwners(folderId);
+            const uniqueOwnerIds = Array.from(new Set(ownerIds));
+
+            const mapPointIds = rows.map(r => r.id as number);
+
+            let ownerEditsMap: Map<number, any> | undefined = undefined;
+            if (uniqueOwnerIds.length > 0 && mapPointIds.length > 0) {
+                const ownerEdits = await fetchUserLocationEditsForUsersAndMapPoints(uniqueOwnerIds, mapPointIds);
+                ownerEditsMap = new Map<number, any>();
+                for (const edit of ownerEdits) {
+                    const existing = ownerEditsMap.get(edit.mapPointId);
+                    if (!existing || new Date(edit.lastUpdated).getTime() > new Date(existing.lastUpdated).getTime()) {
+                        ownerEditsMap.set(edit.mapPointId, edit);
+                    }
+                }
+            }
+
+            shared[folderId] = formatRows(rows, ownerEditsMap);
         }
 
-        // Build followed folders object
+        // Build followed folders object; apply fallbacks to owners' edits if viewer has none
         const followed: any = {};
         for (const folderId of followedFolderIds) {
             const rows = await fetchFolderLocations(folderId);
-            followed[folderId] = formatRows(rows);
+
+            // Gather owners for this folder (including creator) to source edits
+            const ownerIds = await getFolderOwners(folderId);
+            const uniqueOwnerIds = Array.from(new Set(ownerIds));
+
+            // Collect map point ids in this folder
+            const mapPointIds = rows.map(r => r.id as number);
+
+            let ownerEditsMap: Map<number, any> | undefined = undefined;
+            if (uniqueOwnerIds.length > 0 && mapPointIds.length > 0) {
+                const ownerEdits = await fetchUserLocationEditsForUsersAndMapPoints(uniqueOwnerIds, mapPointIds);
+                ownerEditsMap = new Map<number, any>();
+
+                // If multiple owners edited the same location, prefer the most recent
+                for (const edit of ownerEdits) {
+                    const existing = ownerEditsMap.get(edit.mapPointId);
+                    if (!existing || new Date(edit.lastUpdated).getTime() > new Date(existing.lastUpdated).getTime()) {
+                        ownerEditsMap.set(edit.mapPointId, edit);
+                    }
+                }
+            }
+
+            followed[folderId] = formatRows(rows, ownerEditsMap);
         }
 
         const payload = { personal, shared, followed };
@@ -210,8 +253,9 @@ export async function getSavedAndRecommendedLocations(req: BunRequest): Promise<
 
 
 /**
- * Deletes a location for the authenticated user by removing it from saved locations
- * and setting posted_by to null for all their posts at that location.
+ * Deletes a location for the authenticated user by removing it from saved locations,
+ * setting posted_by to null for all their posts at that location, and removing the
+ * location from all folders where the user is a co-owner.
  *
  * @param req - The Bun request, containing the session token and the location ID.
  * @returns A response indicating success or failure.
@@ -241,6 +285,21 @@ export async function deleteLocationForUser(req: BunRequest): Promise<Response> 
             "UPDATE posts SET posted_by = NULL WHERE posted_by = ? AND map_point_id = ?",
             [accountId, id]
         );
+        
+        // Remove the location from all folders the user owns or co-owns
+        const [createdFolderIds, coOwnedFolderIds] = await Promise.all([
+            getCreatedFolderIds(accountId),
+            getCoOwnedFolderIds(accountId)
+        ]);
+        const uniqueFolderIds = Array.from(new Set([...createdFolderIds, ...coOwnedFolderIds]));
+        for (const folderId of uniqueFolderIds) {
+            try {
+                await removeLocationFromFolder(folderId, id);
+            } catch (folderError) {
+                console.error(`Error removing location ${id} from folder ${folderId}:`, folderError);
+                // Continue with other folders even if one fails
+            }
+        }
         
         return new Response(null, { status: 204 });
     } catch (error) {

@@ -495,6 +495,7 @@ export async function fetchPostsForLocation(locationId: number): Promise<Post[]>
 export async function fetchUserLocationEdits(userId: number): Promise<LocationEdit[]> {
     const query = `
         SELECT
+            user_id,
             map_point_id,
             title,
             description,
@@ -513,6 +514,45 @@ export async function fetchUserLocationEdits(userId: number): Promise<LocationEd
     `;
 
     const [rows] = await db.execute(query, [userId]) as [any[], any];
+    return toCamelCase(rows) as LocationEdit[];
+}
+
+
+/**
+ * Fetches user location edits for a set of users and a set of map points.
+ * Useful for applying shared edits from folder owners to followers/co-owners.
+ */
+export async function fetchUserLocationEditsForUsersAndMapPoints(
+    userIds: number[],
+    mapPointIds: number[]
+): Promise<LocationEdit[]> {
+    if (userIds.length === 0 || mapPointIds.length === 0) {
+        return [];
+    }
+
+    const userPlaceholders = userIds.map(() => '?').join(', ');
+    const mapPointPlaceholders = mapPointIds.map(() => '?').join(', ');
+
+    const query = `
+        SELECT
+            user_id,
+            map_point_id,
+            title,
+            description,
+            emoji,
+            ST_X(location) as longitude,
+            ST_Y(location) as latitude,
+            website_url,
+            phone_number,
+            address,
+            created_at,
+            last_updated
+        FROM user_location_edits
+        WHERE user_id IN (${userPlaceholders})
+          AND map_point_id IN (${mapPointPlaceholders})
+    `;
+
+    const [rows] = await db.execute(query, [...userIds, ...mapPointIds]) as [any[], any];
     return toCamelCase(rows) as LocationEdit[];
 }
 
