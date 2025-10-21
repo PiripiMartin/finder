@@ -2,7 +2,7 @@ import type { BunRequest } from "bun";
 import { db } from "../database";
 import { verifySessionToken } from "../user/session";
 import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld, getCreatedFolderIds, getCoOwnedFolderIds, fetchUserLocationEditsForUsersAndMapPoints } from "./queries";
-import { getFolderOwners } from "../folders/queries";
+import { getFolderOwners, removeLocationFromFolder } from "../folders/queries";
 import { removeSavedLocationForUser } from "../posts/queries";
 
 /**
@@ -253,8 +253,9 @@ export async function getSavedAndRecommendedLocations(req: BunRequest): Promise<
 
 
 /**
- * Deletes a location for the authenticated user by removing it from saved locations
- * and setting posted_by to null for all their posts at that location.
+ * Deletes a location for the authenticated user by removing it from saved locations,
+ * setting posted_by to null for all their posts at that location, and removing the
+ * location from all folders where the user is a co-owner.
  *
  * @param req - The Bun request, containing the session token and the location ID.
  * @returns A response indicating success or failure.
@@ -284,6 +285,17 @@ export async function deleteLocationForUser(req: BunRequest): Promise<Response> 
             "UPDATE posts SET posted_by = NULL WHERE posted_by = ? AND map_point_id = ?",
             [accountId, id]
         );
+        
+        // Remove the location from all folders where the user is a co-owner
+        const coOwnedFolderIds = await getCoOwnedFolderIds(accountId);
+        for (const folderId of coOwnedFolderIds) {
+            try {
+                await removeLocationFromFolder(folderId, id);
+            } catch (folderError) {
+                console.error(`Error removing location ${id} from folder ${folderId}:`, folderError);
+                // Continue with other folders even if one fails
+            }
+        }
         
         return new Response(null, { status: 204 });
     } catch (error) {
