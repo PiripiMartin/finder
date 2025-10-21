@@ -1522,7 +1522,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    borderStyle: 'dashed',
     borderWidth: 2,
     shadowColor: '#000',
     shadowOffset: {

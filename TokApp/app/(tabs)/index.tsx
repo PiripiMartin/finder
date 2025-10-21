@@ -278,7 +278,8 @@ export default function Index() {
         savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
         recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
         
-        // Also fetch shared and followed locations from /map/saved-new
+        // Also fetch ALL locations from /map/saved-new to get complete folder contents
+        // This includes locations added by other co-owners to shared folders
         try {
           const savedNewResponse = await fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
             headers: {
@@ -291,8 +292,18 @@ export default function Index() {
             const savedNewData = await savedNewResponse.json();
             console.log('📂 [fetchMapPoints] Fetched saved-new data:', savedNewData);
             
-            // Collect all additional locations
+            // Collect all additional locations from ALL sections
             const additionalLocations: any[] = [];
+            
+            // Extract locations from personal folders (includes co-owned folder locations)
+            if (savedNewData.personal) {
+              Object.keys(savedNewData.personal).forEach((folderId) => {
+                const folderLocations = savedNewData.personal[folderId];
+                if (Array.isArray(folderLocations)) {
+                  additionalLocations.push(...folderLocations);
+                }
+              });
+            }
             
             // Extract locations from shared folders
             if (savedNewData.shared) {
@@ -325,11 +336,11 @@ export default function Index() {
             
             savedLocationsData = [...savedLocationsData, ...uniqueAdditionalLocations];
             
-            console.log('📂 [fetchMapPoints] After adding shared/followed, total saved locations:', savedLocationsData.length);
+            console.log('📂 [fetchMapPoints] After adding all folder locations, total saved locations:', savedLocationsData.length);
             console.log('📂 [fetchMapPoints] Added unique locations:', uniqueAdditionalLocations.length);
           }
         } catch (error) {
-          console.error('❌ [fetchMapPoints] Error fetching shared/followed locations:', error);
+          console.error('❌ [fetchMapPoints] Error fetching folder locations:', error);
         }
       }
       
@@ -1342,7 +1353,7 @@ export default function Index() {
           styles.progressBanner,
           {
             backgroundColor: theme.colors.primary,
-            bottom: insets.bottom - 10, // Position very close to the nav bar
+            bottom: insets.bottom + 20, // Position above the nav bar
           }
         ]}>
           <View style={styles.progressBannerTop}>
