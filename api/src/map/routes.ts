@@ -286,9 +286,13 @@ export async function deleteLocationForUser(req: BunRequest): Promise<Response> 
             [accountId, id]
         );
         
-        // Remove the location from all folders where the user is a co-owner
-        const coOwnedFolderIds = await getCoOwnedFolderIds(accountId);
-        for (const folderId of coOwnedFolderIds) {
+        // Remove the location from all folders the user owns or co-owns
+        const [createdFolderIds, coOwnedFolderIds] = await Promise.all([
+            getCreatedFolderIds(accountId),
+            getCoOwnedFolderIds(accountId)
+        ]);
+        const uniqueFolderIds = Array.from(new Set([...createdFolderIds, ...coOwnedFolderIds]));
+        for (const folderId of uniqueFolderIds) {
             try {
                 await removeLocationFromFolder(folderId, id);
             } catch (folderError) {
