@@ -63,7 +63,7 @@ export default function Saved() {
   const router = useRouter();
   const { theme } = useTheme();
   const { sessionToken, isGuest } = useAuth();
-  const { registerRefreshCallback } = useLocationContext();
+  const { registerRefreshCallback, setSavedLocations: setContextSavedLocations } = useLocationContext();
   const { showTutorial, tutorialFeatureEnabled } = useTutorial();
   
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
@@ -195,6 +195,10 @@ export default function Saved() {
       setSavedLocations(allLocations);
       setFilteredLocations(allLocations);
       setReorderedLocations(uncategorised);
+      
+      // Update LocationContext so location details page can access ALL locations
+      setContextSavedLocations(allLocations);
+      console.log('📍 [Saved] Updated LocationContext with all locations:', allLocations.length);
       
       console.log('📚 [Saved] Total locations:', allLocations.length);
       
