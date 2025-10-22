@@ -568,6 +568,99 @@ export async function fetchUserLocationEditsForUsersAndMapPoints(
     return toCamelCase(rows) as LocationEdit[];
 }
 
+/**
+ * Fetches all folder locations with their top posts in a single optimized query.
+ * Returns data grouped by folder_id for efficient processing.
+ */
+export async function getAllFolderLocationsWithTopPost(folderIds: number[]): Promise<Map<number, any[]>> {
+    if (folderIds.length === 0) {
+        return new Map();
+    }
+
+    const folderPlaceholders = folderIds.map(() => '?').join(', ');
+    
+    const query = `
+        SELECT DISTINCT
+            fl.folder_id,
+            mp.id,
+            mp.google_place_id,
+            mp.title,
+            mp.description,
+            mp.emoji,
+            mp.website_url,
+            mp.phone_number,
+            mp.address,
+            mp.created_at,
+            mp.is_valid_location,
+            ST_X(mp.location) as longitude,
+            ST_Y(mp.location) as latitude,
+            p.id as post_id,
+            p.url as post_url,
+            p.posted_by as post_posted_by,
+            p.posted_at as post_posted_at
+        FROM folder_locations fl
+        INNER JOIN map_points mp ON fl.map_point_id = mp.id
+        LEFT JOIN (
+            SELECT DISTINCT
+                map_point_id,
+                FIRST_VALUE(id) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as id,
+                FIRST_VALUE(url) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as url,
+                FIRST_VALUE(posted_by) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_by,
+                FIRST_VALUE(posted_at) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_at
+            FROM posts
+        ) p ON mp.id = p.map_point_id
+        WHERE fl.folder_id IN (${folderPlaceholders})
+        ORDER BY fl.folder_id, COALESCE(p.posted_at, mp.created_at) DESC
+    `;
+    
+    const [rows] = await db.execute(query, folderIds) as [any[], any];
+    
+    // Group results by folder_id
+    const folderMap = new Map<number, any[]>();
+    for (const row of rows) {
+        const folderId = row.folder_id;
+        if (!folderMap.has(folderId)) {
+            folderMap.set(folderId, []);
+        }
+        folderMap.get(folderId)!.push(row);
+    }
+    
+    return folderMap;
+}
+
+/**
+ * Fetches all folder owners in a single optimized query.
+ * Returns a map of folder_id -> owner_ids for efficient processing.
+ */
+export async function getAllFolderOwners(folderIds: number[]): Promise<Map<number, number[]>> {
+    if (folderIds.length === 0) {
+        return new Map();
+    }
+
+    const folderPlaceholders = folderIds.map(() => '?').join(', ');
+    
+    const query = `
+        SELECT fo.folder_id, fo.user_id
+        FROM folder_owners fo
+        WHERE fo.folder_id IN (${folderPlaceholders})
+        ORDER BY fo.folder_id
+    `;
+    
+    const [rows] = await db.execute(query, folderIds) as [any[], any];
+    
+    // Group results by folder_id
+    const ownerMap = new Map<number, number[]>();
+    for (const row of rows) {
+        const folderId = row.folder_id;
+        if (!ownerMap.has(folderId)) {
+            ownerMap.set(folderId, []);
+        }
+        ownerMap.get(folderId)!.push(row.user_id);
+    }
+    
+    return ownerMap;
+}
+
 
 
 
