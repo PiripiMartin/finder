@@ -470,7 +470,8 @@ export async function getRecommendedLocationsWithTopPost(
 }
 
 /**
- * Fetches all posts for a specific location.
+ * Fetches all posts for a specific location, excluding posts with duplicate URLs.
+ * For duplicate URLs, only the most recent post is returned.
  *
  * @param locationId - The ID of the location.
  * @returns A promise that resolves to an array of posts for the given location.
@@ -483,8 +484,19 @@ export async function fetchPostsForLocation(locationId: number): Promise<Post[]>
             posted_by,
             map_point_id,
             posted_at
-        FROM posts
-        WHERE map_point_id = ?
+        FROM (
+            SELECT 
+                id,
+                url,
+                posted_by,
+                map_point_id,
+                posted_at,
+                ROW_NUMBER() OVER (PARTITION BY url ORDER BY posted_at DESC) as rn
+            FROM posts
+            WHERE map_point_id = ?
+        ) ranked_posts
+        WHERE rn = 1
+        ORDER BY posted_at DESC
     `;
 
     const [rows] = await db.execute(query, [locationId]) as [any[], any];
