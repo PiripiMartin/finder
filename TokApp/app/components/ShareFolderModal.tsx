@@ -44,7 +44,7 @@ export default function ShareFolderModal({
   const handleShareAsCollaborative = async () => {
     try {
       const shareUrl = `lai://folder/${folderId}/join-owner`;
-      const message = `Join my collaborative folder "${folderName}" on Lai!`;
+      const message = `Join my collaborative folder "${folderName}" on Lai! (paste link into safari if it's not clickable)`;
       
       await Share.share({
         message: `${message}\n${shareUrl}`,

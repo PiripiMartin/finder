@@ -16,6 +16,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useTutorial } from '../context/TutorialContext';
 import { MapPoint } from '../mapData';
 import { API_CONFIG } from '../config/api';
+import { cacheMapPoints, loadCachedMapPoints, clearMapPointsCache } from '../utils/mapPointsCache';
 
 import { videoUrls } from '../videoData';
 
@@ -96,6 +97,7 @@ export default function Index() {
   const [savedLocations, setSavedLocations] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(0);
+  const [isLoadingFromCache, setIsLoadingFromCache] = useState(true);
   const REFRESH_INTERVAL = 10000; // 10 seconds in milliseconds
   
 
@@ -156,6 +158,36 @@ export default function Index() {
       setIsLoadingVideos(prev => ({ ...prev, [locationId]: false }));
     }
   };
+
+  // Load cached map points on initial mount
+  const loadCachedData = useCallback(async () => {
+    try {
+      console.log('📦 [loadCachedData] Loading cached map data...');
+      const cachedData = await loadCachedMapPoints();
+      
+      if (cachedData) {
+        console.log('✅ [loadCachedData] Found cached data, loading into state');
+        
+        // Load cached data into state
+        setMapPoints(cachedData.transformedMapPoints);
+        setSavedLocations(cachedData.savedLocations);
+        setContextSavedLocations(cachedData.savedLocations);
+        setContextRecommendedLocations(cachedData.recommendedLocations);
+        
+        console.log('📦 [loadCachedData] Successfully loaded cached data:', {
+          mapPoints: cachedData.transformedMapPoints.length,
+          savedLocations: cachedData.savedLocations.length,
+          recommendedLocations: cachedData.recommendedLocations.length,
+        });
+      } else {
+        console.log('📦 [loadCachedData] No cached data available');
+      }
+    } catch (error) {
+      console.error('❌ [loadCachedData] Error loading cached data:', error);
+    } finally {
+      setIsLoadingFromCache(false);
+    }
+  }, [setContextSavedLocations, setContextRecommendedLocations]);
 
   // Fetch map points from API
   const fetchMapPoints = useCallback(async () => {
@@ -424,6 +456,15 @@ export default function Index() {
       console.log('🎉 [fetchMapPoints] Successfully fetched data from API, total points:', transformedMapPoints.length);
       console.log('📱 [fetchMapPoints] State updated with map points:', transformedMapPoints);
       
+      // Cache the fetched data for offline access
+      await cacheMapPoints({
+        savedLocations: savedLocationsData,
+        recommendedLocations,
+        transformedMapPoints,
+        timestamp: Date.now(),
+      });
+      console.log('💾 [fetchMapPoints] Data cached successfully');
+      
     } catch (err) {
       console.error('Error fetching map points:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch map points');
@@ -628,6 +669,18 @@ export default function Index() {
       console.log('📂 [Map] Screen focused, reloading folders...');
       loadFoldersData();
     }, [loadFoldersData])
+  );
+
+  // Refresh map points when screen is focused (after app closes/reopens)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🗺️ [Map] Screen focused, refreshing map points...');
+      if (userLocation) {
+        // Reset the last refresh time to allow immediate refresh
+        setLastRefresh(0);
+        fetchMapPoints();
+      }
+    }, [userLocation, fetchMapPoints])
   );
 
   // Load map points when user location is available
@@ -879,7 +932,10 @@ export default function Index() {
     buttonAnim.stopAnimation();
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Clear cached map points when logging out
+    await clearMapPointsCache();
+    console.log('🗑️ [Logout] Cleared map points cache');
     logout();
     router.push('/auth/login');
   };
@@ -947,6 +1003,11 @@ export default function Index() {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Load cached data on initial mount for instant display
+  useEffect(() => {
+    loadCachedData();
+  }, [loadCachedData]);
 
   // Show tutorial overlay if needed (automatic or manual) and feature is enabled
   if (tutorialFeatureEnabled && (shouldShowTutorial || showManualTutorial)) {
