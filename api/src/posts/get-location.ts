@@ -36,14 +36,14 @@ interface PlacesDetailsResponse {
     displayName: {
         text: string;
     };
-    nationalPhoneNumber: string;
-    websiteUri: string;
+    nationalPhoneNumber?: string;
+    websiteUri?: string;
     location: {
         latitude: number;
         longitude: number;
     };
     formattedAddress: string;
-    generativeSummary: {
+    generativeSummary?: {
         overview: string;
     };
 }
@@ -57,7 +57,7 @@ interface PlacesDetailsResponse {
  * @returns The embeddable URL for the TikTok player.
  */
 export function buildTikTokEmbedUrl(videoId: string): string {
-    return `https://www.tiktok.com/player/v1/${videoId}?loop=1&autoplay=1&controls=0&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
+    return `https://www.tiktok.com/player/v1/${videoId}?loop=1&autoplay=1&controls=1&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
 }
 
 /**
@@ -106,7 +106,7 @@ export async function extractPossibleLocationName(embedInfo: EmbedResponse): Pro
     3. Include any location hints (city, neighborhood, etc.) if mentioned
     4. Be formatted as a simple text string suitable for Google Places API
 
-    IMPORTANT: If you cannot find a good search query, return an empty string and nothing else.
+    IMPORTANT: If you cannot find a good search query OR if you are not confident about the name, return an empty string and nothing else.
 
     Return ONLY the search query text, nothing else.`;
 
@@ -191,7 +191,8 @@ export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDeta
             method: "GET",
             headers: {
                 "X-Goog-Api-Key": apiKey,
-                "X-Goog-FieldMask": "id,displayName,formattedAddress,location,nationalPhoneNumber,websiteUri,generativeSummary",
+                //"X-Goog-FieldMask": "id,displayName,formattedAddress,location,nationalPhoneNumber,websiteUri,generativeSummary",
+                "X-Goog-FieldMask": "id,displayName,formattedAddress,location", // Temporary Essentials-only SKU fix
             },
         });
 

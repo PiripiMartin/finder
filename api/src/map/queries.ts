@@ -470,7 +470,8 @@ export async function getRecommendedLocationsWithTopPost(
 }
 
 /**
- * Fetches all posts for a specific location.
+ * Fetches all posts for a specific location, excluding posts with duplicate URLs.
+ * For duplicate URLs, only the most recent post is returned.
  *
  * @param locationId - The ID of the location.
  * @returns A promise that resolves to an array of posts for the given location.
@@ -483,8 +484,19 @@ export async function fetchPostsForLocation(locationId: number): Promise<Post[]>
             posted_by,
             map_point_id,
             posted_at
-        FROM posts
-        WHERE map_point_id = ?
+        FROM (
+            SELECT 
+                id,
+                url,
+                posted_by,
+                map_point_id,
+                posted_at,
+                ROW_NUMBER() OVER (PARTITION BY url ORDER BY posted_at DESC) as rn
+            FROM posts
+            WHERE map_point_id = ?
+        ) ranked_posts
+        WHERE rn = 1
+        ORDER BY posted_at DESC
     `;
 
     const [rows] = await db.execute(query, [locationId]) as [any[], any];
@@ -495,6 +507,7 @@ export async function fetchPostsForLocation(locationId: number): Promise<Post[]>
 export async function fetchUserLocationEdits(userId: number): Promise<LocationEdit[]> {
     const query = `
         SELECT
+            user_id,
             map_point_id,
             title,
             description,
@@ -514,6 +527,138 @@ export async function fetchUserLocationEdits(userId: number): Promise<LocationEd
 
     const [rows] = await db.execute(query, [userId]) as [any[], any];
     return toCamelCase(rows) as LocationEdit[];
+}
+
+
+/**
+ * Fetches user location edits for a set of users and a set of map points.
+ * Useful for applying shared edits from folder owners to followers/co-owners.
+ */
+export async function fetchUserLocationEditsForUsersAndMapPoints(
+    userIds: number[],
+    mapPointIds: number[]
+): Promise<LocationEdit[]> {
+    if (userIds.length === 0 || mapPointIds.length === 0) {
+        return [];
+    }
+
+    const userPlaceholders = userIds.map(() => '?').join(', ');
+    const mapPointPlaceholders = mapPointIds.map(() => '?').join(', ');
+
+    const query = `
+        SELECT
+            user_id,
+            map_point_id,
+            title,
+            description,
+            emoji,
+            ST_X(location) as longitude,
+            ST_Y(location) as latitude,
+            website_url,
+            phone_number,
+            address,
+            created_at,
+            last_updated
+        FROM user_location_edits
+        WHERE user_id IN (${userPlaceholders})
+          AND map_point_id IN (${mapPointPlaceholders})
+    `;
+
+    const [rows] = await db.execute(query, [...userIds, ...mapPointIds]) as [any[], any];
+    return toCamelCase(rows) as LocationEdit[];
+}
+
+/**
+ * Fetches all folder locations with their top posts in a single optimized query.
+ * Returns data grouped by folder_id for efficient processing.
+ */
+export async function getAllFolderLocationsWithTopPost(folderIds: number[]): Promise<Map<number, any[]>> {
+    if (folderIds.length === 0) {
+        return new Map();
+    }
+
+    const folderPlaceholders = folderIds.map(() => '?').join(', ');
+    
+    const query = `
+        SELECT DISTINCT
+            fl.folder_id,
+            mp.id,
+            mp.google_place_id,
+            mp.title,
+            mp.description,
+            mp.emoji,
+            mp.website_url,
+            mp.phone_number,
+            mp.address,
+            mp.created_at,
+            mp.is_valid_location,
+            ST_X(mp.location) as longitude,
+            ST_Y(mp.location) as latitude,
+            p.id as post_id,
+            p.url as post_url,
+            p.posted_by as post_posted_by,
+            p.posted_at as post_posted_at
+        FROM folder_locations fl
+        INNER JOIN map_points mp ON fl.map_point_id = mp.id
+        LEFT JOIN (
+            SELECT DISTINCT
+                map_point_id,
+                FIRST_VALUE(id) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as id,
+                FIRST_VALUE(url) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as url,
+                FIRST_VALUE(posted_by) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_by,
+                FIRST_VALUE(posted_at) OVER (PARTITION BY map_point_id ORDER BY posted_at DESC) as posted_at
+            FROM posts
+        ) p ON mp.id = p.map_point_id
+        WHERE fl.folder_id IN (${folderPlaceholders})
+        ORDER BY fl.folder_id, COALESCE(p.posted_at, mp.created_at) DESC
+    `;
+    
+    const [rows] = await db.execute(query, folderIds) as [any[], any];
+    
+    // Group results by folder_id
+    const folderMap = new Map<number, any[]>();
+    for (const row of rows) {
+        const folderId = row.folder_id;
+        if (!folderMap.has(folderId)) {
+            folderMap.set(folderId, []);
+        }
+        folderMap.get(folderId)!.push(row);
+    }
+    
+    return folderMap;
+}
+
+/**
+ * Fetches all folder owners in a single optimized query.
+ * Returns a map of folder_id -> owner_ids for efficient processing.
+ */
+export async function getAllFolderOwners(folderIds: number[]): Promise<Map<number, number[]>> {
+    if (folderIds.length === 0) {
+        return new Map();
+    }
+
+    const folderPlaceholders = folderIds.map(() => '?').join(', ');
+    
+    const query = `
+        SELECT fo.folder_id, fo.user_id
+        FROM folder_owners fo
+        WHERE fo.folder_id IN (${folderPlaceholders})
+        ORDER BY fo.folder_id
+    `;
+    
+    const [rows] = await db.execute(query, folderIds) as [any[], any];
+    
+    // Group results by folder_id
+    const ownerMap = new Map<number, number[]>();
+    for (const row of rows) {
+        const folderId = row.folder_id;
+        if (!ownerMap.has(folderId)) {
+            ownerMap.set(folderId, []);
+        }
+        ownerMap.get(folderId)!.push(row.user_id);
+    }
+    
+    return ownerMap;
 }
 
 
