@@ -313,11 +313,10 @@ export default function Index() {
           ];
         }
       } else {
-        // Authenticated API format
-        savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
-        recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+        // Authenticated API format - ONLY fetch from /map/saved-new
+        // No longer using data.savedLocations or data.recommendedLocations
         
-        // Also fetch ALL locations from /map/saved-new to get complete folder contents
+        // Fetch ALL locations from /map/saved-new to get complete folder contents
         // This includes locations added by other co-owners to shared folders
         try {
           const savedNewResponse = await fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
@@ -331,15 +330,15 @@ export default function Index() {
             const savedNewData = await savedNewResponse.json();
             console.log('📂 [fetchMapPoints] Fetched saved-new data:', savedNewData);
             
-            // Collect all additional locations from ALL sections
-            const additionalLocations: any[] = [];
+            // Collect all locations from ALL sections
+            const allLocations: any[] = [];
             
             // Extract locations from personal folders (includes co-owned folder locations)
             if (savedNewData.personal) {
               Object.keys(savedNewData.personal).forEach((folderId) => {
                 const folderLocations = savedNewData.personal[folderId];
                 if (Array.isArray(folderLocations)) {
-                  additionalLocations.push(...folderLocations);
+                  allLocations.push(...folderLocations);
                 }
               });
             }
@@ -349,7 +348,7 @@ export default function Index() {
               Object.keys(savedNewData.shared).forEach((folderId) => {
                 const folderLocations = savedNewData.shared[folderId];
                 if (Array.isArray(folderLocations)) {
-                  additionalLocations.push(...folderLocations);
+                  allLocations.push(...folderLocations);
                 }
               });
             }
@@ -359,28 +358,30 @@ export default function Index() {
               Object.keys(savedNewData.followed).forEach((folderId) => {
                 const folderLocations = savedNewData.followed[folderId];
                 if (Array.isArray(folderLocations)) {
-                  additionalLocations.push(...folderLocations);
+                  allLocations.push(...folderLocations);
                 }
               });
             }
             
-            // Deduplicate: only add locations that aren't already in savedLocationsData
-            const existingLocationIds = new Set(
-              savedLocationsData.map((loc: any) => loc.location?.id).filter(Boolean)
-            );
+            // Deduplicate locations by ID
+            const seenIds = new Set();
+            savedLocationsData = allLocations.filter((loc: any) => {
+              if (loc.location?.id && !seenIds.has(loc.location.id)) {
+                seenIds.add(loc.location.id);
+                return true;
+              }
+              return false;
+            });
             
-            const uniqueAdditionalLocations = additionalLocations.filter(
-              (loc: any) => loc.location?.id && !existingLocationIds.has(loc.location.id)
-            );
-            
-            savedLocationsData = [...savedLocationsData, ...uniqueAdditionalLocations];
-            
-            console.log('📂 [fetchMapPoints] After adding all folder locations, total saved locations:', savedLocationsData.length);
-            console.log('📂 [fetchMapPoints] Added unique locations:', uniqueAdditionalLocations.length);
+            console.log('📂 [fetchMapPoints] Total unique saved-new locations:', savedLocationsData.length);
           }
         } catch (error) {
           console.error('❌ [fetchMapPoints] Error fetching folder locations:', error);
+          savedLocationsData = [];
         }
+        
+        // No recommended locations - only showing saved-new
+        recommendedLocations = [];
       }
       
       // Safely extract and validate the data
