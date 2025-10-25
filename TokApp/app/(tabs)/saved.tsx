@@ -746,7 +746,8 @@ export default function Saved() {
                   />
                 </TouchableOpacity>
               )}
-              {!isFolderEditMode && getFolderLocations(selectedFolderId).length > 1 && (
+              {/* REMOVED: Folder reorder button - keeping functionality for future restoration */}
+              {/* {!isFolderEditMode && getFolderLocations(selectedFolderId).length > 1 && (
                 <TouchableOpacity
                   style={[styles.reorderButton, { marginLeft: 8 }, isFolderReorderMode && { backgroundColor: theme.colors.primary }]}
                   onPress={toggleFolderReorderMode}
@@ -757,7 +758,7 @@ export default function Saved() {
                     color={isFolderReorderMode ? '#FFFFFF' : theme.colors.text} 
                   />
                 </TouchableOpacity>
-              )}
+              )} */}
               {!isFolderReorderMode && !isFolderEditMode && (
                 <TouchableOpacity
                   style={[styles.reorderButton, { backgroundColor: theme.colors.primary, marginLeft: 8 }]}
@@ -772,7 +773,8 @@ export default function Saved() {
           // Main view header
           <>
             <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
-            {getUnfiledLocations().length > 1 && !searchQuery && !selectedFolderId && (
+            {/* REMOVED: Main reorder button - keeping functionality for future restoration */}
+            {/* {getUnfiledLocations().length > 1 && !searchQuery && !selectedFolderId && (
               <TouchableOpacity
                 style={[styles.reorderButton, isReorderMode && { backgroundColor: theme.colors.primary }]}
                 onPress={toggleReorderMode}
@@ -783,7 +785,7 @@ export default function Saved() {
                   color={isReorderMode ? '#FFFFFF' : theme.colors.text} 
                 />
               </TouchableOpacity>
-            )}
+            )} */}
           </>
         )}
       </View>
