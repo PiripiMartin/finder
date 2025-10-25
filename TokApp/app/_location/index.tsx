@@ -154,7 +154,21 @@ export default function Location() {
       })).filter((video: VideoPost) => video.url); // Only include videos with valid URLs
       
       console.log('Processed videos:', fetchedVideos);
-      setVideos(fetchedVideos);
+      
+      // Sort videos by platform priority (TikTok first) then by date (newest first)
+      const sortedVideos = fetchedVideos.sort((a, b) => {
+        const platformA = getVideoPlatform(a.url);
+        const platformB = getVideoPlatform(b.url);
+        
+        // TikTok videos get priority (appear first)
+        if (platformA === 'tiktok' && platformB !== 'tiktok') return -1;
+        if (platformA !== 'tiktok' && platformB === 'tiktok') return 1;
+        
+        // If same platform, maintain original order (or could sort by date if available)
+        return 0;
+      });
+      
+      setVideos(sortedVideos);
       
     } catch (error) {
       console.error('Error fetching location videos:', error);
