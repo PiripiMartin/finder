@@ -4,6 +4,7 @@ import { checkedExtractBody } from "../utils";
 import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, buildTikTokEmbedUrl } from "./get-location";
 import { db } from "../database";
 import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, createInvalidLocation, saveLocationForUser, removeSavedLocationForUser } from "./queries";
+import { getPostPlatform } from "./utils";
 
 
 interface NewPostRequest {
@@ -36,6 +37,13 @@ export async function createPost(req: BunRequest): Promise<Response> {
     if (!data) {
         return new Response("Malformed body", {status: 400});
     }
+
+    // Now, we check if the post is for TikTok or Instagram
+    const postPlatform = getPostPlatform(data.url);
+    if (!postPlatform) {
+        return new Response("Invalid post platform", {status: 400});
+    }
+
 
     // Get TikTok embed info
     const embedInfo = await getTikTokEmbedInfo(data.url);
@@ -222,8 +230,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
         longitude: placeDetails.location.longitude,
         isValidLocation: true, 
         recommendable: false, // Always starts as false
-        websiteUrl: placeDetails.websiteUri,
-        phoneNumber: placeDetails.nationalPhoneNumber,
+        websiteUrl: placeDetails.websiteUri ?? null,
+        phoneNumber: placeDetails.nationalPhoneNumber ?? null,
         address: placeDetails.formattedAddress,
     };
 
@@ -314,4 +322,3 @@ export async function deletePost(req: BunRequest): Promise<Response> {
         { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
 }
-
