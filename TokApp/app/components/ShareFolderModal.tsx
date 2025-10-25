@@ -25,26 +25,27 @@ export default function ShareFolderModal({
 }: ShareFolderModalProps) {
   const { theme } = useTheme();
 
-  const handleShareWithFollowers = async () => {
-    try {
-      const shareUrl = `lai://folder/${folderId}`;
-      const message = `Check out my folder "${folderName}" on Lai!`;
-      
-      await Share.share({
-        message: `${message}\n${shareUrl}`,
-        url: shareUrl,
-        title: folderName,
-      });
-      onClose();
-    } catch (error) {
-      console.error('Error sharing folder with followers:', error);
-    }
-  };
+  // REMOVED: handleShareWithFollowers function - keeping for future restoration
+  // const handleShareWithFollowers = async () => {
+  //   try {
+  //     const shareUrl = `lai://folder/${folderId}`;
+  //     const message = `Check out my folder "${folderName}" on Lai!`;
+  //     
+  //     await Share.share({
+  //       message: `${message}\n${shareUrl}`,
+  //       url: shareUrl,
+  //       title: folderName,
+  //     });
+  //     onClose();
+  //   } catch (error) {
+  //     console.error('Error sharing folder with followers:', error);
+  //   }
+  // };
 
   const handleShareAsCollaborative = async () => {
     try {
       const shareUrl = `lai://folder/${folderId}/join-owner`;
-      const message = `Join my collaborative folder "${folderName}" on Lai!`;
+      const message = `Join my collaborative folder "${folderName}" on Lai! (paste link into safari if it's not clickable)`;
       
       await Share.share({
         message: `${message}\n${shareUrl}`,
@@ -85,25 +86,6 @@ export default function ShareFolderModal({
 
           {/* Share Options */}
           <View style={styles.optionsContainer}>
-            {/* Share with Followers */}
-            <TouchableOpacity
-              style={[styles.optionCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
-              onPress={handleShareWithFollowers}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: theme.colors.primary + '20' }]}>
-                <Ionicons name="people-outline" size={32} color={theme.colors.primary} />
-              </View>
-              <View style={styles.optionContent}>
-                <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
-                  Share with Followers
-                </Text>
-                <Text style={[styles.optionDescription, { color: theme.colors.textSecondary }]}>
-                  Others can follow this folder to see its locations. They won't be able to add or edit locations.
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-
             {/* Share as Collaborative Folder */}
             <TouchableOpacity
               style={[styles.optionCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}

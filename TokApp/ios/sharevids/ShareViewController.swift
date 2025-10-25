@@ -10,7 +10,7 @@ class ShareViewController: UIViewController {
     // UI Elements
     private let containerView = UIView()
     private let statusLabel = UILabel()
-    private let brandLabel = UILabel() // "lai" branding
+    private let brandImageView = UIImageView() // Logo image instead of text
     private let activityIndicator = UIActivityIndicatorView(style: .large)
     private let closingIndicator = UIActivityIndicatorView(style: .medium)
     
@@ -44,13 +44,16 @@ class ShareViewController: UIViewController {
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(statusLabel)
         
-        // Brand label ("lai")
-        brandLabel.text = "lai"
-        brandLabel.font = UIFont.systemFont(ofSize: 40, weight: .bold) // Bigger letters
-        brandLabel.textColor = UIColor(red: 0.4, green: 0.3, blue: 0.2, alpha: 1.0) // Brown text color
-        brandLabel.textAlignment = .center
-        brandLabel.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(brandLabel)
+        // Brand image (logo)
+        if let logoImage = UIImage(named: "loading logo") {
+            brandImageView.image = logoImage
+        } else {
+            // Fallback to text if image not found
+            brandImageView.backgroundColor = UIColor(red: 0.4, green: 0.3, blue: 0.2, alpha: 1.0)
+        }
+        brandImageView.contentMode = .scaleAspectFit
+        brandImageView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(brandImageView)
         
         // Activity indicator
         activityIndicator.color = .systemBlue
@@ -85,9 +88,11 @@ class ShareViewController: UIViewController {
             closingIndicator.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
             closingIndicator.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 30),
             
-            // Brand label - positioned below activity indicator
-            brandLabel.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-            brandLabel.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 25),
+            // Brand image - positioned below activity indicator
+            brandImageView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            brandImageView.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 25),
+            brandImageView.widthAnchor.constraint(equalToConstant: 400),
+            brandImageView.heightAnchor.constraint(equalToConstant: 200),
         ])
         
         // Start the activity indicator
@@ -313,7 +318,7 @@ class ShareViewController: UIViewController {
         activityIndicator.alpha = 0
         
         // Show the success message for 1 second
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             // Then show closing state
             self.statusLabel.text = "Closing..."
             
@@ -322,7 +327,7 @@ class ShareViewController: UIViewController {
             self.closingIndicator.startAnimating()
             
             // Close after 0.5 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now()) {
                 self.completeRequest()
             }
         }
@@ -362,7 +367,7 @@ class ShareViewController: UIViewController {
                 self.closingIndicator.alpha = 1
                 self.closingIndicator.startAnimating()
                 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                DispatchQueue.main.asyncAfter(deadline: .now()) {
                     self.completeRequest()
                 }
             }

@@ -81,6 +81,13 @@ const mockLocationData: { [key: string]: LocationData } = {
   }
 };
 
+// Helper function to detect video platform from URL
+const getVideoPlatform = (url: string): 'tiktok' | 'instagram' | 'unknown' => {
+  if (url.includes('tiktok.com') || url.includes('vm.tiktok.com')) return 'tiktok';
+  if (url.includes('instagram.com') || url.includes('instagr.am')) return 'instagram';
+  return 'unknown';
+};
+
 export default function Location() {
   const router = useRouter();
   const { id, needsCoordinates, readonly, source } = useLocalSearchParams();
@@ -147,7 +154,21 @@ export default function Location() {
       })).filter((video: VideoPost) => video.url); // Only include videos with valid URLs
       
       console.log('Processed videos:', fetchedVideos);
-      setVideos(fetchedVideos);
+      
+      // Sort videos by platform priority (TikTok first) then by date (newest first)
+      const sortedVideos = fetchedVideos.sort((a, b) => {
+        const platformA = getVideoPlatform(a.url);
+        const platformB = getVideoPlatform(b.url);
+        
+        // TikTok videos get priority (appear first)
+        if (platformA === 'tiktok' && platformB !== 'tiktok') return -1;
+        if (platformA !== 'tiktok' && platformB === 'tiktok') return 1;
+        
+        // If same platform, maintain original order (or could sort by date if available)
+        return 0;
+      });
+      
+      setVideos(sortedVideos);
       
     } catch (error) {
       console.error('Error fetching location videos:', error);
@@ -650,59 +671,122 @@ export default function Location() {
                   <Text style={[styles.noVideosText, { color: theme.colors.textSecondary }]}>No videos available</Text>
                 </View>
               ) : (
-                videos.map((video, index) => (
-                  <TouchableOpacity 
-                    key={video.id} 
-                    style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
-                    onPress={() => handleVideoPress(video.url)}
-                  >
-                    <View style={styles.videoThumbnail}>
-                      <WebView
-                        source={{
-                          html: `
-                            <!DOCTYPE html>
-                            <html>
-                            <head>
-                              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                              <style>
-                                body { 
-                                  margin: 0; 
-                                  padding: 0; 
-                                  background: #000; 
-                                  display: flex;
-                                  justify-content: center;
-                                  align-items: center;
-                                  height: 100vh;
-                                }
-                                iframe { 
-                                  border: none; 
-                                  display: block;
-                                  width: 100%;
-                                  height: 100%;
-                                }
-                              </style>
-                            </head>
-                            <body>
-                              <iframe 
-                                src="${video.url}" 
-                                allow="fullscreen" 
-                                title="TikTok Video">
-                              </iframe>
-                            </body>
-                            </html>
-                          `
-                        }}
-                        style={styles.videoThumbnail}
-                        allowsInlineMediaPlayback={true}
-                        mediaPlaybackRequiresUserAction={false}
-                        javaScriptEnabled={true}
-                        domStorageEnabled={true}
-                        scrollEnabled={false}
-                        bounces={false}
-                      />
-                    </View>
-                  </TouchableOpacity>
-                ))
+                videos.map((video, index) => {
+                  const platform = getVideoPlatform(video.url);
+                  
+                  return (
+                    <TouchableOpacity 
+                      key={video.id} 
+                      style={[styles.videoTile, { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }]}
+                      onPress={() => handleVideoPress(video.url)}
+                    >
+                      <View style={styles.videoThumbnail}>
+                        <WebView
+                          source={{
+                            html: platform === 'instagram' ? `
+                              <!DOCTYPE html>
+                              <html>
+                              <head>
+                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                <style>
+                                  * {
+                                    margin: 0;
+                                    padding: 0;
+                                    box-sizing: border-box;
+                                  }
+                                  html, body { 
+                                    width: 100%;
+                                    height: 100%;
+                                    overflow: hidden;
+                                    background: transparent;
+                                  }
+                                  body {
+                                    position: relative;
+                                  }
+                                  #instagram-container {
+                                    position: absolute;
+                                    top: 0;
+                                    left: 0;
+                                    right: 0;
+                                    bottom: 0;
+                                    display: flex;
+                                    justify-content: center;
+                                    align-items: center;
+                                    overflow: hidden;
+                                    pointer-events: none;
+                                  }
+                                  .instagram-media {
+                                    max-width: 50% !important;
+                                    width: 50% !important;
+                                    margin: 0 auto !important;
+                                    transform: scale(0.79) translateY(6%);
+                                  }
+                                  iframe {
+                                    pointer-events: none;
+                                  }
+                                </style>
+                              </head>
+                              <body>
+                                <div id="instagram-container">
+                                  <blockquote 
+                                    class="instagram-media" 
+                                    data-instgrm-permalink="${video.url}" 
+                                    data-instgrm-version="14" 
+                                    style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);"
+                                  >
+                                    <div style="padding:16px;"> 
+                                      <a href="${video.url}" style="background:#FFFFFF; line-height:0; padding:0 0; text-align:center; text-decoration:none; width:100%;" target="_blank">Instagram Video</a>
+                                    </div>
+                                  </blockquote>
+                                </div>
+                                <script async src="https://www.instagram.com/embed.js"><\/script>
+                              </body>
+                              </html>
+                            ` : `
+                              <!DOCTYPE html>
+                              <html>
+                              <head>
+                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                <style>
+                                  body { 
+                                    margin: 0; 
+                                    padding: 0; 
+                                    background: #000; 
+                                    display: flex;
+                                    justify-content: center;
+                                    align-items: center;
+                                    height: 100vh;
+                                  }
+                                  iframe { 
+                                    border: none; 
+                                    display: block;
+                                    width: 100%;
+                                    height: 100%;
+                                  }
+                                </style>
+                              </head>
+                              <body>
+                                <iframe 
+                                  src="${video.url}" 
+                                  allow="fullscreen" 
+                                  title="TikTok Video">
+                                </iframe>
+                              </body>
+                              </html>
+                            `
+                          }}
+                          style={styles.videoThumbnail}
+                          allowsInlineMediaPlayback={true}
+                          mediaPlaybackRequiresUserAction={false}
+                          javaScriptEnabled={true}
+                          domStorageEnabled={true}
+                          scrollEnabled={false}
+                          bounces={false}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
               )}
             </View>
           </View>
@@ -710,70 +794,133 @@ export default function Location() {
       </ScrollView>
 
       {/* Full Screen Video Modal */}
-      {selectedVideo && (
-        <View style={styles.videoModal}>
-          <View style={styles.videoModalContent}>
-            <TouchableOpacity style={styles.closeVideoButton} onPress={closeVideo}>
-              <Ionicons name="close" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <WebView
-              key={selectedVideo}
-              source={{ 
-                html: `
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                      body { 
-                        margin: 0; 
-                        padding: 0; 
-                        background: #000; 
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        height: 100vh;
-                      }
-                      iframe { 
-                        border: none; 
-                        display: block;
-                        width: 100%;
-                        height: 100%;
-                      }
-                    </style>
-                  </head>
-                  <body>
-                    <iframe 
-                      src="${selectedVideo}" 
-                      allow="fullscreen" 
-                      title="TikTok Video">
-                    </iframe>
-                  </body>
-                  </html>
-                `
-              }}
-              style={styles.fullScreenVideo}
-              allowsInlineMediaPlayback={true}
-              mediaPlaybackRequiresUserAction={false}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-            />
-            <View style={styles.videoLinkContainer}>
-              <TouchableOpacity 
-                style={[styles.videoLinkButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => {
-                  if (selectedVideo) {
-                    Linking.openURL(selectedVideo);
-                  }
-                }}
-              >
-                <Ionicons name="link" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.videoLinkText}>Open in TikTok</Text>
+      {selectedVideo && (() => {
+        const modalPlatform = getVideoPlatform(selectedVideo);
+        const isInstagram = modalPlatform === 'instagram';
+        
+        return (
+          <View style={styles.videoModal}>
+            <View style={styles.videoModalContent}>
+              <TouchableOpacity style={styles.closeVideoButton} onPress={closeVideo}>
+                <Ionicons name="close" size={24} color="#FFFFFF" />
               </TouchableOpacity>
+              <WebView
+                key={selectedVideo}
+                source={{ 
+                  html: isInstagram ? `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                      <style>
+                        * {
+                          margin: 0;
+                          padding: 0;
+                          box-sizing: border-box;
+                        }
+                        html, body { 
+                          width: 100%;
+                          height: 100%;
+                          overflow: hidden;
+                          background: transparent;
+                        }
+                        body {
+                          position: relative;
+                        }
+                        #instagram-container {
+                          position: absolute;
+                          top: -55px;
+                          left: 50%;
+                          transform: translateX(-50%);
+                          width: 143%;
+                          height: 190%;
+                          overflow: hidden;
+                        }
+                        .instagram-media {
+                          max-width: 100% !important;
+                          width: 100% !important;
+                          margin: 0 auto !important;
+                          background: transparent !important;
+                        }
+                        blockquote {
+                          background: transparent !important;
+                        }
+                      </style>
+                    </head>
+                    <body>
+                      <div id="instagram-container">
+                        <blockquote 
+                          class="instagram-media" 
+                          data-instgrm-permalink="${selectedVideo}" 
+                          data-instgrm-version="14" 
+                          style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);"
+                        >
+                          <div style="padding:16px;"> 
+                            <a href="${selectedVideo}" style="background:#FFFFFF; line-height:0; padding:0 0; text-align:center; text-decoration:none; width:100%;" target="_blank">Instagram Video</a>
+                          </div>
+                        </blockquote>
+                      </div>
+                      <script async src="https://www.instagram.com/embed.js"><\/script>
+                    </body>
+                    </html>
+                  ` : `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                      <style>
+                        body { 
+                          margin: 0; 
+                          padding: 0; 
+                          background: #000; 
+                          display: flex;
+                          justify-content: center;
+                          align-items: center;
+                          height: 100vh;
+                        }
+                        iframe { 
+                          border: none; 
+                          display: block;
+                          width: 100%;
+                          height: 100%;
+                        }
+                      </style>
+                    </head>
+                    <body>
+                      <iframe 
+                        src="${selectedVideo}" 
+                        allow="fullscreen" 
+                        title="TikTok Video">
+                      </iframe>
+                    </body>
+                    </html>
+                  `
+                }}
+                style={styles.fullScreenVideo}
+                allowsInlineMediaPlayback={true}
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+              />
+              <View style={styles.videoLinkContainer}>
+                <TouchableOpacity 
+                  style={[styles.videoLinkButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => {
+                    if (selectedVideo) {
+                      Linking.openURL(selectedVideo);
+                    }
+                  }}
+                >
+                  <Ionicons name="link" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.videoLinkText}>
+                    {isInstagram ? 'Open in Instagram' : 'Open in TikTok'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      )}
+        );
+      })()}
 
       {/* Report Location Modal */}
       <Modal

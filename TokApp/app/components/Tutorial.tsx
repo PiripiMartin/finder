@@ -29,7 +29,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
       content: (
         <View style={styles.videoStepContent}>
           <Text style={styles.stepDescription}>
-            This is how you setup to save tiktoks to lai!
+            This is how you setup to save tiktoks or reels to lai!
           </Text>
           <View style={styles.videoContainer}>
             {isVideoLoading && (
@@ -56,11 +56,11 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
       ),
     },
     {
-      title: "How to Share from TikTok",
+      title: "How to Share from TikTok or Instagram",
       content: (
         <View style={styles.stepContent}>
           <Text style={styles.stepDescription}>
-            Follow these steps to share TikTok videos to lai:
+            Follow these steps to share TikToks or Instagram reels to lai:
           </Text>
           
           <View style={styles.instructionStep}>
@@ -68,7 +68,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
               <Text style={styles.stepNumberText}>1</Text>
             </View>
             <Text style={styles.instructionText}>
-              Press <Text style={styles.boldText}>Share</Text> on any TikTok video
+              Press <Text style={styles.boldText}>Share</Text> on any TikTok or Instagram reel
             </Text>
           </View>
           
@@ -77,7 +77,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
               <Text style={styles.stepNumberText}>2</Text>
             </View>
             <Text style={styles.instructionText}>
-              Tap the <Text style={styles.boldText}>...</Text> button in the share menu
+              Tap the <Text style={styles.boldText}>...</Text> button or Share to... button in the share menu
             </Text>
           </View>
           
@@ -92,7 +92,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           
           <View style={styles.illustrationContainer}>
             <Ionicons name="share-outline" size={60} color="#A8C3A0" />
-            <Text style={styles.illustrationText}>Share from any TikTok video!</Text>
+            <Text style={styles.illustrationText}>Share from any TikTok or Instagram reel!</Text>
           </View>
         </View>
       ),
@@ -110,7 +110,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
               <Text style={styles.stepNumberText}>1</Text>
             </View>
             <Text style={styles.instructionText}>
-              Press <Text style={styles.boldText}>Share</Text> in TikTok
+              Press <Text style={styles.boldText}>Share</Text> in TikTok or Instagram
             </Text>
           </View>
           
@@ -163,7 +163,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
       content: (
         <View style={styles.stepContent}>
           <Text style={styles.stepDescription}>
-            Once you share a TikTok video, here's what we do automatically:
+            Once you share a TikTok or Instagram reel, here's what we do automatically:
           </Text>
           
           <View style={styles.featureCard}>

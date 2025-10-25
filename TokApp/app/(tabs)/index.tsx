@@ -16,8 +16,16 @@ import { useTheme } from '../context/ThemeContext';
 import { useTutorial } from '../context/TutorialContext';
 import { MapPoint } from '../mapData';
 import { API_CONFIG } from '../config/api';
+import { cacheMapPoints, loadCachedMapPoints, clearMapPointsCache } from '../utils/mapPointsCache';
 
 import { videoUrls } from '../videoData';
+
+// Helper function to detect video platform from URL
+const getVideoPlatform = (url: string): 'tiktok' | 'instagram' | 'unknown' => {
+  if (url.includes('tiktok.com') || url.includes('vm.tiktok.com')) return 'tiktok';
+  if (url.includes('instagram.com') || url.includes('instagr.am')) return 'instagram';
+  return 'unknown';
+};
 
 interface Folder {
   id: number;
@@ -96,6 +104,7 @@ export default function Index() {
   const [savedLocations, setSavedLocations] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(0);
+  const [isLoadingFromCache, setIsLoadingFromCache] = useState(true);
   const REFRESH_INTERVAL = 10000; // 10 seconds in milliseconds
   
 
@@ -156,6 +165,36 @@ export default function Index() {
       setIsLoadingVideos(prev => ({ ...prev, [locationId]: false }));
     }
   };
+
+  // Load cached map points on initial mount
+  const loadCachedData = useCallback(async () => {
+    try {
+      console.log('📦 [loadCachedData] Loading cached map data...');
+      const cachedData = await loadCachedMapPoints();
+      
+      if (cachedData) {
+        console.log('✅ [loadCachedData] Found cached data, loading into state');
+        
+        // Load cached data into state
+        setMapPoints(cachedData.transformedMapPoints);
+        setSavedLocations(cachedData.savedLocations);
+        setContextSavedLocations(cachedData.savedLocations);
+        setContextRecommendedLocations(cachedData.recommendedLocations);
+        
+        console.log('📦 [loadCachedData] Successfully loaded cached data:', {
+          mapPoints: cachedData.transformedMapPoints.length,
+          savedLocations: cachedData.savedLocations.length,
+          recommendedLocations: cachedData.recommendedLocations.length,
+        });
+      } else {
+        console.log('📦 [loadCachedData] No cached data available');
+      }
+    } catch (error) {
+      console.error('❌ [loadCachedData] Error loading cached data:', error);
+    } finally {
+      setIsLoadingFromCache(false);
+    }
+  }, [setContextSavedLocations, setContextRecommendedLocations]);
 
   // Fetch map points from API
   const fetchMapPoints = useCallback(async () => {
@@ -274,11 +313,10 @@ export default function Index() {
           ];
         }
       } else {
-        // Authenticated API format
-        savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
-        recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+        // Authenticated API format - ONLY fetch from /map/saved-new
+        // No longer using data.savedLocations or data.recommendedLocations
         
-        // Also fetch ALL locations from /map/saved-new to get complete folder contents
+        // Fetch ALL locations from /map/saved-new to get complete folder contents
         // This includes locations added by other co-owners to shared folders
         try {
           const savedNewResponse = await fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
@@ -292,15 +330,15 @@ export default function Index() {
             const savedNewData = await savedNewResponse.json();
             console.log('📂 [fetchMapPoints] Fetched saved-new data:', savedNewData);
             
-            // Collect all additional locations from ALL sections
-            const additionalLocations: any[] = [];
+            // Collect all locations from ALL sections
+            const allLocations: any[] = [];
             
             // Extract locations from personal folders (includes co-owned folder locations)
             if (savedNewData.personal) {
               Object.keys(savedNewData.personal).forEach((folderId) => {
                 const folderLocations = savedNewData.personal[folderId];
                 if (Array.isArray(folderLocations)) {
-                  additionalLocations.push(...folderLocations);
+                  allLocations.push(...folderLocations);
                 }
               });
             }
@@ -310,7 +348,7 @@ export default function Index() {
               Object.keys(savedNewData.shared).forEach((folderId) => {
                 const folderLocations = savedNewData.shared[folderId];
                 if (Array.isArray(folderLocations)) {
-                  additionalLocations.push(...folderLocations);
+                  allLocations.push(...folderLocations);
                 }
               });
             }
@@ -320,28 +358,30 @@ export default function Index() {
               Object.keys(savedNewData.followed).forEach((folderId) => {
                 const folderLocations = savedNewData.followed[folderId];
                 if (Array.isArray(folderLocations)) {
-                  additionalLocations.push(...folderLocations);
+                  allLocations.push(...folderLocations);
                 }
               });
             }
             
-            // Deduplicate: only add locations that aren't already in savedLocationsData
-            const existingLocationIds = new Set(
-              savedLocationsData.map((loc: any) => loc.location?.id).filter(Boolean)
-            );
+            // Deduplicate locations by ID
+            const seenIds = new Set();
+            savedLocationsData = allLocations.filter((loc: any) => {
+              if (loc.location?.id && !seenIds.has(loc.location.id)) {
+                seenIds.add(loc.location.id);
+                return true;
+              }
+              return false;
+            });
             
-            const uniqueAdditionalLocations = additionalLocations.filter(
-              (loc: any) => loc.location?.id && !existingLocationIds.has(loc.location.id)
-            );
-            
-            savedLocationsData = [...savedLocationsData, ...uniqueAdditionalLocations];
-            
-            console.log('📂 [fetchMapPoints] After adding all folder locations, total saved locations:', savedLocationsData.length);
-            console.log('📂 [fetchMapPoints] Added unique locations:', uniqueAdditionalLocations.length);
+            console.log('📂 [fetchMapPoints] Total unique saved-new locations:', savedLocationsData.length);
           }
         } catch (error) {
           console.error('❌ [fetchMapPoints] Error fetching folder locations:', error);
+          savedLocationsData = [];
         }
+        
+        // No recommended locations - only showing saved-new
+        recommendedLocations = [];
       }
       
       // Safely extract and validate the data
@@ -423,6 +463,15 @@ export default function Index() {
       setLastRefresh(Date.now()); // Update last refresh timestamp
       console.log('🎉 [fetchMapPoints] Successfully fetched data from API, total points:', transformedMapPoints.length);
       console.log('📱 [fetchMapPoints] State updated with map points:', transformedMapPoints);
+      
+      // Cache the fetched data for offline access
+      await cacheMapPoints({
+        savedLocations: savedLocationsData,
+        recommendedLocations,
+        transformedMapPoints,
+        timestamp: Date.now(),
+      });
+      console.log('💾 [fetchMapPoints] Data cached successfully');
       
     } catch (err) {
       console.error('Error fetching map points:', err);
@@ -628,6 +677,18 @@ export default function Index() {
       console.log('📂 [Map] Screen focused, reloading folders...');
       loadFoldersData();
     }, [loadFoldersData])
+  );
+
+  // Refresh map points when screen is focused (after app closes/reopens)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🗺️ [Map] Screen focused, refreshing map points...');
+      if (userLocation) {
+        // Reset the last refresh time to allow immediate refresh
+        setLastRefresh(0);
+        fetchMapPoints();
+      }
+    }, [userLocation, fetchMapPoints])
   );
 
   // Load map points when user location is available
@@ -879,7 +940,10 @@ export default function Index() {
     buttonAnim.stopAnimation();
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Clear cached map points when logging out
+    await clearMapPointsCache();
+    console.log('🗑️ [Logout] Cleared map points cache');
     logout();
     router.push('/auth/login');
   };
@@ -947,6 +1011,11 @@ export default function Index() {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Load cached data on initial mount for instant display
+  useEffect(() => {
+    loadCachedData();
+  }, [loadCachedData]);
 
   // Show tutorial overlay if needed (automatic or manual) and feature is enabled
   if (tutorialFeatureEnabled && (shouldShowTutorial || showManualTutorial)) {
@@ -1207,109 +1276,169 @@ export default function Index() {
       </View>
 
       {/* Picture-in-Picture Video - Only show for authenticated users */}
-      {isVideoVisible && selectedVideo && sessionToken && !isGuest ? (
-        <Animated.View 
-          style={[
-            styles.videoOverlay, 
-            { 
-              left: 15, // Hardcoded 50px from left edge
-              bottom: insets.bottom + 20, // Position above the filters
-              opacity: fadeAnim,
-            }
-          ]}
-        >
-          {/* Shop Button with Arrow */}
-          <TouchableOpacity
-            style={[styles.shopButton, { backgroundColor: '#FFFFFF' }]}
-            onPress={() => {
-              // Log the "Check it out" process
-              console.log('=== "Check it out" Button Tapped ===');
-              console.log('Selected Marker ID:', selectedMarkerId);
-              console.log('Selected Video:', selectedVideo);
-              console.log('User Location:', userLocation);
-              console.log('Timestamp:', new Date().toISOString());
-              
-              // Navigate to location page
-              console.log('Navigating to location page with ID:', selectedMarkerId);
-              router.push(`/_location?id=${selectedMarkerId}`);
-              
-              console.log('Navigation initiated successfully');
-            }}
+      {isVideoVisible && selectedVideo && sessionToken && !isGuest ? (() => {
+        const thumbnailPlatform = getVideoPlatform(selectedVideo);
+        const isInstagram = thumbnailPlatform === 'instagram';
+        
+        return (
+          <Animated.View 
+            style={[
+              styles.videoOverlay, 
+              { 
+                left: 15, // Hardcoded 50px from left edge
+                bottom: insets.bottom + 20, // Position above the filters
+                opacity: fadeAnim,
+              }
+            ]}
           >
-            <Animated.View
-              style={{
-                transform: [
-                  {
-                    translateX: buttonAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, 8], // Move 8px to the right
-                    }),
-                  },
-                ],
+            {/* Shop Button with Arrow */}
+            <TouchableOpacity
+              style={[styles.shopButton, { backgroundColor: '#FFFFFF' }]}
+              onPress={() => {
+                // Log the "Check it out" process
+                console.log('=== "Check it out" Button Tapped ===');
+                console.log('Selected Marker ID:', selectedMarkerId);
+                console.log('Selected Video:', selectedVideo);
+                console.log('User Location:', userLocation);
+                console.log('Timestamp:', new Date().toISOString());
+                
+                // Navigate to location page
+                console.log('Navigating to location page with ID:', selectedMarkerId);
+                router.push(`/_location?id=${selectedMarkerId}`);
+                
+                console.log('Navigation initiated successfully');
               }}
             >
-              <Text style={styles.shopButtonText}>→ Check it out</Text>
-            </Animated.View>
-          </TouchableOpacity>
-          
-          <View style={[styles.videoContainer, { backgroundColor: theme.colors.surface }]}>
-            <TouchableOpacity style={styles.closeButton} onPress={closeVideo}>
-              <Text style={styles.closeButtonText}>✕</Text>
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      translateX: buttonAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 8], // Move 8px to the right
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Text style={styles.shopButtonText}>→ Check it out</Text>
+              </Animated.View>
             </TouchableOpacity>
-            <WebView
-              key={`${selectedVideo}-${Date.now()}`}
-              source={{ 
-                html: `
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                      body { 
-                        margin: 0; 
-                        padding: 0; 
-                        background: #000; 
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        height: 100vh;
-                      }
-                      iframe { 
-                        border: none; 
-                        display: block;
-                      }
-                    </style>
-                  </head>
-                  <body>
-                    <iframe 
-                      height="300" 
-                      width="400" 
-                      src="${selectedVideo}" 
-                      allow="fullscreen" 
-                      title="TikTok Video">
-                    </iframe>
-                  </body>
-                  </html>
-                `
-              }}
-              style={styles.video}
-              allowsInlineMediaPlayback={true}
-              mediaPlaybackRequiresUserAction={false}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              scalesPageToFit={true}
-              bounces={false}
-              scrollEnabled={false}
-              onError={(syntheticEvent) => {
-                const { nativeEvent } = syntheticEvent;
-              }}
-              onHttpError={(syntheticEvent) => {
-                const { nativeEvent } = syntheticEvent;
-              }}
-            />
-          </View>
-        </Animated.View>
-      ) : null}
+            
+            <View style={[styles.videoContainer, { backgroundColor: theme.colors.surface }]}>
+              <TouchableOpacity style={styles.closeButton} onPress={closeVideo}>
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+              <WebView
+                key={`${selectedVideo}-${Date.now()}`}
+                source={{ 
+                  html: isInstagram ? `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                      <style>
+                        * {
+                          margin: 0;
+                          padding: 0;
+                          box-sizing: border-box;
+                        }
+                        html, body { 
+                          width: 100%;
+                          height: 100%;
+                          overflow: hidden;
+                          background: transparent;
+                        }
+                        body {
+                          position: relative;
+                        }
+                        #instagram-container {
+                          position: absolute;
+                          top: 0;
+                          left: 0;
+                          right: 0;
+                          bottom: 0;
+                          display: flex;
+                          justify-content: center;
+                          align-items: center;
+                          overflow: hidden;
+                        }
+                        .instagram-media {
+                          max-width: 50% !important;
+                          width: 50% !important;
+                          margin: 0 auto !important;
+                          transform: scale(0.79) translateY(6%);
+                        }
+                      </style>
+                    </head>
+                    <body>
+                      <div id="instagram-container">
+                        <blockquote 
+                          class="instagram-media" 
+                          data-instgrm-permalink="${selectedVideo}" 
+                          data-instgrm-version="14" 
+                          style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);"
+                        >
+                          <div style="padding:16px;"> 
+                            <a href="${selectedVideo}" style="background:#FFFFFF; line-height:0; padding:0 0; text-align:center; text-decoration:none; width:100%;" target="_blank">Instagram Video</a>
+                          </div>
+                        </blockquote>
+                      </div>
+                      <script async src="https://www.instagram.com/embed.js"><\/script>
+                    </body>
+                    </html>
+                  ` : `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                      <style>
+                        body { 
+                          margin: 0; 
+                          padding: 0; 
+                          background: #000; 
+                          display: flex;
+                          justify-content: center;
+                          align-items: center;
+                          height: 100vh;
+                        }
+                        iframe { 
+                          border: none; 
+                          display: block;
+                        }
+                      </style>
+                    </head>
+                    <body>
+                      <iframe 
+                        height="300" 
+                        width="400" 
+                        src="${selectedVideo}" 
+                        allow="fullscreen" 
+                        title="TikTok Video">
+                      </iframe>
+                    </body>
+                    </html>
+                  `
+                }}
+                style={styles.video}
+                allowsInlineMediaPlayback={true}
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                scalesPageToFit={true}
+                bounces={false}
+                scrollEnabled={false}
+                onError={(syntheticEvent) => {
+                  const { nativeEvent } = syntheticEvent;
+                }}
+                onHttpError={(syntheticEvent) => {
+                  const { nativeEvent } = syntheticEvent;
+                }}
+              />
+            </View>
+          </Animated.View>
+        );
+      })() : null}
 
       {/* Shared Content Notification */}
       {sharedContent && (
