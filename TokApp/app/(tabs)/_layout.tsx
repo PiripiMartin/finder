@@ -43,16 +43,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="people" size={20} color={color} />
-          ),
-          href: isGuest ? null : '/profile',
-        }}
-      />
     </Tabs>
   );
 }
