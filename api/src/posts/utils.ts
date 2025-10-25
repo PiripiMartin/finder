@@ -1,7 +1,4 @@
-export enum PostPlatform {
-    TIKTOK = "tiktok",
-    INSTAGRAM = "instagram",
-}
+import { PostPlatform } from "./types";
 
 export function getPostPlatform(url: string): PostPlatform | null {
 

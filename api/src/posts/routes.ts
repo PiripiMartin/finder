@@ -1,9 +1,11 @@
 import type { BunRequest } from "bun";
+import type { TikTokEmbedResponse, InstagramPostInformation } from "./types";
 import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
 import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, buildTikTokEmbedUrl } from "./get-location";
 import { db } from "../database";
 import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, createInvalidLocation, saveLocationForUser, removeSavedLocationForUser } from "./queries";
+import { PostPlatform } from "./types";
 import { getPostPlatform } from "./utils";
 
 
@@ -44,28 +46,44 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Invalid post platform", {status: 400});
     }
 
+    let postInformation: TikTokEmbedResponse | InstagramPostInformation | null = null;
 
-    // Get TikTok embed info
-    const embedInfo = await getTikTokEmbedInfo(data.url);
-    if (!embedInfo || !embedInfo.embedProductId) {
-        return new Response("Couldn't get TikTok video ID from link.", {status: 500});
+    if (postPlatform === PostPlatform.TIKTOK) {
+
+        // Get TikTok embed info
+        postInformation = await getTikTokEmbedInfo(data.url) as TikTokEmbedResponse | null;
+
+
+        if (!postInformation || !postInformation.embedProductId) {
+            return new Response("Couldn't get TikTok video ID from link.", {status: 500});
+        }
+
+        // Compute embed URL
+        let embedUrl: string | null = null;
+        if (postInformation?.embedProductId) {
+            embedUrl = buildTikTokEmbedUrl(postInformation.embedProductId);
+        } 
+    } else if (postPlatform === PostPlatform.INSTAGRAM) {
+        postInformation = await getInstagramPostInformation(data.url) as InstagramPostInformation | null;
+
+        if (!postInformation) {
+            return new Response("Couldn't get Instagram post information", {status: 500});
+        }
     }
 
-    // Compute embed URL
-    let embedUrl: string | null = null;
-    if (embedInfo?.embedProductId) {
-        embedUrl = buildTikTokEmbedUrl(embedInfo.embedProductId);
-    } 
+    if (!postInformation) {
+        return new Response("Couldn't get post information", {status: 500});
+    }
 
     // Extract possible location name using LLM API
-    const possiblePlaceName = embedInfo ? await extractPossibleLocationName(embedInfo) : null;
+    const possiblePlaceName = postInformation ? await extractPossibleLocationName(postInformation) : null;
     if (!possiblePlaceName) {
         console.error("Couldn't create a good location name");
-        const invalidLocation = await createInvalidLocation(embedInfo);
+        const invalidLocation = await createInvalidLocation(postInformation);
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
-        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        const post = await createPostRecord({ url: postInformation.url!, postedBy: userId, mapPointId: invalidLocation.id });
         
         // Add to user's saved locations
         await saveLocationForUser(userId, invalidLocation.id);

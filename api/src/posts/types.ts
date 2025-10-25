@@ -1,3 +1,10 @@
+
+export enum PostPlatform {
+    TIKTOK = "tiktok",
+    INSTAGRAM = "instagram",
+}
+
+
 /**
  * Represents a post made by a user.
  */
@@ -21,11 +28,18 @@ export interface Post {
 /**
  * Represents the essential data from the TikTok embed API response.
  */
-export interface EmbedResponse {
+export interface TikTokEmbedResponse {
     title: string;
     authorUrl: string;
     authorName: string;
     html: string;
     thumbnailUrl: string;
     embedProductId: string;
+}
+
+export interface InstagramPostInformation {
+    authorName: string;
+    title: string;
+    description: string;
+    location: string;
 }
