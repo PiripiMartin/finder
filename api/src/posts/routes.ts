@@ -7,6 +7,7 @@ import { db } from "../database";
 import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, createInvalidLocation, saveLocationForUser, removeSavedLocationForUser } from "./queries";
 import { PostPlatform } from "./types";
 import { getPostPlatform } from "./utils";
+import { getInstagramPostInformation } from "./instagram";
 
 
 interface NewPostRequest {
@@ -47,6 +48,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
     }
 
     let postInformation: TikTokEmbedResponse | InstagramPostInformation | null = null;
+    let embedUrl: string | null = null;
 
     if (postPlatform === PostPlatform.TIKTOK) {
 
@@ -59,7 +61,6 @@ export async function createPost(req: BunRequest): Promise<Response> {
         }
 
         // Compute embed URL
-        let embedUrl: string | null = null;
         if (postInformation?.embedProductId) {
             embedUrl = buildTikTokEmbedUrl(postInformation.embedProductId);
         } 
@@ -104,7 +105,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
     const placesResult = await searchGooglePlaces(possiblePlaceName);
     if (!placesResult) {
         console.error("Couldn't resolve actual location.");
-        const invalidLocation = await createInvalidLocation(embedInfo);
+        const invalidLocation = await createInvalidLocation(postInformation);
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
