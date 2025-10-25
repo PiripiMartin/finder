@@ -313,7 +313,7 @@ class ShareViewController: UIViewController {
         activityIndicator.alpha = 0
         
         // Show the success message for 1 second
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             // Then show closing state
             self.statusLabel.text = "Closing..."
             
@@ -322,7 +322,7 @@ class ShareViewController: UIViewController {
             self.closingIndicator.startAnimating()
             
             // Close after 0.5 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now()) {
                 self.completeRequest()
             }
         }
@@ -362,7 +362,7 @@ class ShareViewController: UIViewController {
                 self.closingIndicator.alpha = 1
                 self.closingIndicator.startAnimating()
                 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                DispatchQueue.main.asyncAfter(deadline: .now()) {
                     self.completeRequest()
                 }
             }
