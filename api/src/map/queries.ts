@@ -301,7 +301,7 @@ export async function getFolderLocationsWithTopPost(folderId: number): Promise<a
 }
 
 /**
- * Fetches locations that are saved by user but not attributed to any folder, with latest top post.
+ * Fetches locations that are saved by user but not attributed to any folder the user has access to, with latest top post.
  */
 export async function getUncategorisedSavedLocationsWithTopPost(userId: number): Promise<any[]> {
     const query = `
@@ -324,7 +324,6 @@ export async function getUncategorisedSavedLocationsWithTopPost(userId: number):
             p.posted_at as post_posted_at
         FROM user_saved_locations usl
         INNER JOIN map_points mp ON usl.map_point_id = mp.id
-        LEFT JOIN folder_locations fl ON fl.map_point_id = mp.id
         LEFT JOIN (
             SELECT DISTINCT
                 map_point_id,
@@ -335,10 +334,25 @@ export async function getUncategorisedSavedLocationsWithTopPost(userId: number):
             FROM posts
         ) p ON mp.id = p.map_point_id
         WHERE usl.user_id = ?
-          AND fl.map_point_id IS NULL
+          AND mp.id NOT IN (
+            -- Exclude locations that are in folders the user has access to
+            SELECT DISTINCT fl.map_point_id
+            FROM folder_locations fl
+            INNER JOIN (
+                -- Get all folders the user has access to (created, co-owned, or followed)
+                SELECT DISTINCT folder_id
+                FROM (
+                    SELECT id as folder_id FROM folders WHERE creator_id = ?
+                    UNION
+                    SELECT folder_id FROM folder_owners WHERE user_id = ?
+                    UNION
+                    SELECT folder_id FROM folder_follows WHERE user_id = ?
+                ) user_folders
+            ) uf ON fl.folder_id = uf.folder_id
+        )
         ORDER BY usl.created_at DESC
     `;
-    const [rows] = await db.execute(query, [userId]) as [any[], any];
+    const [rows] = await db.execute(query, [userId, userId, userId, userId]) as [any[], any];
     return rows;
 }
 /**
