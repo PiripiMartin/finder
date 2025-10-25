@@ -7,7 +7,7 @@ import { db } from "../database";
 import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, createInvalidLocation, saveLocationForUser, removeSavedLocationForUser } from "./queries";
 import { PostPlatform } from "./types";
 import { getPostPlatform } from "./utils";
-import { getInstagramPostInformation } from "./instagram";
+import { buildInstagramEmbedUrl, getInstagramPostInformation } from "./instagram";
 
 
 interface NewPostRequest {
@@ -55,7 +55,6 @@ export async function createPost(req: BunRequest): Promise<Response> {
         // Get TikTok embed info
         postInformation = await getTikTokEmbedInfo(data.url) as TikTokEmbedResponse | null;
 
-
         if (!postInformation || !postInformation.embedProductId) {
             return new Response("Couldn't get TikTok video ID from link.", {status: 500});
         }
@@ -64,12 +63,16 @@ export async function createPost(req: BunRequest): Promise<Response> {
         if (postInformation?.embedProductId) {
             embedUrl = buildTikTokEmbedUrl(postInformation.embedProductId);
         } 
+
+
     } else if (postPlatform === PostPlatform.INSTAGRAM) {
         postInformation = await getInstagramPostInformation(data.url) as InstagramPostInformation | null;
 
         if (!postInformation) {
             return new Response("Couldn't get Instagram post information", {status: 500});
         }
+
+        embedUrl = buildInstagramEmbedUrl(data.url);
     }
 
     if (!postInformation) {
@@ -84,7 +87,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
-        const post = await createPostRecord({ url: postInformation.url!, postedBy: userId, mapPointId: invalidLocation.id });
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
         
         // Add to user's saved locations
         await saveLocationForUser(userId, invalidLocation.id);
@@ -128,7 +131,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     if (!placesResult.places || placesResult.places.length === 0) {
         console.error("Couldn't resolve actual location.");
-        const invalidLocation = await createInvalidLocation(embedInfo);
+        const invalidLocation = await createInvalidLocation(postInformation);
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -190,7 +193,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
     const placeDetails = await getGooglePlaceDetails(placeId);
     if (!placeDetails) {
         console.error("Failed to resolve place details");
-        const invalidLocation = await createInvalidLocation(embedInfo);
+        const invalidLocation = await createInvalidLocation(postInformation);
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -213,10 +216,10 @@ export async function createPost(req: BunRequest): Promise<Response> {
     //console.log("Place details:");
     //console.log(placeDetails);
 
-    const locationDetails = await generateLocationDetails(embedInfo!, placeDetails);
+    const locationDetails = await generateLocationDetails(postInformation, placeDetails);
     if (!locationDetails) {
         console.error("Failed to generate tagline and emoji");
-        const invalidLocation = await createInvalidLocation(embedInfo);
+        const invalidLocation = await createInvalidLocation(postInformation);
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }

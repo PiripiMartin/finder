@@ -1,7 +1,7 @@
 import { db, toCamelCase } from "../database";
 import { generateLocationDetails } from "../posts/get-location";
 import type { MapPoint } from "../map/types";
-import type { EmbedResponse, Post } from "./types";
+import type { TikTokEmbedResponse, InstagramPostInformation, Post } from "./types";
 
 /**
  * Represents an attempt to save a post.
@@ -137,7 +137,7 @@ export async function createPost(post: CreatePostRequest): Promise<Post | null> 
  * @param embedInfo - The embed information for the TikTok video.
  * @returns A promise that resolves to the newly created map point, or null on failure.
  */
-export async function createInvalidLocation(embedInfo: EmbedResponse): Promise<MapPoint | null> {
+export async function createInvalidLocation(embedInfo: TikTokEmbedResponse | InstagramPostInformation): Promise<MapPoint | null> {
     const locationDetails = await generateLocationDetails(embedInfo);
     if (!locationDetails) {
         return null;

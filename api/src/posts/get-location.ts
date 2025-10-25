@@ -1,5 +1,5 @@
 import { toCamelCase } from "../database";
-import type { EmbedResponse, Post } from "./types";
+import type { TikTokEmbedResponse, InstagramPostInformation, Post } from "./types";
 
 /**
  * The endpoint for the Gemini API.
@@ -66,7 +66,7 @@ export function buildTikTokEmbedUrl(videoId: string): string {
  * @param vidUrl - The URL of the TikTok video.
  * @returns A promise that resolves to the embed information or null on failure.
  */
-export async function getTikTokEmbedInfo(vidUrl: string): Promise<EmbedResponse | null> {
+export async function getTikTokEmbedInfo(vidUrl: string): Promise<TikTokEmbedResponse | null> {
     const ttEmbedEndpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(vidUrl)}`;
 
     try {
@@ -75,7 +75,7 @@ export async function getTikTokEmbedInfo(vidUrl: string): Promise<EmbedResponse 
             console.error("TikTok oEmbed API request failed:", await embedResponse.text());
             return null;
         }
-        return toCamelCase(await embedResponse.json() as any) as EmbedResponse;
+        return toCamelCase(await embedResponse.json() as any) as TikTokEmbedResponse;
     } catch (error) {
         console.error("Error fetching TikTok embed info:", error);
         return null;
@@ -83,12 +83,12 @@ export async function getTikTokEmbedInfo(vidUrl: string): Promise<EmbedResponse 
 }
 
 /**
- * Uses the Gemini API to extract a potential location name from TikTok embed information.
+ * Uses the Gemini API to extract a potential location name from post embed information.
  *
- * @param embedInfo - The embed information for the TikTok video.
+ * @param embedInfo - The embed information for the post.
  * @returns A promise that resolves to a search query for Google Places or null on failure.
  */
-export async function extractPossibleLocationName(embedInfo: EmbedResponse): Promise<string | null> {
+export async function extractPossibleLocationName(embedInfo: TikTokEmbedResponse | InstagramPostInformation): Promise<string | null> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not set");
@@ -98,7 +98,7 @@ export async function extractPossibleLocationName(embedInfo: EmbedResponse): Pro
 
     Video Title: ${embedInfo.title}
     Author: ${embedInfo.authorName}
-    Author URL: ${embedInfo.authorUrl}
+    Author URL: ${"authorUrl" in embedInfo ? embedInfo.authorUrl : "N/A"}
 
     Based on this information, create a search query that would work well with Google Places Text Search API to find this business. The query should be:
     1. Concise but descriptive
@@ -218,7 +218,7 @@ export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDeta
  * @returns A promise that resolves to the generated description and emoji, or null on failure.
  */
 export async function generateLocationDetails(
-    embedInfo: EmbedResponse,
+    embedInfo: TikTokEmbedResponse | InstagramPostInformation,
     placeDetails?: PlacesDetailsResponse
 ): Promise<{ title: string; description: string; emoji: string } | null> {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -226,9 +226,9 @@ export async function generateLocationDetails(
         throw new Error("GEMINI_API_KEY is not set");
     }
 
-    const prompt = `You are a location expert. Based on the following TikTok video context${placeDetails ? " and Google Place information" : ""}, generate a brief title, description and a relevant emoji for this location.
+    const prompt = `You are a location expert. Based on the following TikTok/Instagram video context${placeDetails ? " and Google Place information" : ""}, generate a brief title, description and a relevant emoji for this location.
 
-    TikTok Video Context:
+    Video Context:
     Title: ${embedInfo.title}
     Author: ${embedInfo.authorName}
     ${placeDetails ? `

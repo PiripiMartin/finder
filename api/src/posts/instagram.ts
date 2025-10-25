@@ -43,3 +43,16 @@ export async function getInstagramPostInformation(url: string): Promise<Instagra
 }
 
 
+export function buildInstagramEmbedUrl(url: string): string {
+    try {
+        const urlObj = new URL(url);
+        // Remove all existing query parameters
+        urlObj.search = '';
+        // Add the utm_source parameter
+        urlObj.searchParams.set('utm_source', 'ig_embed');
+        return urlObj.toString();
+    } catch (error) {
+        // If URL parsing fails, return the original URL
+        return url;
+    }
+}
