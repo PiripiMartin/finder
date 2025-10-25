@@ -1,9 +1,13 @@
 import type { BunRequest } from "bun";
+import type { TikTokEmbedResponse, InstagramPostInformation } from "./types";
 import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
 import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, buildTikTokEmbedUrl } from "./get-location";
 import { db } from "../database";
 import { type CreateLocationRequest, type CreatePostRequest, createLocation, createPost as createPostRecord, createPostSaveAttempt, createInvalidLocation, saveLocationForUser, removeSavedLocationForUser } from "./queries";
+import { PostPlatform } from "./types";
+import { getPostPlatform } from "./utils";
+import { buildInstagramEmbedUrl, getInstagramPostInformation } from "./instagram";
 
 
 interface NewPostRequest {
@@ -37,23 +41,49 @@ export async function createPost(req: BunRequest): Promise<Response> {
         return new Response("Malformed body", {status: 400});
     }
 
-    // Get TikTok embed info
-    const embedInfo = await getTikTokEmbedInfo(data.url);
-    if (!embedInfo || !embedInfo.embedProductId) {
-        return new Response("Couldn't get TikTok video ID from link.", {status: 500});
+    // Now, we check if the post is for TikTok or Instagram
+    const postPlatform = getPostPlatform(data.url);
+    if (!postPlatform) {
+        return new Response("Invalid post platform", {status: 400});
     }
 
-    // Compute embed URL
+    let postInformation: TikTokEmbedResponse | InstagramPostInformation | null = null;
     let embedUrl: string | null = null;
-    if (embedInfo?.embedProductId) {
-        embedUrl = buildTikTokEmbedUrl(embedInfo.embedProductId);
-    } 
+
+    if (postPlatform === PostPlatform.TIKTOK) {
+
+        // Get TikTok embed info
+        postInformation = await getTikTokEmbedInfo(data.url) as TikTokEmbedResponse | null;
+
+        if (!postInformation || !postInformation.embedProductId) {
+            return new Response("Couldn't get TikTok video ID from link.", {status: 500});
+        }
+
+        // Compute embed URL
+        if (postInformation?.embedProductId) {
+            embedUrl = buildTikTokEmbedUrl(postInformation.embedProductId);
+        } 
+
+
+    } else if (postPlatform === PostPlatform.INSTAGRAM) {
+        postInformation = await getInstagramPostInformation(data.url) as InstagramPostInformation | null;
+
+        if (!postInformation) {
+            return new Response("Couldn't get Instagram post information", {status: 500});
+        }
+
+        embedUrl = buildInstagramEmbedUrl(data.url);
+    }
+
+    if (!postInformation) {
+        return new Response("Couldn't get post information", {status: 500});
+    }
 
     // Extract possible location name using LLM API
-    const possiblePlaceName = embedInfo ? await extractPossibleLocationName(embedInfo) : null;
+    const possiblePlaceName = postInformation ? await extractPossibleLocationName(postInformation) : null;
     if (!possiblePlaceName) {
         console.error("Couldn't create a good location name");
-        const invalidLocation = await createInvalidLocation(embedInfo);
+        const invalidLocation = await createInvalidLocation(postInformation);
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -78,7 +108,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
     const placesResult = await searchGooglePlaces(possiblePlaceName);
     if (!placesResult) {
         console.error("Couldn't resolve actual location.");
-        const invalidLocation = await createInvalidLocation(embedInfo);
+        const invalidLocation = await createInvalidLocation(postInformation);
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -101,7 +131,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     if (!placesResult.places || placesResult.places.length === 0) {
         console.error("Couldn't resolve actual location.");
-        const invalidLocation = await createInvalidLocation(embedInfo);
+        const invalidLocation = await createInvalidLocation(postInformation);
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -163,7 +193,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
     const placeDetails = await getGooglePlaceDetails(placeId);
     if (!placeDetails) {
         console.error("Failed to resolve place details");
-        const invalidLocation = await createInvalidLocation(embedInfo);
+        const invalidLocation = await createInvalidLocation(postInformation);
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -186,10 +216,10 @@ export async function createPost(req: BunRequest): Promise<Response> {
     //console.log("Place details:");
     //console.log(placeDetails);
 
-    const locationDetails = await generateLocationDetails(embedInfo!, placeDetails);
+    const locationDetails = await generateLocationDetails(postInformation, placeDetails);
     if (!locationDetails) {
         console.error("Failed to generate tagline and emoji");
-        const invalidLocation = await createInvalidLocation(embedInfo);
+        const invalidLocation = await createInvalidLocation(postInformation);
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -222,8 +252,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
         longitude: placeDetails.location.longitude,
         isValidLocation: true, 
         recommendable: false, // Always starts as false
-        websiteUrl: placeDetails.websiteUri,
-        phoneNumber: placeDetails.nationalPhoneNumber,
+        websiteUrl: placeDetails.websiteUri ?? null,
+        phoneNumber: placeDetails.nationalPhoneNumber ?? null,
         address: placeDetails.formattedAddress,
     };
 
@@ -314,4 +344,3 @@ export async function deletePost(req: BunRequest): Promise<Response> {
         { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
 }
-
