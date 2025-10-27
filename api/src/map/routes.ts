@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { db } from "../database";
 import { verifySessionToken } from "../user/session";
-import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld, getCreatedFolderIds, getCoOwnedFolderIds, fetchUserLocationEditsForUsersAndMapPoints, getAllFolderLocationsWithTopPost, getAllFolderOwners } from "./queries";
+import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld, getCreatedFolderIds, getCoOwnedFolderIds, fetchUserLocationEditsForUsersAndMapPoints, getAllFolderLocationsWithTopPost, getAllFolderOwners, insertLocationForUser } from "./queries";
 import { getFolderOwners, removeLocationFromFolder } from "../folders/queries";
 import { removeSavedLocationForUser } from "../posts/queries";
 
@@ -342,3 +342,29 @@ export async function getGuestRecommendations(req: BunRequest): Promise<Response
         return new Response("Internal server error", { status: 500 });
     }
 }
+
+
+export async function addLocation(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing or malformed session token", { status: 401 });
+    }
+
+    const accountId = await verifySessionToken(sessionToken);
+    if (accountId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const locationId = parseInt((req.params as any).id, 10);
+    if (isNaN(locationId)) {
+        return new Response("Invalid map point ID", { status: 400 });
+    }
+
+    await insertLocationForUser(accountId, locationId);
+    
+    
+    return new Response("Successfully added location", { status: 200 });
+}
+
+
+

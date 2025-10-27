@@ -1,5 +1,5 @@
 import { createPost, deletePost } from "./posts/routes";
-import { getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations, deleteLocationForUser, getSavedLocationsOld } from "./map/routes";
+import { getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations, deleteLocationForUser, getSavedLocationsOld, addLocation } from "./map/routes";
 import { login, validateSessionToken, signup, getProfileData, deleteUserAccount, editUserLocation } from "./user/routes";
 import { 
     addLocationToFolderEndpoint, 
@@ -41,7 +41,7 @@ Bun.serve({
         "/api/map/saved-new": { GET: getSavedLocations },
         "/api/map/saved": { GET: getSavedLocationsOld },
         "/api/map/:id/posts": { GET: getPostsForLocation },
-        "/api/map/:id": { DELETE: deleteLocationForUser },
+        "/api/map/:id": { POST: addLocation, DELETE: deleteLocationForUser },
         "/api/map/edit/:id": { POST: editUserLocation },
 
         // Post management

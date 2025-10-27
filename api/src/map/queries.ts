@@ -676,5 +676,13 @@ export async function getAllFolderOwners(folderIds: number[]): Promise<Map<numbe
 }
 
 
+export async function insertLocationForUser(userId: number, locationId: number): Promise<void> {
+    const query = `
+        INSERT INTO user_saved_locations (user_id, map_point_id)
+        VALUES (?, ?);
+    `;
+
+    await db.execute(query, [userId, locationId]);
+}
 
 
