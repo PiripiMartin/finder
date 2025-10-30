@@ -131,9 +131,26 @@ CREATE TABLE IF NOT EXISTS friends (
     user_id_1 INT NOT NULL,
     user_id_2 INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     PRIMARY KEY (user_id_1, user_id_2),
     FOREIGN KEY (user_id_1) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id_2) REFERENCES users(id) ON DELETE CASCADE
+);
+
+
+/*
+  Location invitations table (allows user to invite another user to a location)
+*/
+CREATE TABLE IF NOT EXISTS location_invitations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  creator_id INT NOT NULL,
+  recipient_id INT NOT NULL,
+  map_point_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE
 );
 
 
