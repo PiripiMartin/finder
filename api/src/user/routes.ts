@@ -6,6 +6,7 @@ import { checkedExtractBody } from "../utils";
 import { createUserLocationEdit, updateUserLocationEdit } from "./queries";
 import { getGooglePlaceDetails, searchGooglePlaces } from "../posts/get-location";
 import type { LocationEdit } from "../map/types";
+import { s3, write as bunWrite } from "bun";
 
 /**
  * Represents the request body for a user login.
@@ -133,7 +134,7 @@ export async function getProfileData(req: BunRequest): Promise<Response> {
         return new Response("Invalid or expired session token", { status: 401 });
     }
 
-    const [rows] = await db.execute("SELECT username, email, created_at FROM users WHERE id = ?", [userId]) as [any[], any];
+    const [rows] = await db.execute("SELECT username, email, pfp_url, created_at FROM users WHERE id = ?", [userId]) as [any[], any];
     const profileData = toCamelCase(rows) as Array<ProfileStats>;
 
 
@@ -210,4 +211,71 @@ export async function editUserLocation(req: BunRequest): Promise<Response> {
     }
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+/**
+ * Updates the authenticated user's profile picture.
+ * Expects the request body to contain raw image bytes with a valid image Content-Type.
+ */
+export async function updateProfilePicture(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const contentType = req.headers.get("Content-Type") || "";
+    if (!contentType.startsWith("image/")) {
+        return new Response("Unsupported content type", { status: 415 });
+    }
+
+    const body = await req.arrayBuffer();
+    const maxBytes = 5 * 1024 * 1024; // 5MB
+    if (body.byteLength === 0 || body.byteLength > maxBytes) {
+        return new Response("Invalid image size", { status: 400 });
+    }
+
+    const ext = (() => {
+        if (contentType === "image/jpeg" || contentType === "image/jpg") return "jpg";
+        if (contentType === "image/png") return "png";
+        if (contentType === "image/webp") return "webp";
+        return "bin";
+    })();
+
+    const bucket = process.env.S3_BUCKET;
+    const region = process.env.S3_REGION;
+    if (!bucket || !region) {
+        return new Response("Server misconfigured", { status: 500 });
+    }
+
+    // Remember old URL for cleanup
+    const [oldRows] = await db.execute("SELECT pfp_url FROM users WHERE id = ?", [userId]) as [any[], any];
+    const oldUrl: string | null = oldRows?.[0]?.pfp_url ?? null;
+
+    const key = `avatars/${userId}/${crypto.randomUUID()}.${ext}`;
+    const fileRef = s3.file(key);
+    await bunWrite(fileRef, new Uint8Array(body));
+
+    const assetBase = process.env.ASSET_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`;
+    const pfpUrl = `${assetBase}/${key}`;
+
+    await db.execute("UPDATE users SET pfp_url = ? WHERE id = ?", [pfpUrl, userId]);
+
+    // Best-effort delete of previous avatar to save storage
+    if (oldUrl) {
+        try {
+            const prefixB = `https://${bucket}.s3.${region}.amazonaws.com/`;
+            if (oldUrl.startsWith(prefixB)) {
+                await s3.file(oldUrl.slice(prefixB.length)).delete();
+            }
+        } catch (_) {
+            // ignore cleanup errors
+        }
+    }
+
+    return new Response(JSON.stringify({ pfpUrl }), { status: 200, headers: { "Content-Type": "application/json" } });
 }
