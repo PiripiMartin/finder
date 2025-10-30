@@ -90,3 +90,74 @@ export async function getFriends(req: BunRequest): Promise<Response> {
         headers: { "Content-Type": "application/json" }
     });
 }
+
+/**
+ * Creates a shared location invitation for another user.
+ * Expects JSON body: { recipientUserId: number, mapPointId: number, message: string }
+ * Requires authentication.
+ */
+export async function createLocationInvitation(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const creatorId = await verifySessionToken(sessionToken);
+    if (creatorId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const data = await checkedExtractBody(req, ["recipientUserId", "mapPointId", "message"]);
+    if (!data) {
+        return new Response("Malformed request body", { status: 400 });
+    }
+    const recipientId = Number((data as any).recipientUserId);
+    const mapPointId = Number((data as any).mapPointId);
+    const message = (data as any).message;
+
+    if (!Number.isInteger(recipientId) || recipientId <= 0) {
+        return new Response("Invalid recipient user id", { status: 400 });
+    }
+    if (!Number.isInteger(mapPointId) || mapPointId <= 0) {
+        return new Response("Invalid map point id", { status: 400 });
+    }
+    if (typeof message !== "string") {
+        return new Response("Message is required and must be a non-empty string", { status: 400 });
+    }
+    if (recipientId === creatorId) {
+        return new Response("Cannot invite yourself", { status: 400 });
+    }
+
+    // Verify recipient exists
+    const [userRows] = await db.execute("SELECT id FROM users WHERE id = ?", [recipientId]) as [any[], any];
+    if ((userRows as any[]).length === 0) {
+        return new Response("Recipient user not found", { status: 404 });
+    }
+    // Verify map point exists
+    const [mapRows] = await db.execute("SELECT id FROM map_points WHERE id = ?", [mapPointId]) as [any[], any];
+    if ((mapRows as any[]).length === 0) {
+        return new Response("Map point not found", { status: 404 });
+    }
+
+    // Create the invitation
+    await db.execute(
+        `INSERT INTO location_invitations (creator_id, recipient_id, map_point_id, message) VALUES (?, ?, ?, ?)`,
+        [creatorId, recipientId, mapPointId, message]
+    );
+    const [idRows] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
+    const invitationId = idRows[0].id;
+
+    // Fetch created invitation for response
+    const [inviteRows] = await db.execute(
+        `SELECT * FROM location_invitations WHERE id = ?`,
+        [invitationId]
+    ) as [any[], any];
+    if (!inviteRows || inviteRows.length === 0) {
+        return new Response("Failed to fetch created invitation", { status: 500 });
+    }
+
+    return new Response(
+        JSON.stringify(inviteRows[0]),
+        { status: 201, headers: { "Content-Type": "application/json" } }
+    );
+}

@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS location_invitations (
   creator_id INT NOT NULL,
   recipient_id INT NOT NULL,
   map_point_id INT NOT NULL,
+  message TEXT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
