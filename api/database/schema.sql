@@ -122,6 +122,21 @@ CREATE TABLE IF NOT EXISTS user_saved_locations (
     FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE
 );
 
+----------------------------- FRIENDS -----------------------------
+
+/*
+  Friends table (allows many to many relationship between users)
+*/
+CREATE TABLE IF NOT EXISTS friends (
+    user_id_1 INT NOT NULL,
+    user_id_2 INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id_1, user_id_2),
+    FOREIGN KEY (user_id_1) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id_2) REFERENCES users(id) ON DELETE CASCADE
+);
+
+
 ----------------------------- FOLDERS -----------------------------
 
 /*
