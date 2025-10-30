@@ -336,3 +336,34 @@ export async function addFriend(req: BunRequest): Promise<Response> {
 
     return new Response(JSON.stringify({ added: true }), { status: 201, headers: { "Content-Type": "application/json" } });
 }
+
+/**
+ * Returns a list of the authenticated user's friends (bidirectional).
+ * Returns: [{ id, username, email, pfp_url, created_at }]
+ */
+export async function getFriends(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    // Select friends in either direction
+    const query = `
+        SELECT u.id, u.username, u.email, u.pfp_url, u.created_at
+        FROM friends f
+        JOIN users u ON (u.id = IF(f.user_id_1 = ?, f.user_id_2, f.user_id_1))
+        WHERE ? IN (f.user_id_1, f.user_id_2)
+    `;
+    const [rows] = await db.execute(query, [userId, userId]) as [any[], any];
+    const friends = toCamelCase(rows as any[]);
+
+    return new Response(JSON.stringify(friends), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+    });
+}

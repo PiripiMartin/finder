@@ -1,6 +1,6 @@
 import { createPost, deletePost } from "./posts/routes";
 import { getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations, deleteLocationForUser, getSavedLocationsOld, addLocation } from "./map/routes";
-import { login, validateSessionToken, signup, getProfileData, deleteUserAccount, editUserLocation, updateProfilePicture, addFriend } from "./user/routes";
+import { login, validateSessionToken, signup, getProfileData, deleteUserAccount, editUserLocation, updateProfilePicture, addFriend, getFriends } from "./user/routes";
 import { 
     addLocationToFolderEndpoint, 
     removeLocationFromFolderEndpoint, 
@@ -37,7 +37,7 @@ Bun.serve({
         "/api/delete-account": { DELETE: deleteUserAccount },
         
         // Friends
-        "/api/friends": { POST: addFriend },
+        "/api/friends": { POST: addFriend, GET: getFriends },
 
         // Map data
         "/api/map/saved-and-recommended": { GET: getSavedAndRecommendedLocations },
