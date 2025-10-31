@@ -1215,6 +1215,22 @@ export default function Index() {
         </TouchableOpacity>
       )}
 
+      {/* Friends Button - Top Right (only show when authenticated) */}
+      {!isGuest && (
+        <TouchableOpacity 
+          style={[
+            styles.friendsButton,
+            {
+              top: insets.top + 30,
+              right: insets.right + 30,
+            }
+          ]}
+          onPress={() => router.push('/friends')}
+        >
+          <Ionicons name="people" size={28} color="#A8C3A0" />
+        </TouchableOpacity>
+      )}
+
       {/* Profile Button - Top Right (only show when authenticated) */}
       {!isGuest && (
         <TouchableOpacity 
@@ -1222,7 +1238,7 @@ export default function Index() {
             styles.profileButton,
             {
               top: insets.top + 30,
-              right: insets.right + 30,
+              right: insets.right + 90, // Offset to make room for friends button
             }
           ]}
           onPress={() => setShowProfileModal(true)}
@@ -1510,7 +1526,7 @@ export default function Index() {
       )}
 
       {/* Progress Goal Banner - Show when user has less than 3 saved locations */}
-      {!isGuest && savedLocations.length < 3 && (
+      {!isGuest && !isLoadingFromCache && savedLocations.length < 3 && (
         <View style={[
           styles.progressBanner,
           {
@@ -1766,6 +1782,20 @@ const styles = StyleSheet.create({
     fontSize: 8, // Smaller font
     textAlign: 'center',
     lineHeight: 10,
+  },
+  friendsButton: {
+    position: 'absolute',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   profileButton: {
     position: 'absolute',

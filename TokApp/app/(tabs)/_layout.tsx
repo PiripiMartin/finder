@@ -43,6 +43,16 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="activity"
+        options={{
+          title: "",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="notifications" size={20} color={color} />
+          ),
+          href: isGuest ? null : '/activity',
+        }}
+      />
     </Tabs>
   );
 }

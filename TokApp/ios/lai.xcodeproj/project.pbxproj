@@ -261,8 +261,6 @@
 				78E8BBCD2EA197AC0094FF3E /* sharevids */,
 			);
 			name = sharevids;
-			packageProductDependencies = (
-			);
 			productName = sharevids;
 			productReference = 78E8BBCC2EA197AC0094FF3E /* sharevids.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -283,8 +281,6 @@
 				78E8BBE82EA19D5B0094FF3E /* actionshare */,
 			);
 			name = actionshare;
-			packageProductDependencies = (
-			);
 			productName = actionshare;
 			productReference = 78E8BBE52EA19D5B0094FF3E /* Add to lai.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -536,7 +532,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.11;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -568,7 +564,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.11;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -616,6 +612,7 @@
 				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.piripimartin.dew.sharevids;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -659,6 +656,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 1.0;
 				MTL_FAST_MATH = YES;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = com.piripimartin.dew.sharevids;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -704,6 +702,7 @@
 				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.piripimartin.dew.actionshare;
 				PRODUCT_NAME = "Add to lai";
 				SKIP_INSTALL = YES;
@@ -750,6 +749,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 1.0;
 				MTL_FAST_MATH = YES;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = com.piripimartin.dew.actionshare;
 				PRODUCT_NAME = "Add to lai";
 				SKIP_INSTALL = YES;
