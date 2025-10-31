@@ -311,3 +311,49 @@ export async function getLocationInvitations(req: BunRequest): Promise<Response>
         headers: { "Content-Type": "application/json" }
     });
 }
+
+/**
+ * Deletes a location invitation (used by recipient to decline).
+ * Expects invitation ID in URL path: /api/location-invitations/:id
+ * Requires authentication and verifies the user is the recipient.
+ */
+export async function deleteLocationInvitation(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    // Validate invitation ID from path params
+    const invitationId = parseInt((req.params as any).id, 10);
+    if (!invitationId || Number.isNaN(invitationId)) {
+        return new Response("Invalid invitation id", { status: 400 });
+    }
+
+    // Fetch the invitation to verify it exists and check ownership
+    const [inviteRows] = await db.execute(
+        "SELECT recipient_id FROM location_invitations WHERE id = ?",
+        [invitationId]
+    ) as [any[], any];
+
+    if (inviteRows.length === 0) {
+        return new Response("Invitation not found", { status: 404 });
+    }
+
+    const recipientId = inviteRows[0].recipient_id as number;
+    if (recipientId !== userId) {
+        return new Response("Forbidden: Only the recipient can delete an invitation", { status: 403 });
+    }
+
+    // Delete the invitation
+    await db.execute("DELETE FROM location_invitations WHERE id = ?", [invitationId]);
+
+    return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+}
