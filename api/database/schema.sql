@@ -86,6 +86,19 @@ CREATE TABLE IF NOT EXISTS location_review_comments (
 );
 
 
+/*
+  Likes on location reviews
+*/
+CREATE TABLE IF NOT EXISTS location_review_likes (
+    review_id INT NOT NULL,
+    user_id INT NOT NULL,
+
+    PRIMARY KEY (review_id, user_id),
+    FOREIGN KEY (review_id) REFERENCES location_reviews(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+
 
 /* 
   Tracks manual edits (and the resulting Google Maps location resolution) for a given location made by a given user.

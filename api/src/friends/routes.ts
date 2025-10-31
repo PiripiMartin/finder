@@ -624,3 +624,147 @@ export async function commentOnFriendReview(req: BunRequest): Promise<Response> 
     const created = toCamelCase(commentRows[0]) as any;
     return new Response(JSON.stringify(created), { status: 201, headers: { "Content-Type": "application/json" } });
 }
+
+/**
+ * Likes a friend's review.
+ * Path: POST /api/friends/reviews/:id/like
+ */
+export async function likeFriendReview(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const reviewId = parseInt((req.params as any).id, 10);
+    if (!reviewId || Number.isNaN(reviewId)) {
+        return new Response("Invalid review id", { status: 400 });
+    }
+
+    // Fetch the review and its owner
+    const [reviewRows] = await db.execute(
+        "SELECT id, user_id, like_count FROM location_reviews WHERE id = ?",
+        [reviewId]
+    ) as [any[], any];
+    if (reviewRows.length === 0) {
+        return new Response("Review not found", { status: 404 });
+    }
+    const reviewerId = reviewRows[0].user_id as number;
+
+    // Validate friend relationship (allow self-like)
+    if (reviewerId !== userId) {
+        const [friendRows] = await db.execute(
+            `SELECT COUNT(*) as cnt
+             FROM friends
+             WHERE (user_id_1 = ? AND user_id_2 = ?) OR (user_id_1 = ? AND user_id_2 = ?)`,
+            [userId, reviewerId, reviewerId, userId]
+        ) as [any[], any];
+        const isFriend = (friendRows[0]?.cnt ?? 0) > 0;
+        if (!isFriend) {
+            return new Response("Forbidden: can only like friends' reviews", { status: 403 });
+        }
+    }
+
+    // Insert like if not already liked (idempotent)
+    try {
+        const [res] = await db.execute(
+            "INSERT INTO location_review_likes (review_id, user_id) VALUES (?, ?)",
+            [reviewId, userId]
+        ) as [any, any];
+        // Only increment if insert happened
+        if (res.affectedRows && res.affectedRows > 0) {
+            await db.execute(
+                "UPDATE location_reviews SET like_count = like_count + 1 WHERE id = ?",
+                [reviewId]
+            );
+        }
+    } catch (e: any) {
+        // Duplicate like: ignore and proceed
+    }
+
+    // Return updated like count
+    const [countRows] = await db.execute(
+        "SELECT like_count FROM location_reviews WHERE id = ?",
+        [reviewId]
+    ) as [any[], any];
+    const likeCount = countRows[0]?.like_count ?? 0;
+
+    return new Response(
+        JSON.stringify({ liked: true, likeCount }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+}
+
+/**
+ * Unlikes a friend's review.
+ * Path: DELETE /api/friends/reviews/:id/like
+ */
+export async function unlikeFriendReview(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const reviewId = parseInt((req.params as any).id, 10);
+    if (!reviewId || Number.isNaN(reviewId)) {
+        return new Response("Invalid review id", { status: 400 });
+    }
+
+    // Fetch the review and its owner
+    const [reviewRows] = await db.execute(
+        "SELECT id, user_id, like_count FROM location_reviews WHERE id = ?",
+        [reviewId]
+    ) as [any[], any];
+    if (reviewRows.length === 0) {
+        return new Response("Review not found", { status: 404 });
+    }
+    const reviewerId = reviewRows[0].user_id as number;
+
+    // Validate friend relationship (allow self-unlike)
+    if (reviewerId !== userId) {
+        const [friendRows] = await db.execute(
+            `SELECT COUNT(*) as cnt
+             FROM friends
+             WHERE (user_id_1 = ? AND user_id_2 = ?) OR (user_id_1 = ? AND user_id_2 = ?)`,
+            [userId, reviewerId, reviewerId, userId]
+        ) as [any[], any];
+        const isFriend = (friendRows[0]?.cnt ?? 0) > 0;
+        if (!isFriend) {
+            return new Response("Forbidden: can only unlike friends' reviews", { status: 403 });
+        }
+    }
+
+    // Delete like if exists
+    const [res] = await db.execute(
+        "DELETE FROM location_review_likes WHERE review_id = ? AND user_id = ?",
+        [reviewId, userId]
+    ) as [any, any];
+    // Only decrement if deletion happened
+    if (res.affectedRows && res.affectedRows > 0) {
+        await db.execute(
+            "UPDATE location_reviews SET like_count = CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END WHERE id = ?",
+            [reviewId]
+        );
+    }
+
+    // Return updated like count
+    const [countRows] = await db.execute(
+        "SELECT like_count FROM location_reviews WHERE id = ?",
+        [reviewId]
+    ) as [any[], any];
+    const likeCount = countRows[0]?.like_count ?? 0;
+
+    return new Response(
+        JSON.stringify({ liked: false, likeCount }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+}

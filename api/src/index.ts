@@ -1,7 +1,7 @@
 import { createPost, deletePost } from "./posts/routes";
 import { getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations, deleteLocationForUser, getSavedLocationsOld, addLocation, createLocationReview } from "./map/routes";
 import { login, validateSessionToken, signup, getProfileData, deleteUserAccount, editUserLocation, updateProfilePicture } from "./user/routes";
-import { addFriend, createLocationInvitation, getFriends, getLocationInvitations, deleteLocationInvitation, getFriendsReviews, commentOnFriendReview } from "./friends/routes";
+import { addFriend, createLocationInvitation, getFriends, getLocationInvitations, deleteLocationInvitation, getFriendsReviews, commentOnFriendReview, likeFriendReview, unlikeFriendReview } from "./friends/routes";
 import { 
     addLocationToFolderEndpoint, 
     removeLocationFromFolderEndpoint, 
@@ -41,6 +41,7 @@ Bun.serve({
         "/api/friends": { POST: addFriend, GET: getFriends },
         "/api/friends/reviews": { GET: getFriendsReviews },
         "/api/friends/reviews/:id/comments": { POST: commentOnFriendReview },
+        "/api/friends/reviews/:id/like": { POST: likeFriendReview, DELETE: unlikeFriendReview },
         "/api/location-invitation": { POST: createLocationInvitation },
         "/api/location-invitations": { GET: getLocationInvitations },
         "/api/location-invitations/:id": { DELETE: deleteLocationInvitation },
