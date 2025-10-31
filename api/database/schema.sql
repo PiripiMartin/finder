@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS user_sessions(
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+------------------------------- MAP POINTS / LOCATIONS-------------------------------
 
 /*
   Map points (locations) table
@@ -52,6 +53,62 @@ CREATE TABLE IF NOT EXISTS map_points (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     SPATIAL INDEX idx_location (location)
 );
+
+
+/*
+  Location reviews table
+*/
+CREATE TABLE IF NOT EXISTS location_reviews (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    map_point_id INT NOT NULL,
+    user_id INT NOT NULL,
+    rating DECIMAL(2,1) NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    review TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+
+/* 
+  Tracks manual edits (and the resulting Google Maps location resolution) for a given location made by a given user.
+*/
+CREATE TABLE IF NOT EXISTS user_location_edits (
+    user_id INT NOT NULL,
+    map_point_id INT NOT NULL,
+
+    google_place_id VARCHAR(255) NULL, 
+    title VARCHAR(100) NULL,
+    description TEXT NULL,
+    emoji VARCHAR(16) NULL,
+    location POINT NULL,
+
+    website_url VARCHAR(2048) NULL,
+    phone_number VARCHAR(15) NULL,
+    address TEXT NULL,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (user_id, map_point_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (map_point_id) REFERENCES map_points(id)
+);
+
+/*
+  Tracks locations a user has saved (per user).
+*/
+CREATE TABLE IF NOT EXISTS user_saved_locations (
+    user_id INT NOT NULL,
+    map_point_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (user_id, map_point_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE
+);
+
+------------------------------ POSTS ------------------------------
 
 /*
   Posts table
@@ -80,46 +137,6 @@ CREATE TABLE IF NOT EXISTS post_save_attempts (
     user_id INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-);
-
-/* 
-  Tracks manual edits (and the resulting Google Maps location resolution) for a given location made by a given user.
-*/
-CREATE TABLE IF NOT EXISTS user_location_edits (
-    user_id INT NOT NULL,
-    map_point_id INT NOT NULL,
-
-    google_place_id VARCHAR(255) NULL, 
-    title VARCHAR(100) NULL,
-    description TEXT NULL,
-    emoji VARCHAR(16) NULL,
-    location POINT NULL,
-
-    website_url VARCHAR(2048) NULL,
-    phone_number VARCHAR(15) NULL,
-    address TEXT NULL,
-
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    PRIMARY KEY (user_id, map_point_id),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (map_point_id) REFERENCES map_points(id)
-);
-
-
-
-/*
-  Tracks locations a user has saved (per user).
-*/
-CREATE TABLE IF NOT EXISTS user_saved_locations (
-    user_id INT NOT NULL,
-    map_point_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    PRIMARY KEY (user_id, map_point_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE
 );
 
 ----------------------------- FRIENDS -----------------------------

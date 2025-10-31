@@ -1,6 +1,7 @@
 import type { BunRequest } from "bun";
-import { db } from "../database";
+import { db, toCamelCase } from "../database";
 import { verifySessionToken } from "../user/session";
+import { checkedExtractBody } from "../utils";
 import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld, getCreatedFolderIds, getCoOwnedFolderIds, fetchUserLocationEditsForUsersAndMapPoints, getAllFolderLocationsWithTopPost, getAllFolderOwners, insertLocationForUser } from "./queries";
 import { getFolderOwners, removeLocationFromFolder } from "../folders/queries";
 import { removeSavedLocationForUser } from "../posts/queries";
@@ -364,6 +365,117 @@ export async function addLocation(req: BunRequest): Promise<Response> {
     
     
     return new Response("Successfully added location", { status: 200 });
+}
+
+/**
+ * Rounds a rating value to the nearest 0.5 increment.
+ * Valid range is 1.0 to 5.0.
+ * 
+ * @param rating - The rating value to round.
+ * @returns The rating rounded to the nearest 0.5 increment.
+ */
+function roundToHalfIncrement(rating: number): number {
+    return Math.round(rating * 2) / 2;
+}
+
+/**
+ * Creates or updates a review for a location.
+ * Expects JSON body: { mapPointId: number, rating: number, review?: string }
+ * Requires authentication.
+ */
+export async function createLocationReview(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const data = await checkedExtractBody(req, ["mapPointId", "rating"]);
+    if (!data) {
+        return new Response("Malformed request body", { status: 400 });
+    }
+
+    const mapPointId = Number((data as any).mapPointId);
+    const ratingInput = Number((data as any).rating);
+    const reviewText = (data as any).review || null;
+
+    if (!Number.isInteger(mapPointId) || mapPointId <= 0) {
+        return new Response("Invalid map point id", { status: 400 });
+    }
+
+    if (isNaN(ratingInput) || ratingInput < 1 || ratingInput > 5) {
+        return new Response("Rating must be a number between 1 and 5", { status: 400 });
+    }
+
+    if (reviewText !== null && typeof reviewText !== "string") {
+        return new Response("Review must be a string or null", { status: 400 });
+    }
+
+    // Round rating to nearest 0.5 increment
+    const roundedRating = roundToHalfIncrement(ratingInput);
+    if (roundedRating < 1 || roundedRating > 5) {
+        return new Response("Rating must be between 1 and 5", { status: 400 });
+    }
+
+    // Verify map point exists
+    const [mapRows] = await db.execute("SELECT id FROM map_points WHERE id = ?", [mapPointId]) as [any[], any];
+    if ((mapRows as any[]).length === 0) {
+        return new Response("Map point not found", { status: 404 });
+    }
+
+    try {
+        // Check if user already has a review for this location
+        const [existingRows] = await db.execute(
+            "SELECT id FROM location_reviews WHERE user_id = ? AND map_point_id = ?",
+            [userId, mapPointId]
+        ) as [any[], any];
+
+        if (existingRows.length > 0) {
+            // Update existing review
+            await db.execute(
+                "UPDATE location_reviews SET rating = ?, review = ? WHERE user_id = ? AND map_point_id = ?",
+                [roundedRating, reviewText, userId, mapPointId]
+            );
+
+            // Fetch updated review
+            const [updatedRows] = await db.execute(
+                "SELECT * FROM location_reviews WHERE user_id = ? AND map_point_id = ?",
+                [userId, mapPointId]
+            ) as [any[], any];
+
+            return new Response(
+                JSON.stringify(toCamelCase(updatedRows[0])),
+                { status: 200, headers: { "Content-Type": "application/json" } }
+            );
+        } else {
+            // Insert new review
+            await db.execute(
+                "INSERT INTO location_reviews (map_point_id, user_id, rating, review) VALUES (?, ?, ?, ?)",
+                [mapPointId, userId, roundedRating, reviewText]
+            );
+
+            const [idRows] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
+            const reviewId = idRows[0].id;
+
+            // Fetch created review
+            const [reviewRows] = await db.execute(
+                "SELECT * FROM location_reviews WHERE id = ?",
+                [reviewId]
+            ) as [any[], any];
+
+            return new Response(
+                JSON.stringify(toCamelCase(reviewRows[0])),
+                { status: 201, headers: { "Content-Type": "application/json" } }
+            );
+        }
+    } catch (error) {
+        console.error(`Error creating review for location ${mapPointId}:`, error);
+        return new Response("Internal server error", { status: 500 });
+    }
 }
 
 
