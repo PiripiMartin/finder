@@ -457,7 +457,32 @@ export async function getFriendsReviews(req: BunRequest): Promise<Response> {
             }
         }
 
-        // Format payload with applied edits
+        // Fetch comments for all reviews
+        const reviewIds = Array.from(new Set(results.map(r => r.reviewId as number)));
+        const commentsByReviewId = new Map<number, any[]>();
+        if (reviewIds.length > 0) {
+            const placeholdersComments = reviewIds.map(() => "?").join(", ");
+            const [commentRows] = await db.execute(
+                `SELECT 
+                    id,
+                    review_id,
+                    commenter_id,
+                    comment,
+                    created_at
+                 FROM location_review_comments
+                 WHERE review_id IN (${placeholdersComments})
+                 ORDER BY created_at ASC`,
+                reviewIds
+            ) as [any[], any];
+            const comments = toCamelCase(commentRows) as any[];
+            for (const c of comments) {
+                const list = commentsByReviewId.get(c.reviewId) ?? [];
+                list.push(c);
+                commentsByReviewId.set(c.reviewId, list);
+            }
+        }
+
+        // Format payload with applied edits and comments
         const payload = results.map(row => {
             const baseLocation: MapPoint = {
                 id: row.locationId,
@@ -505,6 +530,7 @@ export async function getFriendsReviews(req: BunRequest): Promise<Response> {
                     rating: row.rating,
                     review: row.review,
                     createdAt: row.reviewCreatedAt,
+                    comments: commentsByReviewId.get(row.reviewId) ?? []
                 },
                 location,
                 topPosts: topPostsByLocation.get(row.mapPointId) ?? []
@@ -516,4 +542,85 @@ export async function getFriendsReviews(req: BunRequest): Promise<Response> {
         console.error("Error fetching friends' reviews:", error);
         return new Response("Internal server error", { status: 500 });
     }
+}
+
+/**
+ * Creates a comment on a friend's review.
+ * Path: POST /api/friends/reviews/:id/comments
+ * Body: { comment: string }
+ */
+export async function commentOnFriendReview(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const reviewId = parseInt((req.params as any).id, 10);
+    if (!reviewId || Number.isNaN(reviewId)) {
+        return new Response("Invalid review id", { status: 400 });
+    }
+
+    const data = await checkedExtractBody(req, ["comment"]);
+    if (!data) {
+        return new Response("Malformed request body", { status: 400 });
+    }
+    const commentText = String((data as any).comment ?? "").trim();
+    if (commentText.length === 0) {
+        return new Response("Comment cannot be empty", { status: 400 });
+    }
+
+    // Fetch the review and its owner
+    const [reviewRows] = await db.execute(
+        "SELECT id, user_id FROM location_reviews WHERE id = ?",
+        [reviewId]
+    ) as [any[], any];
+    if (reviewRows.length === 0) {
+        return new Response("Review not found", { status: 404 });
+    }
+    const reviewerId = reviewRows[0].user_id as number;
+    if (reviewerId === userId) {
+        // Allow commenting on own review as well (optional behavior)
+    }
+
+    // Validate friend relationship (bidirectional)
+    const [friendRows] = await db.execute(
+        `SELECT COUNT(*) as cnt
+         FROM friends
+         WHERE (user_id_1 = ? AND user_id_2 = ?) OR (user_id_1 = ? AND user_id_2 = ?)`,
+        [userId, reviewerId, reviewerId, userId]
+    ) as [any[], any];
+    const isFriend = (friendRows[0]?.cnt ?? 0) > 0;
+    if (!isFriend && reviewerId !== userId) {
+        return new Response("Forbidden: can only comment on friends' reviews", { status: 403 });
+    }
+
+    // Insert the comment
+    await db.execute(
+        "INSERT INTO location_review_comments (review_id, commenter_id, comment) VALUES (?, ?, ?)",
+        [reviewId, userId, commentText]
+    );
+
+    const [idRows] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
+    const commentId = idRows[0].id as number;
+
+    // Fetch created comment for response
+    const [commentRows] = await db.execute(
+        `SELECT 
+            id,
+            review_id,
+            commenter_id,
+            comment,
+            created_at
+         FROM location_review_comments
+         WHERE id = ?`,
+        [commentId]
+    ) as [any[], any];
+
+    const created = toCamelCase(commentRows[0]) as any;
+    return new Response(JSON.stringify(created), { status: 201, headers: { "Content-Type": "application/json" } });
 }

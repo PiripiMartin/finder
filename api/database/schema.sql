@@ -64,10 +64,27 @@ CREATE TABLE IF NOT EXISTS location_reviews (
     user_id INT NOT NULL,
     rating DECIMAL(2,1) NOT NULL CHECK (rating >= 1 AND rating <= 5),
     review TEXT NULL,
+    like_count INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+
+/*
+  Comments on location reviews
+*/
+CREATE TABLE IF NOT EXISTS location_review_comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    review_id INT NOT NULL,
+    commenter_id INT NOT NULL,
+    comment TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (review_id) REFERENCES location_reviews(id) ON DELETE CASCADE,
+    FOREIGN KEY (commenter_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 
 
 /* 
