@@ -2,7 +2,7 @@ import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
 import type { BunRequest } from "bun";
 import { toCamelCase, db } from "../database";
-import { fetchUserLocationEdits } from "../map/queries";
+import { fetchUserLocationEdits, fetchPostsForLocation, fetchUserLocationEditsForUsersAndMapPoints } from "../map/queries";
 import type { MapPoint } from "../map/types";
 import { createUserLocationEdit } from "../user/queries";
 
@@ -356,4 +356,164 @@ export async function deleteLocationInvitation(req: BunRequest): Promise<Respons
         JSON.stringify({ success: true }),
         { status: 200, headers: { "Content-Type": "application/json" } }
     );
+}
+
+/**
+ * Number of top videos to include per location in friends' reviews.
+ */
+const TOP_VIDEOS_PER_LOCATION = 10;
+
+/**
+ * Returns reviews created by the authenticated user's friends.
+ * Each review includes the full location object and the top N videos for that location.
+ * GET /api/friends/reviews
+ */
+export async function getFriendsReviews(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    try {
+        // Get friend ids (bidirectional friendship)
+        const [friendRows] = await db.execute(
+            `SELECT IF(f.user_id_1 = ?, f.user_id_2, f.user_id_1) AS friend_id
+             FROM friends f
+             WHERE ? IN (f.user_id_1, f.user_id_2)`,
+            [userId, userId]
+        ) as [any[], any];
+
+        const friendIds: number[] = (friendRows as any[]).map(r => r.friend_id).filter((id: any) => Number.isInteger(id));
+        if (friendIds.length === 0) {
+            return new Response(JSON.stringify([]), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+
+        // Build placeholders for IN clause
+        const placeholders = friendIds.map(() => "?").join(", ");
+
+        // Fetch friends' reviews joined with location data
+        const query = `
+            SELECT 
+                lr.id as review_id,
+                lr.user_id as reviewer_id,
+                lr.map_point_id,
+                lr.rating,
+                lr.review,
+                lr.created_at as review_created_at,
+                mp.id as location_id,
+                mp.google_place_id,
+                mp.title,
+                mp.description,
+                mp.emoji,
+                mp.website_url,
+                mp.phone_number,
+                mp.address,
+                mp.created_at as mp_created_at,
+                mp.is_valid_location,
+                mp.recommendable,
+                ST_X(mp.location) as longitude,
+                ST_Y(mp.location) as latitude
+            FROM location_reviews lr
+            INNER JOIN map_points mp ON mp.id = lr.map_point_id
+            WHERE lr.user_id IN (${placeholders})
+            ORDER BY lr.created_at DESC
+        `;
+
+        const [rows] = await db.execute(query, friendIds) as [any[], any];
+        const results = toCamelCase(rows) as any[];
+
+        // Precompute top posts per location id to avoid repeated queries where possible
+        const uniqueLocationIds = Array.from(new Set(results.map(r => r.mapPointId as number)));
+
+        const topPostsByLocation = new Map<number, any[]>();
+        for (const locId of uniqueLocationIds) {
+            try {
+                const posts = await fetchPostsForLocation(locId);
+                topPostsByLocation.set(locId, posts.slice(0, TOP_VIDEOS_PER_LOCATION));
+            } catch (e) {
+                topPostsByLocation.set(locId, []);
+            }
+        }
+
+        // Fetch relevant edits: viewer's own edits first, then reviewer's edits as fallback
+        const viewerEdits = await fetchUserLocationEdits(userId);
+        const viewerEditsByMapPoint = new Map<number, any>(viewerEdits.map(e => [e.mapPointId, e]));
+
+        const reviewerIds = Array.from(new Set(results.map(r => r.reviewerId as number)));
+        const reviewerEdits = await fetchUserLocationEditsForUsersAndMapPoints(reviewerIds, uniqueLocationIds);
+
+        // Map reviewer edits by composite key reviewerId:mapPointId, keeping the most recent
+        const reviewerEditsMap = new Map<string, any>();
+        for (const edit of reviewerEdits) {
+            const key = `${edit.userId}:${edit.mapPointId}`;
+            const existing = reviewerEditsMap.get(key);
+            if (!existing || new Date(edit.lastUpdated).getTime() > new Date(existing.lastUpdated).getTime()) {
+                reviewerEditsMap.set(key, edit);
+            }
+        }
+
+        // Format payload with applied edits
+        const payload = results.map(row => {
+            const baseLocation: MapPoint = {
+                id: row.locationId,
+                googlePlaceId: row.googlePlaceId,
+                title: row.title,
+                description: row.description,
+                emoji: row.emoji,
+                latitude: row.latitude,
+                longitude: row.longitude,
+                recommendable: row.recommendable,
+                isValidLocation: row.isValidLocation,
+                websiteUrl: row.websiteUrl,
+                phoneNumber: row.phoneNumber,
+                address: row.address,
+                createdAt: row.mpCreatedAt
+            };
+
+            // Apply viewer edit first; if none, fall back to reviewer's edit
+            const viewerEdit = viewerEditsByMapPoint.get(row.mapPointId);
+            const reviewerEdit = reviewerEditsMap.get(`${row.reviewerId}:${row.mapPointId}`);
+            const edit = viewerEdit ?? reviewerEdit ?? null;
+
+            const location: MapPoint = { ...baseLocation } as any;
+            if (edit) {
+                const addressUpdated = edit.googlePlaceId != null && edit.googlePlaceId !== baseLocation.googlePlaceId;
+                location.title = edit.title ?? location.title;
+                location.description = edit.description ?? location.description;
+                location.emoji = edit.emoji ?? location.emoji;
+                location.websiteUrl = edit.websiteUrl ?? location.websiteUrl;
+                location.phoneNumber = edit.phoneNumber ?? location.phoneNumber;
+                location.address = edit.address ?? location.address;
+                location.googlePlaceId = edit.googlePlaceId ?? location.googlePlaceId;
+                location.latitude = edit.latitude ?? location.latitude;
+                location.longitude = edit.longitude ?? location.longitude;
+                if (addressUpdated) {
+                    location.websiteUrl = edit.websiteUrl ?? "";
+                    location.phoneNumber = edit.phoneNumber ?? "";
+                }
+            }
+
+            return {
+                review: {
+                    id: row.reviewId,
+                    reviewerId: row.reviewerId,
+                    rating: row.rating,
+                    review: row.review,
+                    createdAt: row.reviewCreatedAt,
+                },
+                location,
+                topPosts: topPostsByLocation.get(row.mapPointId) ?? []
+            };
+        });
+
+        return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
+    } catch (error) {
+        console.error("Error fetching friends' reviews:", error);
+        return new Response("Internal server error", { status: 500 });
+    }
 }
