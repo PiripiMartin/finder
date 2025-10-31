@@ -1004,7 +1004,7 @@ export default function Saved() {
               <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
                 {selectedEmoji 
                   ? `No saved locations with ${selectedEmoji} emoji found`
-                  : 'Save your first location by sharing a TikTok video to lai!'
+                  : 'Save your first location by sharing a TikTok video or Instagram reel to lai!'
                 }
               </Text>
               {!selectedEmoji && tutorialFeatureEnabled && (

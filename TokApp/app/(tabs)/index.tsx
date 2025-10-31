@@ -1489,7 +1489,7 @@ export default function Index() {
             <View style={styles.progressContent}>
               <Ionicons name="flag-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
               <Text style={styles.progressText}>
-                Goal: Save {savedLocations.length}/3 TikToks
+                Goal: Save {savedLocations.length}/3 TikToks or Instagram Reels
               </Text>
             </View>
             {tutorialFeatureEnabled && (
