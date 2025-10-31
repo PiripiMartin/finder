@@ -1088,57 +1088,68 @@ export default function Index() {
                 latitude: point.latitude,
                 longitude: point.longitude,
               }}
-              tracksViewChanges={false}
+              tracksViewChanges={Platform.OS === 'android' ? true : false}
               onPress={(event) => {
                 handleMarkerPress(point.id, event);
               }}
             >
-              <Animated.View
-                style={{
-                  width: 64, // Increased from 48 to 64
-                  height: 64, // Increased from 48 to 64
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transform: [
-                    {
-                      scale: finalScale,
-                    },
-                  ],
-                }}
-              >
-                <Animated.Text 
-                  style={[
-                    styles.markerEmoji,
-                    {
-                      transform: [
-                        {
-                          translateX: shakeAnims[point.id] ? shakeAnims[point.id].interpolate({
-                            inputRange: [-1, 0, 1],
-                            outputRange: [-3, 0, 3],
-                          }) : 0,
-                        },
-                      ],
-                    }
-                  ]}
+              {Platform.OS === 'android' ? (
+                <Text
+                  style={{
+                    fontSize: 32,
+                  }}
                 >
                   {point.emoji}
-                </Animated.Text>
+                </Text>
+              ) : (
+                // iOS version with animations
+                <Animated.View
+                  style={{
+                    width: 64, // Increased from 48 to 64
+                    height: 64, // Increased from 48 to 64
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transform: [
+                      {
+                        scale: finalScale,
+                      },
+                    ],
+                  }}
+                >
+                  <Animated.Text 
+                    style={[
+                      styles.markerEmoji,
+                      {
+                        transform: [
+                          {
+                            translateX: shakeAnims[point.id] ? shakeAnims[point.id].interpolate({
+                              inputRange: [-1, 0, 1],
+                              outputRange: [-3, 0, 3],
+                            }) : 0,
+                          },
+                        ],
+                      }
+                    ]}
+                  >
+                    {point.emoji}
+                  </Animated.Text>
+                </Animated.View>
+              )}
                 
-                {/* Custom Label - Only show when selected */}
-                {point.id === selectedMarkerId && (
-                  <View style={[
-                    styles.customLabel,
-                    {
-                      top: -30, // Moved down (was -70)
-                      left: -60, // Wider label (was -40)
-                      right: -60, // Wider label (was -40)
-                    }
-                  ]}>
-                    <Text style={styles.labelTitle}>{point.title}</Text>
-                    <Text style={styles.labelDescription}>{point.description}</Text>
-                  </View>
-                )}
-              </Animated.View>
+              {/* Custom Label - Only show when selected */}
+              {point.id === selectedMarkerId && (
+                <View style={[
+                  styles.customLabel,
+                  {
+                    top: -30, // Moved down (was -70)
+                    left: -60, // Wider label (was -40)
+                    right: -60, // Wider label (was -40)
+                  }
+                ]}>
+                  <Text style={styles.labelTitle}>{point.title}</Text>
+                  <Text style={styles.labelDescription}>{point.description}</Text>
+                </View>
+              )}
             </Marker>
           );
         })}
@@ -1489,7 +1500,7 @@ export default function Index() {
             <View style={styles.progressContent}>
               <Ionicons name="flag-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
               <Text style={styles.progressText}>
-                Goal: Save {savedLocations.length}/3 TikToks or Instagram Reels
+                Goal: Save {savedLocations.length}/3 TikToks
               </Text>
             </View>
             {tutorialFeatureEnabled && (

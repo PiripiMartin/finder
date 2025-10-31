@@ -31,7 +31,7 @@ export function ShareProvider({ children }: { children: React.ReactNode }) {
     const checkShareExtensionData = async () => {
       console.log('🔍 [ShareContext] Checking for share extension data...');
       try {
-        if (Platform.OS === 'ios' && ShareExtensionBridge) {
+        if (Platform.OS === 'ios' && ShareExtensionBridge && ShareExtensionBridge.getSharedData) {
           console.log('📱 [ShareContext] iOS detected, using native bridge');
           // Use native bridge to get data from UserDefaults
           const sharedData = await ShareExtensionBridge.getSharedData();
@@ -74,14 +74,25 @@ export function ShareProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    ShareMenu.getInitialShare(handleShare);
-    const listener = ShareMenu.addNewShareListener(handleShare);
-    const appStateListener = AppState.addEventListener('change', handleAppStateChange);
+    // Only use ShareMenu on iOS and if it's available and has the required methods
+    if (Platform.OS === 'ios' && ShareMenu && ShareMenu.getInitialShare && ShareMenu.addNewShareListener) {
+      console.log('📱 [ShareContext] iOS detected, using ShareMenu');
+      ShareMenu.getInitialShare(handleShare);
+      const listener = ShareMenu.addNewShareListener(handleShare);
+      const appStateListener = AppState.addEventListener('change', handleAppStateChange);
 
-    return () => {
-      listener.remove();
-      appStateListener.remove();
-    };
+      return () => {
+        listener.remove();
+        appStateListener.remove();
+      };
+    } else {
+      // Fallback: just listen to app state changes (Android or ShareMenu not available)
+      console.log('🤖 [ShareContext] Android or ShareMenu not available, using fallback');
+      const appStateListener = AppState.addEventListener('change', handleAppStateChange);
+      return () => {
+        appStateListener.remove();
+      };
+    }
   }, []);
 
   const handleSharedContent = async (content: any) => {
