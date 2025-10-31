@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS user_location_edits (
     user_id INT NOT NULL,
     map_point_id INT NOT NULL,
 
-    google_place_id VARCHAR(255) UNIQUE NULL, 
+    google_place_id VARCHAR(255) NULL, 
     title VARCHAR(100) NULL,
     description TEXT NULL,
     emoji VARCHAR(16) NULL,

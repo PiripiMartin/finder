@@ -2,6 +2,9 @@ import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
 import type { BunRequest } from "bun";
 import { toCamelCase, db } from "../database";
+import { fetchUserLocationEdits } from "../map/queries";
+import type { MapPoint } from "../map/types";
+import { createUserLocationEdit } from "../user/queries";
 
 /**
  * Adds a friend relationship between the authenticated user and another user.
@@ -139,6 +142,46 @@ export async function createLocationInvitation(req: BunRequest): Promise<Respons
         return new Response("Map point not found", { status: 404 });
     }
 
+    // Check if creator has a location edit for this map point and duplicate it for recipient
+    const [creatorEditRows] = await db.execute(
+        `SELECT 
+            google_place_id,
+            title,
+            description,
+            emoji,
+            ST_X(location) as longitude,
+            ST_Y(location) as latitude,
+            website_url,
+            phone_number,
+            address
+        FROM user_location_edits
+        WHERE user_id = ? AND map_point_id = ?`,
+        [creatorId, mapPointId]
+    ) as [any[], any];
+
+    // Check if recipient already has an edit (don't overwrite if they do)
+    const [recipientEditRows] = await db.execute(
+        `SELECT user_id FROM user_location_edits WHERE user_id = ? AND map_point_id = ?`,
+        [recipientId, mapPointId]
+    ) as [any[], any];
+
+    // If creator has an edit and recipient doesn't, duplicate it
+    if (creatorEditRows.length > 0 && recipientEditRows.length === 0) {
+        const creatorEdit = toCamelCase([creatorEditRows[0]])[0] as any;
+        
+        await createUserLocationEdit(recipientId, mapPointId, {
+            googlePlaceId: creatorEdit.googlePlaceId ?? null,
+            title: creatorEdit.title ?? null,
+            description: creatorEdit.description ?? null,
+            emoji: creatorEdit.emoji ?? null,
+            latitude: creatorEdit.latitude ?? null,
+            longitude: creatorEdit.longitude ?? null,
+            websiteUrl: creatorEdit.websiteUrl ?? null,
+            phoneNumber: creatorEdit.phoneNumber ?? null,
+            address: creatorEdit.address ?? null
+        });
+    }
+
     // Create the invitation
     await db.execute(
         `INSERT INTO location_invitations (creator_id, recipient_id, map_point_id, message) VALUES (?, ?, ?, ?)`,
@@ -160,4 +203,111 @@ export async function createLocationInvitation(req: BunRequest): Promise<Respons
         JSON.stringify(inviteRows[0]),
         { status: 201, headers: { "Content-Type": "application/json" } }
     );
+}
+
+/**
+ * Returns a list of location invitations for the authenticated user (as recipient).
+ * Returns: [{ id, creatorId, recipientId, location, message, createdAt }]
+ * where location is a MapPoint object replacing map_point_id.
+ */
+export async function getLocationInvitations(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    // Query location invitations with location data
+    const query = `
+        SELECT 
+            li.id,
+            li.creator_id,
+            li.recipient_id,
+            li.map_point_id,
+            li.message,
+            li.created_at,
+            mp.google_place_id,
+            mp.title,
+            mp.description,
+            mp.emoji,
+            mp.website_url,
+            mp.phone_number,
+            mp.address,
+            mp.created_at as mp_created_at,
+            mp.is_valid_location,
+            mp.recommendable,
+            ST_X(mp.location) as longitude,
+            ST_Y(mp.location) as latitude
+        FROM location_invitations li
+        INNER JOIN map_points mp ON li.map_point_id = mp.id
+        WHERE li.recipient_id = ?
+        ORDER BY li.created_at DESC
+    `;
+
+    const [rows] = await db.execute(query, [userId]) as [any[], any];
+    const results = toCamelCase(rows) as any[];
+
+    // Fetch user location edits to apply customizations
+    const userEdits = await fetchUserLocationEdits(userId);
+    const editsMap = new Map(userEdits.map(edit => [edit.mapPointId, edit]));
+
+    // Format the response with location object replacing map_point_id
+    const invitations = results.map(row => {
+        const location: MapPoint = {
+            id: row.mapPointId,
+            googlePlaceId: row.googlePlaceId,
+            title: row.title,
+            description: row.description,
+            emoji: row.emoji,
+            latitude: row.latitude,
+            longitude: row.longitude,
+            recommendable: row.recommendable,
+            isValidLocation: row.isValidLocation,
+            websiteUrl: row.websiteUrl,
+            phoneNumber: row.phoneNumber,
+            address: row.address,
+            createdAt: row.mpCreatedAt
+        };
+
+        // Apply user location edits if they exist
+        const edit = editsMap.get(row.mapPointId);
+        if (edit) {
+            const addressUpdated = edit.googlePlaceId != null && edit.googlePlaceId !== location.googlePlaceId;
+            
+            location.title = edit.title ?? location.title;
+            location.description = edit.description ?? location.description;
+            location.emoji = edit.emoji ?? location.emoji;
+            location.websiteUrl = edit.websiteUrl ?? location.websiteUrl;
+            location.phoneNumber = edit.phoneNumber ?? location.phoneNumber;
+            location.address = edit.address ?? location.address;
+            location.googlePlaceId = edit.googlePlaceId ?? location.googlePlaceId;
+            location.latitude = edit.latitude ?? location.latitude;
+            location.longitude = edit.longitude ?? location.longitude;
+
+            if (addressUpdated) {
+                // If the location changed in Google Maps but the new website/phone number 
+                // wasn't found, make sure we're not just reporting the old website/phone.
+                location.websiteUrl = edit.websiteUrl ?? "";
+                location.phoneNumber = edit.phoneNumber ?? "";
+            }
+        }
+
+        return {
+            id: row.id,
+            creatorId: row.creatorId,
+            recipientId: row.recipientId,
+            location: location,
+            message: row.message,
+            createdAt: row.createdAt
+        };
+    });
+
+    return new Response(JSON.stringify(invitations), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+    });
 }
