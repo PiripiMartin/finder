@@ -196,7 +196,7 @@ export default function Index() {
     }
   }, [setContextSavedLocations, setContextRecommendedLocations]);
 
-  // Fetch map points from API
+  // Fetch map points from API with retry logic
   const fetchMapPoints = useCallback(async () => {
     try {
       // Check if enough time has passed since last refresh
@@ -237,247 +237,281 @@ export default function Index() {
       
       console.log('Fetching map points from:', apiUrl);
       
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), 5000); // 5 second timeout
-      });
+      // Retry logic with exponential backoff
+      const MAX_RETRIES = 3;
+      const TIMEOUT_MS = 15000; // Increased from 5s to 15s
+      let lastError: Error | null = null;
       
-      // Fetch map points from API
-      const fetchPromise = fetch(apiUrl, {
-        method: 'GET',
-        headers,
-      });
-      
-      // Race between fetch and timeout
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('API response data:', data);
-      
-      // Handle different API response formats for guest vs authenticated
-      let savedLocationsData: any[] = [];
-      let recommendedLocations: any[] = [];
-      
-      if (isGuest) {
-        console.log('👤 [fetchMapPoints] Processing guest API response');
-        // Guest API might return data in a different format
-        if (Array.isArray(data)) {
-          // If guest API returns an array directly
-          recommendedLocations = data;
-          console.log('👤 [fetchMapPoints] Guest API returned array with', data.length, 'items');
-        } else if (data.recommendedLocations) {
-          // If guest API returns object with recommendedLocations
-          recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
-          console.log('👤 [fetchMapPoints] Guest API returned object with recommendedLocations:', recommendedLocations.length);
-        } else {
-          console.log('👤 [fetchMapPoints] Guest API returned unexpected format:', data);
-          // Try to extract any array from the response
-          Object.keys(data).forEach(key => {
-            if (Array.isArray(data[key])) {
-              recommendedLocations = data[key];
-              console.log('👤 [fetchMapPoints] Found array in key:', key, 'with', data[key].length, 'items');
-            }
-          });
-        }
-        
-        // Ensure we have some data for guest users, even if API returns empty
-        if (recommendedLocations.length === 0) {
-          console.log('👤 [fetchMapPoints] Guest API returned empty data, using fallback locations');
-          recommendedLocations = [
-            {
-              location: {
-                id: "guest-1",
-                title: "Welcome to lai!",
-                description: "Explore the map to discover amazing places",
-                emoji: "🗺️",
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-                isValidLocation: 1,
-                websiteUrl: null,
-                phoneNumber: null,
-                address: null,
-                createdAt: new Date().toISOString(),
-              },
-              topPost: {
-                id: 0,
-                url: "",
-                postedBy: 0,
-                mapPointId: 0,
-                postedAt: new Date().toISOString(),
-              }
-            }
-          ];
-        }
-      } else {
-        // Authenticated API format - ONLY fetch from /map/saved-new
-        // No longer using data.savedLocations or data.recommendedLocations
-        
-        // Fetch ALL locations from /map/saved-new to get complete folder contents
-        // This includes locations added by other co-owners to shared folders
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
-          const savedNewResponse = await fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${sessionToken || ''}`,
-            },
+          if (attempt > 0) {
+            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 1s, 2s, 4s max
+            console.log(`🔄 [fetchMapPoints] Retry attempt ${attempt + 1}/${MAX_RETRIES} after ${delay}ms delay`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+          
+          // Create a timeout promise
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Request timeout')), TIMEOUT_MS);
           });
           
-          if (savedNewResponse.ok) {
-            const savedNewData = await savedNewResponse.json();
-            console.log('📂 [fetchMapPoints] Fetched saved-new data:', savedNewData);
-            
-            // Collect all locations from ALL sections
-            const allLocations: any[] = [];
-            
-            // Extract locations from personal folders (includes co-owned folder locations)
-            if (savedNewData.personal) {
-              Object.keys(savedNewData.personal).forEach((folderId) => {
-                const folderLocations = savedNewData.personal[folderId];
-                if (Array.isArray(folderLocations)) {
-                  allLocations.push(...folderLocations);
-                }
-              });
-            }
-            
-            // Extract locations from shared folders
-            if (savedNewData.shared) {
-              Object.keys(savedNewData.shared).forEach((folderId) => {
-                const folderLocations = savedNewData.shared[folderId];
-                if (Array.isArray(folderLocations)) {
-                  allLocations.push(...folderLocations);
-                }
-              });
-            }
-            
-            // Extract locations from followed folders
-            if (savedNewData.followed) {
-              Object.keys(savedNewData.followed).forEach((folderId) => {
-                const folderLocations = savedNewData.followed[folderId];
-                if (Array.isArray(folderLocations)) {
-                  allLocations.push(...folderLocations);
-                }
-              });
-            }
-            
-            // Deduplicate locations by ID
-            const seenIds = new Set();
-            savedLocationsData = allLocations.filter((loc: any) => {
-              if (loc.location?.id && !seenIds.has(loc.location.id)) {
-                seenIds.add(loc.location.id);
-                return true;
-              }
-              return false;
-            });
-            
-            console.log('📂 [fetchMapPoints] Total unique saved-new locations:', savedLocationsData.length);
+          // Fetch map points from API
+          const fetchPromise = fetch(apiUrl, {
+            method: 'GET',
+            headers,
+          });
+          
+          // Race between fetch and timeout
+          const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+      
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
           }
-        } catch (error) {
-          console.error('❌ [fetchMapPoints] Error fetching folder locations:', error);
-          savedLocationsData = [];
+          
+          const data = await response.json();
+          console.log(`✅ [fetchMapPoints] API response received successfully on attempt ${attempt + 1}`);
+          console.log('API response data:', data);
+      
+          // Handle different API response formats for guest vs authenticated
+          let savedLocationsData: any[] = [];
+          let recommendedLocations: any[] = [];
+      
+          if (isGuest) {
+            console.log('👤 [fetchMapPoints] Processing guest API response');
+            // Guest API might return data in a different format
+            if (Array.isArray(data)) {
+              // If guest API returns an array directly
+              recommendedLocations = data;
+              console.log('👤 [fetchMapPoints] Guest API returned array with', data.length, 'items');
+            } else if (data.recommendedLocations) {
+              // If guest API returns object with recommendedLocations
+              recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+              console.log('👤 [fetchMapPoints] Guest API returned object with recommendedLocations:', recommendedLocations.length);
+            } else {
+              console.log('👤 [fetchMapPoints] Guest API returned unexpected format:', data);
+              // Try to extract any array from the response
+              Object.keys(data).forEach(key => {
+                if (Array.isArray(data[key])) {
+                  recommendedLocations = data[key];
+                  console.log('👤 [fetchMapPoints] Found array in key:', key, 'with', data[key].length, 'items');
+                }
+              });
+            }
+            
+            // Ensure we have some data for guest users, even if API returns empty
+            if (recommendedLocations.length === 0) {
+              console.log('👤 [fetchMapPoints] Guest API returned empty data, using fallback locations');
+              recommendedLocations = [
+                {
+                  location: {
+                    id: "guest-1",
+                    title: "Welcome to lai!",
+                    description: "Explore the map to discover amazing places",
+                    emoji: "🗺️",
+                    latitude: userLocation.latitude,
+                    longitude: userLocation.longitude,
+                    isValidLocation: 1,
+                    websiteUrl: null,
+                    phoneNumber: null,
+                    address: null,
+                    createdAt: new Date().toISOString(),
+                  },
+                  topPost: {
+                    id: 0,
+                    url: "",
+                    postedBy: 0,
+                    mapPointId: 0,
+                    postedAt: new Date().toISOString(),
+                  }
+                }
+              ];
+            }
+          } else {
+            // Authenticated API format - ONLY fetch from /map/saved-new
+            // No longer using data.savedLocations or data.recommendedLocations
+            
+            // Fetch ALL locations from /map/saved-new to get complete folder contents
+            // This includes locations added by other co-owners to shared folders
+            try {
+              const savedNewResponse = await fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${sessionToken || ''}`,
+                },
+              });
+              
+              if (savedNewResponse.ok) {
+                const savedNewData = await savedNewResponse.json();
+                console.log('📂 [fetchMapPoints] Fetched saved-new data:', savedNewData);
+                
+                // Collect all locations from ALL sections
+                const allLocations: any[] = [];
+                
+                // Extract locations from personal folders (includes co-owned folder locations)
+                if (savedNewData.personal) {
+                  Object.keys(savedNewData.personal).forEach((folderId) => {
+                    const folderLocations = savedNewData.personal[folderId];
+                    if (Array.isArray(folderLocations)) {
+                      allLocations.push(...folderLocations);
+                    }
+                  });
+                }
+                
+                // Extract locations from shared folders
+                if (savedNewData.shared) {
+                  Object.keys(savedNewData.shared).forEach((folderId) => {
+                    const folderLocations = savedNewData.shared[folderId];
+                    if (Array.isArray(folderLocations)) {
+                      allLocations.push(...folderLocations);
+                    }
+                  });
+                }
+                
+                // Extract locations from followed folders
+                if (savedNewData.followed) {
+                  Object.keys(savedNewData.followed).forEach((folderId) => {
+                    const folderLocations = savedNewData.followed[folderId];
+                    if (Array.isArray(folderLocations)) {
+                      allLocations.push(...folderLocations);
+                    }
+                  });
+                }
+                
+                // Deduplicate locations by ID
+                const seenIds = new Set();
+                savedLocationsData = allLocations.filter((loc: any) => {
+                  if (loc.location?.id && !seenIds.has(loc.location.id)) {
+                    seenIds.add(loc.location.id);
+                    return true;
+                  }
+                  return false;
+                });
+                
+                console.log('📂 [fetchMapPoints] Total unique saved-new locations:', savedLocationsData.length);
+              }
+            } catch (error) {
+              console.error('❌ [fetchMapPoints] Error fetching folder locations:', error);
+              savedLocationsData = [];
+            }
+            
+            // No recommended locations - only showing saved-new
+            recommendedLocations = [];
+          }
+          
+          // Safely extract and validate the data
+          // const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
+          // const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
+          
+          // Update saved locations state
+          setSavedLocations(savedLocationsData);
+          // Also update the context for sharing with other components
+          setContextSavedLocations(savedLocationsData);
+          setContextRecommendedLocations(recommendedLocations);
+          
+          console.log('🔍 [fetchMapPoints] API Response Data:', {
+            savedLocations: {
+              count: savedLocationsData.length,
+              data: savedLocationsData
+            },
+            recommendedLocations: {
+              count: recommendedLocations.length,
+              data: recommendedLocations
+            }
+          });
+          
+          // Debug saved locations structure
+          if (savedLocationsData.length > 0) {
+            console.log('🔍 [fetchMapPoints] First saved location structure:', savedLocationsData[0]);
+            console.log('🔍 [fetchMapPoints] Saved location IDs:', savedLocationsData.map((s: any) => s.location?.id));
+          }
+          
+          // Combine saved and recommended locations
+          const allLocations = [...savedLocationsData, ...recommendedLocations];
+          
+          console.log('📊 [fetchMapPoints] Combined Locations:', {
+            totalCount: allLocations.length,
+            allLocations: allLocations
+          });
+          
+          
+          
+          // Transform locations to MapPoint format with error handling
+          console.log('🔄 [fetchMapPoints] Starting data transformation...');
+          
+          const transformedMapPoints: MapPoint[] = allLocations.map((item: any, index: number) => {
+            console.log(`📍 [fetchMapPoints] Processing item ${index}:`, item);
+            
+            // Validate required fields
+            if (!item.location || !item.location.id || !item.location.latitude || !item.location.longitude) {
+              console.warn('❌ [fetchMapPoints] Invalid location data:', item);
+              return null;
+            }
+            
+            const transformedItem = {
+              id: String(item.location.id), // Ensure ID is a string
+              title: item.location.title || 'Unknown Location',
+              description: item.location.description || '',
+              emoji: item.location.emoji || '📍',
+              latitude: Number(item.location.latitude),
+              longitude: Number(item.location.longitude),
+              isValidLocation: Number(item.location.isValidLocation) || 0,
+              websiteUrl: item.location.websiteUrl || null,
+              phoneNumber: item.location.phoneNumber || null,
+              address: item.location.address || null,
+              createdAt: item.location.createdAt || new Date().toISOString(),
+              videoUrl: item.topPost?.url || '',
+            };
+            
+            console.log(`✅ [fetchMapPoints] Transformed item ${index}:`, transformedItem);
+            return transformedItem;
+          }).filter(Boolean) as MapPoint[]; // Remove null entries
+          
+          console.log('🎯 [fetchMapPoints] Final transformed map points:', {
+            totalCount: transformedMapPoints.length,
+            mapPoints: transformedMapPoints
+          });
+          
+         
+          setMapPoints(transformedMapPoints);
+          setError(null); // Clear any previous errors
+          setLastRefresh(Date.now()); // Update last refresh timestamp
+          console.log('🎉 [fetchMapPoints] Successfully fetched data from API, total points:', transformedMapPoints.length);
+          console.log('📱 [fetchMapPoints] State updated with map points:', transformedMapPoints);
+          
+          // Cache the fetched data for offline access
+          await cacheMapPoints({
+            savedLocations: savedLocationsData,
+            recommendedLocations,
+            transformedMapPoints,
+            timestamp: Date.now(),
+          });
+          console.log('💾 [fetchMapPoints] Data cached successfully');
+          
+          // Success! Break out of the retry loop
+          break;
+          
+        } catch (retryError) {
+          // Capture the error for potential retry
+          lastError = retryError instanceof Error ? retryError : new Error(String(retryError));
+          console.error(`❌ [fetchMapPoints] Attempt ${attempt + 1}/${MAX_RETRIES} failed:`, lastError.message);
+          
+          // If this was the last attempt, we'll handle the error outside the loop
+          if (attempt === MAX_RETRIES - 1) {
+            console.error(`❌ [fetchMapPoints] All ${MAX_RETRIES} attempts failed`);
+          }
         }
-        
-        // No recommended locations - only showing saved-new
-        recommendedLocations = [];
       }
       
-      // Safely extract and validate the data
-      // const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
-      // const recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
-      
-      // Update saved locations state
-      setSavedLocations(savedLocationsData);
-      // Also update the context for sharing with other components
-      setContextSavedLocations(savedLocationsData);
-      setContextRecommendedLocations(recommendedLocations);
-      
-      console.log('🔍 [fetchMapPoints] API Response Data:', {
-        savedLocations: {
-          count: savedLocationsData.length,
-          data: savedLocationsData
-        },
-        recommendedLocations: {
-          count: recommendedLocations.length,
-          data: recommendedLocations
-        }
-      });
-      
-      // Debug saved locations structure
-      if (savedLocationsData.length > 0) {
-        console.log('🔍 [fetchMapPoints] First saved location structure:', savedLocationsData[0]);
-        console.log('🔍 [fetchMapPoints] Saved location IDs:', savedLocationsData.map((s: any) => s.location?.id));
+      // If we exhausted all retries and still have an error, handle it
+      if (lastError) {
+        throw lastError;
       }
-      
-      // Combine saved and recommended locations
-      const allLocations = [...savedLocationsData, ...recommendedLocations];
-      
-      console.log('📊 [fetchMapPoints] Combined Locations:', {
-        totalCount: allLocations.length,
-        allLocations: allLocations
-      });
-      
-      
-      
-      // Transform locations to MapPoint format with error handling
-      console.log('🔄 [fetchMapPoints] Starting data transformation...');
-      
-      const transformedMapPoints: MapPoint[] = allLocations.map((item: any, index: number) => {
-        console.log(`📍 [fetchMapPoints] Processing item ${index}:`, item);
-        
-        // Validate required fields
-        if (!item.location || !item.location.id || !item.location.latitude || !item.location.longitude) {
-          console.warn('❌ [fetchMapPoints] Invalid location data:', item);
-          return null;
-        }
-        
-        const transformedItem = {
-          id: String(item.location.id), // Ensure ID is a string
-          title: item.location.title || 'Unknown Location',
-          description: item.location.description || '',
-          emoji: item.location.emoji || '📍',
-          latitude: Number(item.location.latitude),
-          longitude: Number(item.location.longitude),
-          isValidLocation: Number(item.location.isValidLocation) || 0,
-          websiteUrl: item.location.websiteUrl || null,
-          phoneNumber: item.location.phoneNumber || null,
-          address: item.location.address || null,
-          createdAt: item.location.createdAt || new Date().toISOString(),
-          videoUrl: item.topPost?.url || '',
-        };
-        
-        console.log(`✅ [fetchMapPoints] Transformed item ${index}:`, transformedItem);
-        return transformedItem;
-      }).filter(Boolean) as MapPoint[]; // Remove null entries
-      
-      console.log('🎯 [fetchMapPoints] Final transformed map points:', {
-        totalCount: transformedMapPoints.length,
-        mapPoints: transformedMapPoints
-      });
-      
-     
-      setMapPoints(transformedMapPoints);
-      setError(null); // Clear any previous errors
-      setLastRefresh(Date.now()); // Update last refresh timestamp
-      console.log('🎉 [fetchMapPoints] Successfully fetched data from API, total points:', transformedMapPoints.length);
-      console.log('📱 [fetchMapPoints] State updated with map points:', transformedMapPoints);
-      
-      // Cache the fetched data for offline access
-      await cacheMapPoints({
-        savedLocations: savedLocationsData,
-        recommendedLocations,
-        transformedMapPoints,
-        timestamp: Date.now(),
-      });
-      console.log('💾 [fetchMapPoints] Data cached successfully');
       
     } catch (err) {
-      console.error('Error fetching map points:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch map points');
+      console.error('❌ [fetchMapPoints] All retry attempts exhausted, using offline data:', err);
       
-      // Use fallback data if API fails
+      // Only show offline data message after all retries have failed
+      // Use fallback data if API fails after all retry attempts
       const fallbackData = {
         recommendedLocations: [
           {
@@ -716,17 +750,9 @@ export default function Index() {
   
 
 
-  // Filter out blocked locations from map points
-  useEffect(() => {
-    if (blockedLocationIds.length > 0) {
-      console.log(`🗑️ [Map] Filtering out ${blockedLocationIds.length} blocked locations:`, blockedLocationIds);
-      setMapPoints(prev => {
-        const newMapPoints = prev.filter(point => !blockedLocationIds.includes(point.id));
-        console.log(`🗑️ [Map] Filtered mapPoints from ${prev.length} to ${newMapPoints.length}`);
-        return newMapPoints;
-      });
-    }
-  }, [blockedLocationIds]);
+  // NOTE: Blocked locations are now filtered in the filteredMapPoints useMemo below
+  // to avoid permanently mutating the mapPoints state, which caused bugs when
+  // toggling folder filters on/off.
 
 
 
@@ -753,6 +779,12 @@ export default function Index() {
   // Filtered map points based on active filter and saved locations
   const filteredMapPoints = useMemo(() => {
     let filtered = mapPoints;
+    
+    // First, filter out blocked locations (don't mutate state, just filter at render time)
+    if (blockedLocationIds.length > 0) {
+      console.log(`🗑️ [Map] Filtering out ${blockedLocationIds.length} blocked locations from display`);
+      filtered = filtered.filter(point => !blockedLocationIds.includes(point.id));
+    }
     
     // Apply folder filter
     if (activeFilter) {
@@ -792,7 +824,7 @@ export default function Index() {
     }
     
     return filtered;
-  }, [mapPoints, activeFilter, showSavedOnly, savedLocations, folders]);
+  }, [mapPoints, activeFilter, showSavedOnly, savedLocations, folders, blockedLocationIds]);
 
   // Function to clear all filters
   const clearAllFilters = () => {
@@ -1234,6 +1266,7 @@ export default function Index() {
           {foldersWithCounts.map((folder) => (
             <TouchableOpacity
               key={folder.id}
+              activeOpacity={1}
               style={[
                 styles.filterButton,
                 {
