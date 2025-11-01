@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, KeyboardAvoidingView, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
@@ -495,11 +495,6 @@ export default function Location() {
       return;
     }
 
-    if (!invitationMessage.trim()) {
-      Alert.alert('Error', 'Please enter a message');
-      return;
-    }
-
     try {
       setIsSendingInvitation(true);
       console.log('📤 [Location] Sending invitation...');
@@ -513,7 +508,7 @@ export default function Location() {
         body: JSON.stringify({
           recipientUserId: selectedFriendId,
           mapPointId: parseInt(locationData.id),
-          message: invitationMessage.trim(),
+          message: invitationMessage.trim() || '',
         }),
       });
 
@@ -566,11 +561,6 @@ export default function Location() {
       return;
     }
 
-    if (!reviewText.trim()) {
-      Alert.alert('Error', 'Please write a review');
-      return;
-    }
-
     try {
       setIsSubmittingReview(true);
       console.log('📝 [Location] Submitting review...');
@@ -584,7 +574,7 @@ export default function Location() {
         body: JSON.stringify({
           mapPointId: parseInt(locationData.id),
           rating: reviewRating,
-          review: reviewText.trim(),
+          review: reviewText.trim() || '',
         }),
       });
 
@@ -767,14 +757,6 @@ export default function Location() {
               {!isReadOnly && (
                 <TouchableOpacity 
                   style={styles.actionIcon}
-                  onPress={() => setShowReviewModal(true)}
-                >
-                  <Ionicons name="create-outline" size={28} color={theme.colors.primary} />
-                </TouchableOpacity>
-              )}
-              {!isReadOnly && (
-                <TouchableOpacity 
-                  style={styles.actionIcon}
                   onPress={handleEditPress}
                 >
                   <Ionicons name="pencil" size={28} color={theme.colors.primary} />
@@ -789,6 +771,16 @@ export default function Location() {
                 </TouchableOpacity>
               )}
             </View>
+            
+            {/* Review Button */}
+            {!isReadOnly && (
+              <TouchableOpacity 
+                style={[styles.reviewButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => setShowReviewModal(true)}
+              >
+                <Text style={styles.reviewButtonText}>Review</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -1433,7 +1425,7 @@ export default function Location() {
               {/* Message Input */}
               <View style={styles.sendModalSection}>
                 <Text style={[styles.sendModalSectionTitle, { color: theme.colors.text }]}>
-                  Your Message
+                  Your Message (Optional)
                 </Text>
                 <TextInput
                   style={[styles.sendModalTextArea, { 
@@ -1614,132 +1606,144 @@ export default function Location() {
         onRequestClose={() => setShowReviewModal(false)}
       >
         <View style={styles.editModalOverlay}>
-          <View style={[styles.editModalContent, { backgroundColor: theme.colors.surface }]}>
-            {/* Header */}
-            <View style={[styles.editModalHeader, { 
-              backgroundColor: theme.colors.surface,
-            }]}>
-              <View style={styles.editModalHandleBar} />
-              <View style={styles.editModalHeaderContent}>
-                <Text style={[styles.editModalTitle, { color: theme.colors.text }]}>
-                  Write Review
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardAvoidingView}
+            keyboardVerticalOffset={0}
+          >
+            <View style={[styles.editModalContent, { backgroundColor: theme.colors.surface }]}>
+              {/* Header */}
+              <View style={[styles.editModalHeader, { 
+                backgroundColor: theme.colors.surface,
+              }]}>
+                <View style={styles.editModalHandleBar} />
+                <View style={styles.editModalHeaderContent}>
+                  <Text style={[styles.editModalTitle, { color: theme.colors.text }]}>
+                    Write Review
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.editModalCloseButton} 
+                    onPress={() => setShowReviewModal(false)}
+                    disabled={isSubmittingReview}
+                  >
+                    <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <ScrollView 
+                style={styles.editModalScrollView}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.editModalScrollContent}
+                keyboardShouldPersistTaps="handled"
+                scrollEnabled={true}
+              >
+                {/* Location Preview */}
+                <View style={[styles.reviewLocationPreview, { backgroundColor: theme.colors.background }]}>
+                  <Text style={styles.reviewLocationEmoji}>{locationData.emoji}</Text>
+                  <Text style={[styles.reviewLocationTitle, { color: theme.colors.text }]}>
+                    {locationData.title}
+                  </Text>
+                </View>
+
+                {/* Rating Selector */}
+                <View style={styles.ratingSelector}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      style={styles.starButton}
+                      onPress={() => setReviewRating(star)}
+                    >
+                      <Ionicons
+                        name={reviewRating >= star ? "star" : "star-outline"}
+                        size={40}
+                        color="#FFD700"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Review Text Input */}
+                <View style={styles.inputGroup}>
+                <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>
+                  Your Review (Optional)
                 </Text>
-                <TouchableOpacity 
-                  style={styles.editModalCloseButton} 
-                  onPress={() => setShowReviewModal(false)}
+                  <View style={[styles.reviewTextInputContainer, {
+                    backgroundColor: theme.colors.background,
+                    borderColor: theme.colors.border,
+                  }]}>
+                    <TextInput
+                      style={[styles.reviewTextInput, { 
+                        color: theme.colors.text,
+                      }]}
+                      value={reviewText}
+                      onChangeText={(text) => {
+                        if (text.length <= 1000) {
+                          setReviewText(text);
+                        }
+                      }}
+                    placeholder="Share your experience with your friends..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                    multiline
+                    numberOfLines={5}
+                    textAlignVertical="top"
+                    maxLength={1000}
+                    />
+                    <View style={styles.reviewTextInputFooter}>
+                      <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
+                        {reviewText.length}/1000
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* Footer Buttons */}
+              <View style={[styles.editModalFooter, { 
+                backgroundColor: theme.colors.surface,
+              }]}>
+                <TouchableOpacity
+                  style={[styles.editModalButton, styles.cancelButton, { 
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderColor: theme.colors.border,
+                  }]}
+                  onPress={() => {
+                    setShowReviewModal(false);
+                    setReviewRating(0);
+                    setReviewText('');
+                  }}
                   disabled={isSubmittingReview}
                 >
-                  <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+                  <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.editModalButton, styles.saveButton, { 
+                    backgroundColor: theme.colors.primary,
+                    opacity: (isSubmittingReview || reviewRating === 0) ? 0.5 : 1,
+                  }]}
+                  onPress={submitReview}
+                  disabled={isSubmittingReview || reviewRating === 0}
+                >
+                  {isSubmittingReview ? (
+                    <View style={styles.savingContainer}>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <Text style={[styles.saveButtonText, { color: '#FFFFFF', marginLeft: 8 }]}>
+                        Submitting
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.saveButtonText, { color: '#FFFFFF' }]}>
+                      Submit Review
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
-
-            <ScrollView 
-              style={styles.editModalScrollView}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.editModalScrollContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* Location Preview */}
-              <View style={[styles.reviewLocationPreview, { backgroundColor: theme.colors.background }]}>
-                <Text style={styles.reviewLocationEmoji}>{locationData.emoji}</Text>
-                <Text style={[styles.reviewLocationTitle, { color: theme.colors.text }]}>
-                  {locationData.title}
-                </Text>
-              </View>
-
-              {/* Rating Selector */}
-              <View style={styles.ratingSelector}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <TouchableOpacity
-                    key={star}
-                    style={styles.starButton}
-                    onPress={() => setReviewRating(star)}
-                  >
-                    <Ionicons
-                      name={reviewRating >= star ? "star" : "star-outline"}
-                      size={40}
-                      color="#FFD700"
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Review Text Input */}
-              <View style={styles.inputGroup}>
-                <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>
-                  Your Review
-                </Text>
-                <TextInput
-                  style={[styles.editFormTextArea, { 
-                    backgroundColor: theme.colors.background,
-                    color: theme.colors.text,
-                    borderColor: theme.colors.border,
-                  }]}
-                  value={reviewText}
-                  onChangeText={(text) => {
-                    if (text.length <= 1000) {
-                      setReviewText(text);
-                    }
-                  }}
-                  placeholder="Share your experience..."
-                  placeholderTextColor={theme.colors.textSecondary}
-                  multiline
-                  numberOfLines={6}
-                  textAlignVertical="top"
-                  maxLength={1000}
-                />
-                <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
-                  {reviewText.length}/1000
-                </Text>
-              </View>
-            </ScrollView>
-
-            {/* Footer Buttons */}
-            <View style={[styles.editModalFooter, { 
-              backgroundColor: theme.colors.surface,
-            }]}>
-              <TouchableOpacity
-                style={[styles.editModalButton, styles.cancelButton, { 
-                  backgroundColor: 'transparent',
-                  borderWidth: 2,
-                  borderColor: theme.colors.border,
-                }]}
-                onPress={() => {
-                  setShowReviewModal(false);
-                  setReviewRating(0);
-                  setReviewText('');
-                }}
-                disabled={isSubmittingReview}
-              >
-                <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.editModalButton, styles.saveButton, { 
-                  backgroundColor: theme.colors.primary,
-                  opacity: (isSubmittingReview || reviewRating === 0 || !reviewText.trim()) ? 0.5 : 1,
-                }]}
-                onPress={submitReview}
-                disabled={isSubmittingReview || reviewRating === 0 || !reviewText.trim()}
-              >
-                {isSubmittingReview ? (
-                  <View style={styles.savingContainer}>
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                    <Text style={[styles.saveButtonText, { color: '#FFFFFF', marginLeft: 8 }]}>
-                      Submitting
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={[styles.saveButtonText, { color: '#FFFFFF' }]}>
-                    Submit Review
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>
@@ -1799,6 +1803,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  reviewButton: {
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  reviewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   locationName: {
     fontSize: 28,
@@ -2091,6 +2117,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
+  keyboardAvoidingView: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   editModalContent: {
     width: '100%',
     height: '92%',
@@ -2140,12 +2170,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   editModalScrollContent: {
-    padding: 24,
-    paddingTop: 16,
-    paddingBottom: 40,
+    padding: 20,
+    paddingTop: 12,
+    paddingBottom: 32,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   editFormLabel: {
     fontSize: 15,
@@ -2401,9 +2431,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 16,
+    padding: 12,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   reviewLocationEmoji: {
     fontSize: 32,
@@ -2416,10 +2446,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 20,
-    marginBottom: 20,
+    paddingVertical: 12,
+    marginBottom: 12,
   },
   starButton: {
     padding: 4,
+  },
+  reviewTextInputContainer: {
+    borderWidth: 2,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  reviewTextInput: {
+    minHeight: 140,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 12,
+    fontSize: 16,
+    lineHeight: 24,
+    textAlignVertical: 'top',
+  },
+  reviewTextInputFooter: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.06)',
+    alignItems: 'flex-end',
   },
 });

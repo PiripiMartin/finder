@@ -106,6 +106,7 @@ export default function ActivityScreen() {
   const [newComment, setNewComment] = useState('');
   const [isAddingComment, setIsAddingComment] = useState(false);
   const [isTogglingLike, setIsTogglingLike] = useState(false);
+  const [savingLocationIds, setSavingLocationIds] = useState<Set<number>>(new Set());
 
   // Fetch location invitations
   const fetchInvitations = async () => {
@@ -269,6 +270,54 @@ export default function ActivityScreen() {
       fetchReviews();
     }, [])
   );
+
+  // Save location from review
+  const saveLocationFromReview = async (locationId: number, event?: any) => {
+    // Prevent the card's onPress from firing
+    if (event) {
+      event.stopPropagation();
+    }
+    
+    try {
+      setSavingLocationIds(prev => new Set(prev).add(locationId));
+      console.log('💾 [Activity] Saving location from review:', locationId);
+
+      const saveResponse = await fetch(`${API_CONFIG.BASE_URL}/map/${locationId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+      });
+
+      if (!saveResponse.ok) {
+        const errorText = await saveResponse.text();
+        
+        // If location is already saved, show a different message
+        if (saveResponse.status === 409 || errorText.includes('duplicate') || errorText.includes('already')) {
+          Alert.alert('Already Saved', 'This location is already in your saved locations');
+        } else {
+          throw new Error(`Failed to save location: ${errorText}`);
+        }
+      } else {
+        // Refresh saved locations
+        await refreshLocations();
+        Alert.alert('Success', 'Location saved to your list!');
+      }
+    } catch (error) {
+      console.error('💾 [Activity] Error saving location:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to save location'
+      );
+    } finally {
+      setSavingLocationIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(locationId);
+        return newSet;
+      });
+    }
+  };
 
   // Accept invitation
   const acceptInvitation = async (invitation: LocationInvitation) => {
@@ -723,6 +772,27 @@ export default function ActivityScreen() {
             </Text>
           </View>
         )}
+        
+        {/* Save Location Button */}
+        <TouchableOpacity
+          style={[styles.saveLocationButton, { backgroundColor: theme.colors.primary }]}
+          onPress={(e) => {
+            e.stopPropagation();
+            saveLocationFromReview(item.location.id);
+          }}
+          disabled={savingLocationIds.has(item.location.id)}
+        >
+          {savingLocationIds.has(item.location.id) ? (
+            <ActivityIndicator size="small" color={theme.colors.surface} />
+          ) : (
+            <>
+              <Ionicons name="bookmark" size={18} color={theme.colors.surface} />
+              <Text style={[styles.saveLocationButtonText, { color: theme.colors.surface }]}>
+                Save Location
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
         
         {/* Tap to view indicator */}
         <View style={styles.tapIndicator}>
@@ -1226,6 +1296,21 @@ const styles = StyleSheet.create({
   },
   likesCount: {
     fontSize: 14,
+  },
+  saveLocationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  saveLocationButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   tapIndicator: {
     flexDirection: 'row',
