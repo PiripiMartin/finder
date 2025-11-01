@@ -105,6 +105,7 @@ export default function Index() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(0);
   const [isLoadingFromCache, setIsLoadingFromCache] = useState(true);
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
   const REFRESH_INTERVAL = 10000; // 10 seconds in milliseconds
   
   // Cache the saved-new API response to avoid duplicate fetches
@@ -183,6 +184,7 @@ export default function Index() {
         setSavedLocations(cachedData.savedLocations);
         setContextSavedLocations(cachedData.savedLocations);
         setContextRecommendedLocations(cachedData.recommendedLocations);
+        setHasCompletedInitialLoad(true); // Mark that we have data (even if from cache)
         
         console.log('📦 [loadCachedData] Successfully loaded cached data:', {
           mapPoints: cachedData.transformedMapPoints.length,
@@ -526,6 +528,7 @@ export default function Index() {
           setMapPoints(transformedMapPoints);
           setError(null); // Clear any previous errors
           setLastRefresh(Date.now()); // Update last refresh timestamp
+          setHasCompletedInitialLoad(true); // Mark that we've completed at least one successful load
           console.log('🎉 [fetchMapPoints] Successfully fetched data from API, total points:', transformedMapPoints.length);
           console.log('📱 [fetchMapPoints] State updated with map points:', transformedMapPoints);
           
@@ -1696,7 +1699,7 @@ export default function Index() {
       )}
 
       {/* Progress Goal Banner - Show when user has less than 3 saved locations */}
-      {!isLoadingFromCache && savedLocations.length < 3 && (
+      {hasCompletedInitialLoad && savedLocations.length < 3 && (
         <View style={[
           styles.progressBanner,
           {
