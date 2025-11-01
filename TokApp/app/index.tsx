@@ -6,14 +6,13 @@ import { useTheme } from './context/ThemeContext';
 
 export default function RootIndex() {
   const router = useRouter();
-  const { isAuthenticated, isGuest, isLoading, sessionToken } = useAuth();
+  const { isAuthenticated, isLoading, sessionToken } = useAuth();
   const { theme } = useTheme();
   
   useEffect(() => {
     try {
       console.log('🔍 [RootIndex] Auth state changed:', { 
         isAuthenticated, 
-        isGuest, 
         isLoading, 
         hasToken: !!sessionToken 
       });
@@ -35,7 +34,7 @@ export default function RootIndex() {
       // Fallback to login if navigation fails
       router.replace('/auth/login');
     }
-  }, [isAuthenticated, isGuest, isLoading, sessionToken, router]);
+  }, [isAuthenticated, isLoading, sessionToken, router]);
 
   // Show loading spinner while checking authentication status
   return (

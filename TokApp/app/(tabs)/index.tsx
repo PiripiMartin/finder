@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import ProfileModal from '../components/ProfileModal';
 import Tutorial from '../components/Tutorial';
-import { getApiUrl, getGuestPostsUrl, getMapPointsUrl } from '../config/api';
+import { getApiUrl, getMapPointsUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useShare } from '../context/ShareContext';
@@ -84,7 +84,7 @@ export default function Index() {
   const [videoPosition, setVideoPosition] = useState({ x: 0, y: 0 });
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const { theme } = useTheme();
-  const { sessionToken, isGuest, logout } = useAuth();
+  const { sessionToken, logout } = useAuth();
   const { setSavedLocations: setContextSavedLocations, setRecommendedLocations: setContextRecommendedLocations, blockedLocationIds, registerRefreshCallback } = useLocationContext();
   const { sharedContent, clearSharedContent } = useShare();
   const { shouldShowTutorial, completeTutorial, tutorialFeatureEnabled } = useTutorial();
@@ -106,6 +106,9 @@ export default function Index() {
   const [lastRefresh, setLastRefresh] = useState(0);
   const [isLoadingFromCache, setIsLoadingFromCache] = useState(true);
   const REFRESH_INTERVAL = 10000; // 10 seconds in milliseconds
+  
+  // Cache the saved-new API response to avoid duplicate fetches
+  const [cachedSavedNewData, setCachedSavedNewData] = useState<any | null>(null);
   
 
 
@@ -214,28 +217,18 @@ export default function Index() {
         return;
       }
       
-      // Build the API URL with coordinates
-      let apiUrl: string;
-      let headers: any;
-      
-      if (isGuest) {
-        // Use guest API with current coordinates
-        apiUrl = getGuestPostsUrl(userLocation.latitude, userLocation.longitude);
-        headers = {
-          'Content-Type': 'application/json',
-        };
-        console.log('👤 [fetchMapPoints] Using guest API with coordinates:', { lat: userLocation.latitude, lon: userLocation.longitude });
-      } else {
-        // Use authenticated API
-        apiUrl = `${getApiUrl('MAP_POINTS')}?lat=${userLocation.latitude}&lon=${userLocation.longitude}`;
-        headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken || ''}`,
-        };
-        console.log('🔐 [fetchMapPoints] Using authenticated API');
-      }
-      
-      console.log('Fetching map points from:', apiUrl);
+      // Build the API URL (saved-new doesn't need coordinates)
+      const apiUrl = getApiUrl('MAP_POINTS');
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionToken || ''}`,
+      };
+      console.log('🔐 [fetchMapPoints] Using authenticated API');
+      console.log('🌐 [fetchMapPoints] API URL:', apiUrl);
+      console.log('🔑 [fetchMapPoints] Session token present:', !!sessionToken);
+      console.log('🔑 [fetchMapPoints] Session token (first 20 chars):', sessionToken?.substring(0, 20));
+      console.log('📍 [fetchMapPoints] User location:', userLocation);
+      console.log('⏰ [fetchMapPoints] Timestamp:', new Date().toISOString());
       
       // Retry logic with exponential backoff
       const MAX_RETRIES = 3;
@@ -256,147 +249,205 @@ export default function Index() {
           });
           
           // Fetch map points from API
+          console.log(`🚀 [fetchMapPoints] Initiating fetch request (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          console.log(`🚀 [fetchMapPoints] Request URL: ${apiUrl}`);
+          console.log(`🚀 [fetchMapPoints] Request method: GET`);
+          console.log(`🚀 [fetchMapPoints] Request headers:`, JSON.stringify(headers, null, 2));
+          
           const fetchPromise = fetch(apiUrl, {
             method: 'GET',
             headers,
           });
           
           // Race between fetch and timeout
+          console.log(`⏱️ [fetchMapPoints] Waiting for response (timeout: ${TIMEOUT_MS}ms)...`);
           const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+          console.log(`📥 [fetchMapPoints] Response received!`);
+          console.log(`📥 [fetchMapPoints] Response status: ${response.status} ${response.statusText}`);
+          console.log(`📥 [fetchMapPoints] Response headers:`, JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
       
           if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            console.error(`❌ [fetchMapPoints] HTTP error! Status: ${response.status}`);
+            console.error(`❌ [fetchMapPoints] Status text: ${response.statusText}`);
+            console.error(`❌ [fetchMapPoints] Response body:`, errorText);
+            
+            // Special handling for specific error codes
+            if (response.status === 502) {
+              console.error(`🚨 [fetchMapPoints] BAD GATEWAY ERROR DETECTED!`);
+              console.error(`🚨 [fetchMapPoints] This usually means:`);
+              console.error(`   1. Backend server (Bun) is down or restarting`);
+              console.error(`   2. Database query timeout (request took too long)`);
+              console.error(`   3. Reverse proxy/load balancer timeout`);
+              console.error(`   4. Server resource exhaustion (memory/CPU)`);
+              console.error(`🚨 [fetchMapPoints] Request details:`);
+              console.error(`   - URL: ${apiUrl}`);
+              console.error(`   - Attempt: ${attempt + 1}/${MAX_RETRIES}`);
+              console.error(`   - Timeout setting: ${TIMEOUT_MS}ms`);
+              console.error(`   - Time: ${new Date().toISOString()}`);
+            } else if (response.status === 504) {
+              console.error(`🚨 [fetchMapPoints] GATEWAY TIMEOUT ERROR!`);
+              console.error(`   - The server took too long to respond`);
+              console.error(`   - Consider increasing timeout or optimizing backend queries`);
+            } else if (response.status === 401) {
+              console.error(`🔐 [fetchMapPoints] AUTHENTICATION ERROR!`);
+              console.error(`   - Session token may be invalid or expired`);
+              console.error(`   - Token: ${sessionToken?.substring(0, 20)}...`);
+            } else if (response.status === 500) {
+              console.error(`💥 [fetchMapPoints] INTERNAL SERVER ERROR!`);
+              console.error(`   - Backend server encountered an error`);
+              console.error(`   - Check server logs for details`);
+            }
+            
+            throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
           }
           
+          console.log(`🔄 [fetchMapPoints] Parsing JSON response...`);
           const data = await response.json();
           console.log(`✅ [fetchMapPoints] API response received successfully on attempt ${attempt + 1}`);
-          console.log('API response data:', data);
+          console.log('📦 [fetchMapPoints] Response data type:', typeof data);
+          console.log('📦 [fetchMapPoints] Response data keys:', Object.keys(data));
+          console.log('📦 [fetchMapPoints] Full response data:', JSON.stringify(data, null, 2));
       
           // Handle different API response formats for guest vs authenticated
           let savedLocationsData: any[] = [];
           let recommendedLocations: any[] = [];
       
-          if (isGuest) {
-            console.log('👤 [fetchMapPoints] Processing guest API response');
-            // Guest API might return data in a different format
-            if (Array.isArray(data)) {
-              // If guest API returns an array directly
-              recommendedLocations = data;
-              console.log('👤 [fetchMapPoints] Guest API returned array with', data.length, 'items');
-            } else if (data.recommendedLocations) {
-              // If guest API returns object with recommendedLocations
-              recommendedLocations = Array.isArray(data.recommendedLocations) ? data.recommendedLocations : [];
-              console.log('👤 [fetchMapPoints] Guest API returned object with recommendedLocations:', recommendedLocations.length);
-            } else {
-              console.log('👤 [fetchMapPoints] Guest API returned unexpected format:', data);
-              // Try to extract any array from the response
-              Object.keys(data).forEach(key => {
-                if (Array.isArray(data[key])) {
-                  recommendedLocations = data[key];
-                  console.log('👤 [fetchMapPoints] Found array in key:', key, 'with', data[key].length, 'items');
-                }
-              });
-            }
+          // Authenticated API format - ONLY fetch from /map/saved-new
+          // No longer using data.savedLocations or data.recommendedLocations
+          
+          // Fetch ALL locations from /map/saved-new to get complete folder contents
+          // This includes locations added by other co-owners to shared folders
+          try {
+            const savedNewUrl = `${API_CONFIG.BASE_URL}/map/saved-new`;
+            console.log(`🚀 [fetchMapPoints/saved-new] Initiating fetch request`);
+            console.log(`🚀 [fetchMapPoints/saved-new] Request URL: ${savedNewUrl}`);
+            console.log(`🚀 [fetchMapPoints/saved-new] Request method: GET`);
+            console.log(`🚀 [fetchMapPoints/saved-new] API_CONFIG.BASE_URL: ${API_CONFIG.BASE_URL}`);
             
-            // Ensure we have some data for guest users, even if API returns empty
-            if (recommendedLocations.length === 0) {
-              console.log('👤 [fetchMapPoints] Guest API returned empty data, using fallback locations');
-              recommendedLocations = [
-                {
-                  location: {
-                    id: "guest-1",
-                    title: "Welcome to lai!",
-                    description: "Explore the map to discover amazing places",
-                    emoji: "🗺️",
-                    latitude: userLocation.latitude,
-                    longitude: userLocation.longitude,
-                    isValidLocation: 1,
-                    websiteUrl: null,
-                    phoneNumber: null,
-                    address: null,
-                    createdAt: new Date().toISOString(),
-                  },
-                  topPost: {
-                    id: 0,
-                    url: "",
-                    postedBy: 0,
-                    mapPointId: 0,
-                    postedAt: new Date().toISOString(),
+            const savedNewResponse = await fetch(savedNewUrl, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${sessionToken || ''}`,
+              },
+            });
+            
+            console.log(`📥 [fetchMapPoints/saved-new] Response received!`);
+            console.log(`📥 [fetchMapPoints/saved-new] Response status: ${savedNewResponse.status} ${savedNewResponse.statusText}`);
+            console.log(`📥 [fetchMapPoints/saved-new] Response ok: ${savedNewResponse.ok}`);
+            
+            if (savedNewResponse.ok) {
+              console.log(`🔄 [fetchMapPoints/saved-new] Parsing JSON response...`);
+              const savedNewData = await savedNewResponse.json();
+              console.log('✅ [fetchMapPoints/saved-new] Successfully parsed response');
+              console.log('📂 [fetchMapPoints/saved-new] Response data type:', typeof savedNewData);
+              console.log('📂 [fetchMapPoints/saved-new] Response data keys:', Object.keys(savedNewData));
+              console.log('📂 [fetchMapPoints/saved-new] Full response data:', JSON.stringify(savedNewData, null, 2));
+              
+              // Collect all locations from ALL sections
+              const allLocations: any[] = [];
+              
+              // Extract locations from personal folders (includes co-owned folder locations)
+              console.log('📂 [fetchMapPoints/saved-new] Processing personal folders...');
+              if (savedNewData.personal) {
+                const personalFolderIds = Object.keys(savedNewData.personal);
+                console.log(`📂 [fetchMapPoints/saved-new] Found ${personalFolderIds.length} personal folders:`, personalFolderIds);
+                Object.keys(savedNewData.personal).forEach((folderId) => {
+                  const folderLocations = savedNewData.personal[folderId];
+                  console.log(`📂 [fetchMapPoints/saved-new] Personal folder ${folderId}:`, {
+                    isArray: Array.isArray(folderLocations),
+                    count: Array.isArray(folderLocations) ? folderLocations.length : 0,
+                    locations: folderLocations
+                  });
+                  if (Array.isArray(folderLocations)) {
+                    allLocations.push(...folderLocations);
                   }
+                });
+              } else {
+                console.log('📂 [fetchMapPoints/saved-new] No personal folders found');
+              }
+              
+              // Extract locations from shared folders
+              console.log('📂 [fetchMapPoints/saved-new] Processing shared folders...');
+              if (savedNewData.shared) {
+                const sharedFolderIds = Object.keys(savedNewData.shared);
+                console.log(`📂 [fetchMapPoints/saved-new] Found ${sharedFolderIds.length} shared folders:`, sharedFolderIds);
+                Object.keys(savedNewData.shared).forEach((folderId) => {
+                  const folderLocations = savedNewData.shared[folderId];
+                  console.log(`📂 [fetchMapPoints/saved-new] Shared folder ${folderId}:`, {
+                    isArray: Array.isArray(folderLocations),
+                    count: Array.isArray(folderLocations) ? folderLocations.length : 0,
+                    locations: folderLocations
+                  });
+                  if (Array.isArray(folderLocations)) {
+                    allLocations.push(...folderLocations);
+                  }
+                });
+              } else {
+                console.log('📂 [fetchMapPoints/saved-new] No shared folders found');
+              }
+              
+              // Extract locations from followed folders
+              console.log('📂 [fetchMapPoints/saved-new] Processing followed folders...');
+              if (savedNewData.followed) {
+                const followedFolderIds = Object.keys(savedNewData.followed);
+                console.log(`📂 [fetchMapPoints/saved-new] Found ${followedFolderIds.length} followed folders:`, followedFolderIds);
+                Object.keys(savedNewData.followed).forEach((folderId) => {
+                  const folderLocations = savedNewData.followed[folderId];
+                  console.log(`📂 [fetchMapPoints/saved-new] Followed folder ${folderId}:`, {
+                    isArray: Array.isArray(folderLocations),
+                    count: Array.isArray(folderLocations) ? folderLocations.length : 0,
+                    locations: folderLocations
+                  });
+                  if (Array.isArray(folderLocations)) {
+                    allLocations.push(...folderLocations);
+                  }
+                });
+              } else {
+                console.log('📂 [fetchMapPoints/saved-new] No followed folders found');
+              }
+              
+              // Deduplicate locations by ID
+              console.log('🔄 [fetchMapPoints/saved-new] Deduplicating locations...');
+              console.log('🔄 [fetchMapPoints/saved-new] Total locations before deduplication:', allLocations.length);
+              const seenIds = new Set();
+              const duplicateIds: any[] = [];
+              savedLocationsData = allLocations.filter((loc: any) => {
+                if (loc.location?.id && !seenIds.has(loc.location.id)) {
+                  seenIds.add(loc.location.id);
+                  return true;
+                } else if (loc.location?.id) {
+                  duplicateIds.push(loc.location.id);
                 }
-              ];
-            }
-          } else {
-            // Authenticated API format - ONLY fetch from /map/saved-new
-            // No longer using data.savedLocations or data.recommendedLocations
-            
-            // Fetch ALL locations from /map/saved-new to get complete folder contents
-            // This includes locations added by other co-owners to shared folders
-            try {
-              const savedNewResponse = await fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${sessionToken || ''}`,
-                },
+                return false;
               });
               
-              if (savedNewResponse.ok) {
-                const savedNewData = await savedNewResponse.json();
-                console.log('📂 [fetchMapPoints] Fetched saved-new data:', savedNewData);
-                
-                // Collect all locations from ALL sections
-                const allLocations: any[] = [];
-                
-                // Extract locations from personal folders (includes co-owned folder locations)
-                if (savedNewData.personal) {
-                  Object.keys(savedNewData.personal).forEach((folderId) => {
-                    const folderLocations = savedNewData.personal[folderId];
-                    if (Array.isArray(folderLocations)) {
-                      allLocations.push(...folderLocations);
-                    }
-                  });
-                }
-                
-                // Extract locations from shared folders
-                if (savedNewData.shared) {
-                  Object.keys(savedNewData.shared).forEach((folderId) => {
-                    const folderLocations = savedNewData.shared[folderId];
-                    if (Array.isArray(folderLocations)) {
-                      allLocations.push(...folderLocations);
-                    }
-                  });
-                }
-                
-                // Extract locations from followed folders
-                if (savedNewData.followed) {
-                  Object.keys(savedNewData.followed).forEach((folderId) => {
-                    const folderLocations = savedNewData.followed[folderId];
-                    if (Array.isArray(folderLocations)) {
-                      allLocations.push(...folderLocations);
-                    }
-                  });
-                }
-                
-                // Deduplicate locations by ID
-                const seenIds = new Set();
-                savedLocationsData = allLocations.filter((loc: any) => {
-                  if (loc.location?.id && !seenIds.has(loc.location.id)) {
-                    seenIds.add(loc.location.id);
-                    return true;
-                  }
-                  return false;
-                });
-                
-                console.log('📂 [fetchMapPoints] Total unique saved-new locations:', savedLocationsData.length);
-              }
-            } catch (error) {
-              console.error('❌ [fetchMapPoints] Error fetching folder locations:', error);
-              savedLocationsData = [];
+              console.log('✅ [fetchMapPoints/saved-new] Deduplication complete');
+              console.log('📂 [fetchMapPoints/saved-new] Total unique saved-new locations:', savedLocationsData.length);
+              console.log('📂 [fetchMapPoints/saved-new] Duplicate IDs found:', duplicateIds.length, duplicateIds);
+              console.log('📂 [fetchMapPoints/saved-new] Unique location IDs:', Array.from(seenIds));
+              
+              // Cache the saved-new data to avoid duplicate fetches
+              console.log('💾 [fetchMapPoints/saved-new] Caching saved-new data for folder loading');
+              setCachedSavedNewData(savedNewData);
+            } else {
+              console.error(`❌ [fetchMapPoints/saved-new] Response not OK`);
+              const errorText = await savedNewResponse.text();
+              console.error(`❌ [fetchMapPoints/saved-new] Response status: ${savedNewResponse.status}`);
+              console.error(`❌ [fetchMapPoints/saved-new] Response body:`, errorText);
             }
-            
-            // No recommended locations - only showing saved-new
-            recommendedLocations = [];
+          } catch (error) {
+            console.error('❌ [fetchMapPoints/saved-new] Error fetching folder locations:', error);
+            console.error('❌ [fetchMapPoints/saved-new] Error details:', {
+              message: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined,
+              type: typeof error,
+            });
+            savedLocationsData = [];
           }
+          
+          // No recommended locations - only showing saved-new
+          recommendedLocations = [];
           
           // Safely extract and validate the data
           // const savedLocationsData = Array.isArray(data.savedLocations) ? data.savedLocations : [];
@@ -487,17 +538,45 @@ export default function Index() {
           });
           console.log('💾 [fetchMapPoints] Data cached successfully');
           
-          // Success! Break out of the retry loop
+          // Success! Clear any previous errors and break out of the retry loop
+          lastError = null;
+          console.log('✅ [fetchMapPoints] Retry succeeded, clearing error state');
           break;
           
         } catch (retryError) {
           // Capture the error for potential retry
           lastError = retryError instanceof Error ? retryError : new Error(String(retryError));
           console.error(`❌ [fetchMapPoints] Attempt ${attempt + 1}/${MAX_RETRIES} failed:`, lastError.message);
+          console.error(`❌ [fetchMapPoints] Error type:`, lastError.constructor.name);
+          console.error(`❌ [fetchMapPoints] Error stack:`, lastError.stack);
+          
+          // Diagnose specific error types
+          if (lastError.message.includes('timeout') || lastError.message.includes('Request timeout')) {
+            console.error(`⏱️ [fetchMapPoints] TIMEOUT ERROR DETECTED!`);
+            console.error(`   - Request exceeded ${TIMEOUT_MS}ms timeout`);
+            console.error(`   - Backend query might be too slow`);
+            console.error(`   - Network connection might be slow`);
+            console.error(`   - Consider: increasing TIMEOUT_MS or optimizing backend`);
+          } else if (lastError.message.includes('Network request failed') || lastError.message.includes('fetch')) {
+            console.error(`🌐 [fetchMapPoints] NETWORK ERROR DETECTED!`);
+            console.error(`   - Could not connect to server`);
+            console.error(`   - Server might be down`);
+            console.error(`   - Internet connection might be lost`);
+            console.error(`   - DNS resolution might have failed`);
+          } else if (lastError.message.includes('502')) {
+            console.error(`🚨 [fetchMapPoints] 502 BAD GATEWAY in error message`);
+            console.error(`   - Proxy/gateway cannot reach backend server`);
+            console.error(`   - Backend server crashed or not responding`);
+          }
           
           // If this was the last attempt, we'll handle the error outside the loop
           if (attempt === MAX_RETRIES - 1) {
             console.error(`❌ [fetchMapPoints] All ${MAX_RETRIES} attempts failed`);
+            console.error(`❌ [fetchMapPoints] Final error details:`, {
+              message: lastError.message,
+              name: lastError.name,
+              cause: (lastError as any).cause,
+            });
           }
         }
       }
@@ -604,18 +683,36 @@ export default function Index() {
       setMapPoints(fallbackMapPoints);
       setError('Using offline data - network unavailable');
     }
-  }, [userLocation, isGuest, sessionToken]);
+  }, [userLocation, sessionToken]);
 
   // Load folders function - fetch from API and process with location data
-  const loadFoldersData = useCallback(async () => {
+  // Optional parameter to reuse already-fetched locations data
+  const loadFoldersData = useCallback(async (existingLocationsData?: any) => {
+    console.log('📂 [loadFoldersData] Starting folder data load...');
+    console.log('📂 [loadFoldersData] Session token present:', !!sessionToken);
+    console.log('📂 [loadFoldersData] Using existing locations data:', !!existingLocationsData);
+    console.log('📂 [loadFoldersData] Timestamp:', new Date().toISOString());
+    
     if (!sessionToken) {
-      console.log('📂 [Map] No session token, skipping folder load');
+      console.log('📂 [loadFoldersData] No session token, skipping folder load');
       return;
     }
 
     try {
-      // Fetch owned folders, followed folders, and saved locations
-      const [ownedFoldersResponse, followedFoldersResponse, locationsResponse] = await Promise.all([
+      console.log('🚀 [loadFoldersData] Initiating parallel fetch for folders...');
+      console.log('🚀 [loadFoldersData] Fetching from:');
+      console.log('   - /folders/owned');
+      console.log('   - /folders/followed');
+      if (!existingLocationsData) {
+        console.log('   - /map/saved-new (will fetch)');
+      } else {
+        console.log('   - /map/saved-new (using cached data from fetchMapPoints)');
+      }
+      console.log('🚀 [loadFoldersData] Base URL:', API_CONFIG.BASE_URL);
+      
+      // Fetch owned folders and followed folders
+      // Only fetch locations if not already provided
+      const fetchPromises: Promise<Response>[] = [
         fetch(`${API_CONFIG.BASE_URL}/folders/owned`, {
           headers: {
             'Authorization': `Bearer ${sessionToken}`,
@@ -626,35 +723,103 @@ export default function Index() {
             'Authorization': `Bearer ${sessionToken}`,
           },
         }),
-        fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
-          headers: {
-            'Authorization': `Bearer ${sessionToken}`,
-          },
-        }),
-      ]);
+      ];
+      
+      if (!existingLocationsData) {
+        fetchPromises.push(
+          fetch(`${API_CONFIG.BASE_URL}/map/saved-new`, {
+            headers: {
+              'Authorization': `Bearer ${sessionToken}`,
+            },
+          })
+        );
+      }
+      
+      const responses = await Promise.all(fetchPromises);
+      const [ownedFoldersResponse, followedFoldersResponse, locationsResponse] = responses;
 
-      if (!ownedFoldersResponse.ok || !followedFoldersResponse.ok || !locationsResponse.ok) {
-        throw new Error('Failed to fetch folders or locations');
+      console.log('📥 [loadFoldersData] All responses received!');
+      console.log('📥 [loadFoldersData] Owned folders response:', {
+        status: ownedFoldersResponse.status,
+        statusText: ownedFoldersResponse.statusText,
+        ok: ownedFoldersResponse.ok,
+      });
+      console.log('📥 [loadFoldersData] Followed folders response:', {
+        status: followedFoldersResponse.status,
+        statusText: followedFoldersResponse.statusText,
+        ok: followedFoldersResponse.ok,
+      });
+      
+      if (locationsResponse) {
+        console.log('📥 [loadFoldersData] Locations response:', {
+          status: locationsResponse.status,
+          statusText: locationsResponse.statusText,
+          ok: locationsResponse.ok,
+        });
       }
 
-      const ownedFoldersData = await ownedFoldersResponse.json();
-      const followedFoldersData = await followedFoldersResponse.json();
-      const locationsData = await locationsResponse.json();
+      if (!ownedFoldersResponse.ok || !followedFoldersResponse.ok || (locationsResponse && !locationsResponse.ok)) {
+        const errors = [];
+        if (!ownedFoldersResponse.ok) errors.push(`Owned folders: ${ownedFoldersResponse.status}`);
+        if (!followedFoldersResponse.ok) errors.push(`Followed folders: ${followedFoldersResponse.status}`);
+        if (locationsResponse && !locationsResponse.ok) errors.push(`Locations: ${locationsResponse.status}`);
+        console.error('❌ [loadFoldersData] Some responses failed:', errors.join(', '));
+        throw new Error(`Failed to fetch folders or locations: ${errors.join(', ')}`);
+      }
 
-      console.log('📂 [Map] Owned folders:', ownedFoldersData);
-      console.log('📂 [Map] Followed folders:', followedFoldersData);
-      console.log('📂 [Map] Locations data:', locationsData);
+      console.log('🔄 [loadFoldersData] Parsing JSON responses...');
+      const ownedFoldersData = await ownedFoldersResponse.json();
+      console.log('✅ [loadFoldersData] Owned folders parsed:', {
+        type: typeof ownedFoldersData,
+        isArray: Array.isArray(ownedFoldersData),
+        count: Array.isArray(ownedFoldersData) ? ownedFoldersData.length : 0,
+      });
+      
+      const followedFoldersData = await followedFoldersResponse.json();
+      console.log('✅ [loadFoldersData] Followed folders parsed:', {
+        type: typeof followedFoldersData,
+        isArray: Array.isArray(followedFoldersData),
+        count: Array.isArray(followedFoldersData) ? followedFoldersData.length : 0,
+      });
+      
+      // Use existing data or fetch new data
+      const locationsData = existingLocationsData || (locationsResponse ? await locationsResponse.json() : null);
+      
+      if (!locationsData) {
+        console.error('❌ [loadFoldersData] No locations data available');
+        throw new Error('No locations data available');
+      }
+      
+      console.log('✅ [loadFoldersData] Locations data ready:', {
+        type: typeof locationsData,
+        keys: Object.keys(locationsData),
+        source: existingLocationsData ? 'cached' : 'fetched',
+      });
+
+      console.log('📂 [loadFoldersData] Owned folders data:', JSON.stringify(ownedFoldersData, null, 2));
+      console.log('📂 [loadFoldersData] Followed folders data:', JSON.stringify(followedFoldersData, null, 2));
+      console.log('📂 [loadFoldersData] Locations data:', JSON.stringify(locationsData, null, 2));
 
       // Combine owned and followed folders
+      console.log('🔄 [loadFoldersData] Combining owned and followed folders...');
       const allFolders = [...ownedFoldersData, ...followedFoldersData];
+      console.log('📂 [loadFoldersData] Total folders (owned + followed):', allFolders.length);
 
       // Build folder objects with location IDs from both personal and shared sections
-      const foldersWithLocations = allFolders.map((folder: any) => {
+      console.log('🔄 [loadFoldersData] Building folder objects with location IDs...');
+      const foldersWithLocations = allFolders.map((folder: any, index: number) => {
+        console.log(`📁 [loadFoldersData] Processing folder ${index + 1}/${allFolders.length}:`, {
+          id: folder.id,
+          name: folder.name,
+          color: folder.color,
+        });
+        
         const locationIds: number[] = [];
         
         // Get locations from personal section for this folder
         if (locationsData.personal && locationsData.personal[folder.id]) {
           const folderLocations = locationsData.personal[folder.id];
+          console.log(`📁 [loadFoldersData] Folder ${folder.id} personal locations:`, folderLocations.length);
           folderLocations.forEach((item: any) => {
             if (item.location && item.location.id) {
               locationIds.push(item.location.id);
@@ -665,6 +830,7 @@ export default function Index() {
         // Get locations from shared section for this folder
         if (locationsData.shared && locationsData.shared[folder.id]) {
           const folderLocations = locationsData.shared[folder.id];
+          console.log(`📁 [loadFoldersData] Folder ${folder.id} shared locations:`, folderLocations.length);
           folderLocations.forEach((item: any) => {
             if (item.location && item.location.id) {
               locationIds.push(item.location.id);
@@ -675,6 +841,7 @@ export default function Index() {
         // Get locations from followed section for this folder
         if (locationsData.followed && locationsData.followed[folder.id]) {
           const folderLocations = locationsData.followed[folder.id];
+          console.log(`📁 [loadFoldersData] Folder ${folder.id} followed locations:`, folderLocations.length);
           folderLocations.forEach((item: any) => {
             if (item.location && item.location.id) {
               locationIds.push(item.location.id);
@@ -682,35 +849,59 @@ export default function Index() {
           });
         }
 
-        return {
+        const folderWithLocations = {
           id: folder.id,
           name: folder.name,
           title: folder.name, // For compatibility with existing filter code
           color: folder.color,
           locationIds,
         };
+        
+        console.log(`✅ [loadFoldersData] Folder ${folder.id} complete:`, {
+          name: folderWithLocations.name,
+          totalLocations: locationIds.length,
+          locationIds: locationIds,
+        });
+        
+        return folderWithLocations;
       });
 
+      console.log('✅ [loadFoldersData] All folders processed successfully');
+      console.log('📂 [loadFoldersData] Setting folders state with:', foldersWithLocations.length, 'folders');
+      console.log('📂 [loadFoldersData] Folders summary:', foldersWithLocations.map(f => ({
+        id: f.id,
+        name: f.name,
+        locationCount: f.locationIds.length,
+      })));
+      
       setFolders(foldersWithLocations);
-      console.log('📂 [Map] Loaded folders from API:', foldersWithLocations.length);
-      console.log('📂 [Map] Folders with locations:', foldersWithLocations);
+      console.log('✅ [loadFoldersData] Folders state updated!');
+      console.log('📂 [loadFoldersData] Complete folders data:', JSON.stringify(foldersWithLocations, null, 2));
     } catch (error) {
-      console.error('❌ [Map] Error loading folders:', error);
+      console.error('❌ [loadFoldersData] Error loading folders:', error);
+      console.error('❌ [loadFoldersData] Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        type: typeof error,
+      });
+      console.log('📂 [loadFoldersData] Setting folders to empty array due to error');
       setFolders([]);
     }
   }, [sessionToken]);
 
-  // Load folders on mount
+  // Load folders on mount - use cached data if available
   useEffect(() => {
-    loadFoldersData();
-  }, [loadFoldersData]);
+    console.log('📂 [Map] Loading folders on mount, cached data available:', !!cachedSavedNewData);
+    loadFoldersData(cachedSavedNewData);
+  }, [loadFoldersData, cachedSavedNewData]);
 
   // Reload folders when screen comes into focus (e.g., returning from saved tab)
   useFocusEffect(
     useCallback(() => {
       console.log('📂 [Map] Screen focused, reloading folders...');
-      loadFoldersData();
-    }, [loadFoldersData])
+      console.log('📂 [Map] Cached data available:', !!cachedSavedNewData);
+      loadFoldersData(cachedSavedNewData);
+    }, [loadFoldersData, cachedSavedNewData])
   );
 
   // Refresh map points when screen is focused (after app closes/reopens)
@@ -727,7 +918,7 @@ export default function Index() {
 
   // Load map points when user location is available
   useEffect(() => {
-    console.log('📍 [Map] useEffect triggered - userLocation:', userLocation, 'isGuest:', isGuest);
+    console.log('📍 [Map] useEffect triggered - userLocation:', userLocation);
     if (userLocation) {
       console.log('📍 [Map] User location available, calling fetchMapPoints');
       fetchMapPoints();
@@ -904,7 +1095,7 @@ export default function Index() {
     setSelectedMarkerId(pointId);
     
     // For authenticated users, show video overlay
-    if (sessionToken && !isGuest) {
+    if (sessionToken) {
       // Use the videoUrl from the API response if available, otherwise fall back to videoData
       let videoUrl = selectedPoint.videoUrl;
       
@@ -1215,54 +1406,33 @@ export default function Index() {
         </TouchableOpacity>
       )}
 
-      {/* Friends Button - Top Right (only show when authenticated) */}
-      {!isGuest && (
-        <TouchableOpacity 
-          style={[
-            styles.friendsButton,
-            {
-              top: insets.top + 30,
-              right: insets.right + 30,
-            }
-          ]}
-          onPress={() => router.push('/friends')}
-        >
-          <Ionicons name="people" size={28} color="#A8C3A0" />
-        </TouchableOpacity>
-      )}
+      {/* Friends Button - Top Right */}
+      <TouchableOpacity 
+        style={[
+          styles.friendsButton,
+          {
+            top: insets.top + 30,
+            right: insets.right + 30,
+          }
+        ]}
+        onPress={() => router.push('/friends')}
+      >
+        <Ionicons name="people" size={28} color="#A8C3A0" />
+      </TouchableOpacity>
 
-      {/* Profile Button - Top Right (only show when authenticated) */}
-      {!isGuest && (
-        <TouchableOpacity 
-          style={[
-            styles.profileButton,
-            {
-              top: insets.top + 30,
-              right: insets.right + 90, // Offset to make room for friends button
-            }
-          ]}
-          onPress={() => setShowProfileModal(true)}
-        >
-          <Ionicons name="person" size={28} color="#A8C3A0" />
-        </TouchableOpacity>
-      )}
-
-      {/* Guest Login Button - Top Right (only show when in guest mode) */}
-      {isGuest && (
-        <TouchableOpacity 
-          style={[
-            styles.guestLoginButton,
-            {
-              top: insets.top + 30,
-              right: insets.right + 30,
-            }
-          ]}
-          onPress={() => router.push('/auth/login')}
-        >
-          <Ionicons name="log-in" size={20} color="#A8C3A0" />
-          <Text style={styles.guestLoginButtonText}>Login</Text>
-        </TouchableOpacity>
-      )}
+      {/* Profile Button - Top Right */}
+      <TouchableOpacity 
+        style={[
+          styles.profileButton,
+          {
+            top: insets.top + 30,
+            right: insets.right + 90, // Offset to make room for friends button
+          }
+        ]}
+        onPress={() => setShowProfileModal(true)}
+      >
+        <Ionicons name="person" size={28} color="#A8C3A0" />
+      </TouchableOpacity>
 
 
 
@@ -1325,7 +1495,7 @@ export default function Index() {
       </View>
 
       {/* Picture-in-Picture Video - Only show for authenticated users */}
-      {isVideoVisible && selectedVideo && sessionToken && !isGuest ? (() => {
+      {isVideoVisible && selectedVideo && sessionToken ? (() => {
         const thumbnailPlatform = getVideoPlatform(selectedVideo);
         const isInstagram = thumbnailPlatform === 'instagram';
         
@@ -1526,7 +1696,7 @@ export default function Index() {
       )}
 
       {/* Progress Goal Banner - Show when user has less than 3 saved locations */}
-      {!isGuest && !isLoadingFromCache && savedLocations.length < 3 && (
+      {!isLoadingFromCache && savedLocations.length < 3 && (
         <View style={[
           styles.progressBanner,
           {
@@ -1810,26 +1980,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 3,
-  },
-  guestLoginButton: {
-    position: 'absolute',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-    gap: 6,
-  },
-  guestLoginButtonText: {
-    color: '#A8C3A0',
-    fontSize: 14,
-    fontWeight: '600',
   },
   logoutButton: {
     position: 'absolute',

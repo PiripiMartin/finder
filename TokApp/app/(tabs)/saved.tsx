@@ -62,7 +62,7 @@ interface ApiResponse {
 export default function Saved() {
   const router = useRouter();
   const { theme } = useTheme();
-  const { sessionToken, isGuest } = useAuth();
+  const { sessionToken } = useAuth();
   const { registerRefreshCallback, setSavedLocations: setContextSavedLocations } = useLocationContext();
   const { showTutorial, tutorialFeatureEnabled } = useTutorial();
   
@@ -646,36 +646,6 @@ export default function Saved() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading saved locations...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  // Show guest message if user is not authenticated
-  if (isGuest) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
-        </View>
-        <View style={styles.guestContainer}>
-          <Ionicons name="bookmark-outline" size={80} color={theme.colors.textSecondary} />
-          <Text style={[styles.guestTitle, { color: theme.colors.text }]}>Login to Save Locations</Text>
-          <Text style={[styles.guestSubtitle, { color: theme.colors.textSecondary }]}>
-            Create an account or sign in to save your favorite places and access them from anywhere.
-          </Text>
-          <TouchableOpacity
-            style={[styles.loginButton, { backgroundColor: theme.colors.primary }]}
-            onPress={() => router.push('/auth/login')}
-          >
-            <Text style={[styles.loginButtonText, { color: theme.colors.surface }]}>Login</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.createAccountButton, { borderColor: theme.colors.primary }]}
-            onPress={() => router.push('/auth/create-account')}
-          >
-            <Text style={[styles.createAccountButtonText, { color: theme.colors.primary }]}>Create Account</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );

@@ -1,11 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from "expo-router";
-import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 export default function TabLayout() {
   const { theme } = useTheme();
-  const { isGuest } = useAuth();
   
   return (
     <Tabs
@@ -31,7 +29,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <Ionicons name="bookmark" size={20} color={color} />
           ),
-          href: isGuest ? null : '/saved',
         }}
       />
       <Tabs.Screen
@@ -50,7 +47,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <Ionicons name="notifications" size={20} color={color} />
           ),
-          href: isGuest ? null : '/activity',
         }}
       />
     </Tabs>

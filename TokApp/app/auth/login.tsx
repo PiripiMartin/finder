@@ -22,9 +22,9 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   
   const router = useRouter();
-  const { login, guestLogin } = useAuth();
+  const { login } = useAuth();
   const { theme } = useTheme();
-  const { recheckTutorialAfterLogin, tutorialFeatureEnabled, isLoading: tutorialLoading } = useTutorial();
+  const { recheckTutorialAfterLogin } = useTutorial();
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -59,15 +59,6 @@ export default function LoginScreen() {
       Alert.alert('Error', 'An error occurred during login');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleGuestLogin = async () => {
-    try {
-      await guestLogin();
-      router.replace('/(tabs)');
-    } catch (error) {
-      Alert.alert('Error', 'An error occurred while entering guest mode');
     }
   };
 
@@ -135,19 +126,6 @@ export default function LoginScreen() {
       backgroundColor: theme.colors.textSecondary,
       opacity: 0.6,
     },
-    guestButton: {
-      backgroundColor: theme.colors.textSecondary,
-      borderRadius: 8,
-      paddingVertical: 16,
-      alignItems: 'center',
-      marginTop: 20,
-      marginBottom: 20,
-    },
-    guestButtonText: {
-      color: theme.colors.surface,
-      fontSize: 18,
-      fontWeight: '600',
-    },
   });
 
   return (
@@ -202,19 +180,6 @@ export default function LoginScreen() {
             Don't have an account? Create one
           </Text>
         </TouchableOpacity>
-
-        {/* Only show guest button when tutorial feature flag is NOT enabled (not 200) and not loading */}
-        {!tutorialLoading && !tutorialFeatureEnabled && (
-          <TouchableOpacity
-            style={styles.guestButton}
-            onPress={handleGuestLogin}
-            disabled={isLoading}
-          >
-            <Text style={styles.guestButtonText}>
-              {isLoading ? 'Entering guest mode...' : 'Continue as Guest'}
-            </Text>
-          </TouchableOpacity>
-        )}
 
       </ScrollView>
     </KeyboardAvoidingView>

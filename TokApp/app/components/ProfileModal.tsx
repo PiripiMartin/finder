@@ -24,7 +24,7 @@ interface ProfileModalProps {
 
 export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
-  const { sessionToken, isGuest, logout } = useAuth();
+  const { sessionToken, logout } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   
@@ -268,32 +268,6 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading profile...</Text>
-          </View>
-        ) : isGuest ? (
-          <View style={styles.guestContainer}>
-            <Ionicons name="person-outline" size={80} color={theme.colors.textSecondary} />
-            <Text style={[styles.guestTitle, { color: theme.colors.text }]}>Login to Access Profile</Text>
-            <Text style={[styles.guestSubtitle, { color: theme.colors.textSecondary }]}>
-              Create an account or sign in to access your profile, saved locations, and preferences.
-            </Text>
-            <TouchableOpacity
-              style={[styles.loginButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() => {
-                onClose();
-                router.push('/auth/login');
-              }}
-            >
-              <Text style={[styles.loginButtonText, { color: theme.colors.surface }]}>Login</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.createAccountButton, { borderColor: theme.colors.primary }]}
-              onPress={() => {
-                onClose();
-                router.push('/auth/create-account');
-              }}
-            >
-              <Text style={[styles.createAccountButtonText, { color: theme.colors.primary }]}>Create Account</Text>
-            </TouchableOpacity>
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
