@@ -145,18 +145,32 @@ export default function FriendsScreen() {
         body: JSON.stringify({ username }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
+        // Try to get error message from response
+        let errorMessage = '';
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            errorMessage = data.message || '';
+          } else {
+            errorMessage = await response.text();
+          }
+        } catch {
+          errorMessage = '';
+        }
+
         if (response.status === 404) {
-          Alert.alert('User Not Found', 'No user exists with this username');
+          Alert.alert('User Not Found', errorMessage || 'No user exists with this username');
         } else if (response.status === 400) {
-          Alert.alert('Cannot Add Friend', data.message || 'Invalid request');
+          Alert.alert('Cannot Add Friend', errorMessage || 'Invalid request');
         } else {
-          throw new Error(`Failed to add friend: ${response.status}`);
+          Alert.alert('Error', errorMessage || `Failed to add friend: ${response.status}`);
         }
         return;
       }
+
+      const data = await response.json();
 
       if (data.added === false) {
         Alert.alert('Already Friends', data.message || 'You are already friends with this user');
@@ -183,7 +197,7 @@ export default function FriendsScreen() {
 
     try {
       const shareUrl = `lai://add-friend/${currentUsername}`;
-      const message = `Add me as a friend on Lai!\n\nMy Username: @${currentUsername}\n\nOr use this link: ${shareUrl}`;
+      const message = `Add me as a friend on Lai!\n\nMy Username: ${currentUsername}\n\nOr use this link: ${shareUrl}`;
 
       await Share.share({
         message,
@@ -213,8 +227,12 @@ export default function FriendsScreen() {
 
   // Format date
   const formatDate = (dateString: string) => {
+    // Parse the date string as UTC to avoid timezone offset issues
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    // Use UTC methods to get the correct month and year
+    const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+    const year = date.toLocaleDateString('en-US', { year: 'numeric', timeZone: 'UTC' });
+    return `${month} ${year}`;
   };
 
   useEffect(() => {
@@ -236,7 +254,7 @@ export default function FriendsScreen() {
       </View>
       <View style={styles.friendInfo}>
         <Text style={[styles.friendUsername, { color: theme.colors.text }]}>
-          @{item.username}
+          {item.username}
         </Text>
         <Text style={[styles.friendSince, { color: theme.colors.textSecondary }]}>
           Friends since {formatDate(item.createdAt)}
@@ -380,7 +398,7 @@ export default function FriendsScreen() {
                   color: theme.colors.text,
                   borderColor: theme.colors.border,
                 }]}
-                placeholder="Enter username (e.g., @johndoe)"
+                placeholder="Enter username (e.g., johndoe)"
                 placeholderTextColor={theme.colors.textSecondary}
                 value={friendInput}
                 onChangeText={setFriendInput}
@@ -421,7 +439,7 @@ export default function FriendsScreen() {
                 borderColor: theme.colors.border,
               }]}>
                 <Text style={[styles.codeText, { color: theme.colors.text }]}>
-                  @{currentUsername || '...'}
+                  {currentUsername || '...'}
                 </Text>
               </View>
 

@@ -1540,7 +1540,7 @@ export default function Location() {
                           </Text>
                           {friend.email && (
                             <Text style={[styles.sendModalFriendEmail, { color: theme.colors.textSecondary }]}>
-                              @{friend.username}
+                              {friend.username}
                             </Text>
                           )}
                         </View>

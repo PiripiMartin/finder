@@ -315,7 +315,7 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
               </View>
               
               <Text style={[styles.username, { color: theme.colors.text }]}>
-                @{profileData?.username || 'loading...'}
+                {profileData?.username || 'loading...'}
               </Text>
               <Text style={[styles.displayName, { color: theme.colors.textSecondary }]}>
                 {profileData?.email || 'loading...'}

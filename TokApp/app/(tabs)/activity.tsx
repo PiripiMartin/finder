@@ -596,7 +596,7 @@ export default function ActivityScreen() {
               </View>
             )}
             <Text style={[styles.username, { color: theme.colors.text }]}>
-              @{sender?.username || 'Unknown'}
+              {sender?.username || 'Unknown'}
             </Text>
           </View>
           <Text style={[styles.timestamp, { color: theme.colors.textSecondary }]}>
@@ -720,7 +720,7 @@ export default function ActivityScreen() {
               </View>
             )}
             <Text style={[styles.username, { color: theme.colors.text }]}>
-              @{reviewer?.username || 'Unknown'}
+              {reviewer?.username || 'Unknown'}
             </Text>
           </View>
           <Text style={[styles.timestamp, { color: theme.colors.textSecondary }]}>
@@ -959,7 +959,7 @@ export default function ActivityScreen() {
                 )}
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.username, { color: theme.colors.text }]}>
-                    @{reviewerProfiles.get(selectedReview.review.reviewerId)?.username || 'Unknown'}
+                    {reviewerProfiles.get(selectedReview.review.reviewerId)?.username || 'Unknown'}
                   </Text>
                   <Text style={[styles.timestamp, { color: theme.colors.textSecondary }]}>
                     {getRelativeTime(selectedReview.review.createdAt)}
