@@ -20,6 +20,7 @@ import { cacheMapPoints, loadCachedMapPoints, clearMapPointsCache } from '../uti
 import { fetchSavedLocationsWithCache } from '../utils/savedLocationsCache';
 
 import { videoUrls } from '../videoData';
+import { clearSavedLocationsCache } from '../utils/savedLocationsCache';
 
 // Helper function to detect video platform from URL
 const getVideoPlatform = (url: string): 'tiktok' | 'instagram' | 'unknown' => {
@@ -684,6 +685,11 @@ export default function Index() {
   useFocusEffect(
     useCallback(() => {
       console.log('🗺️ [Map] Screen focused, refreshing map points...');
+      
+      // Clear the cache when app comes to foreground to ensure fresh data
+      clearSavedLocationsCache();
+      console.log('🗑️ [Map] Cleared saved locations cache on focus');
+      
       if (userLocation) {
         // Check if enough time has passed since last refresh before resetting (use ref for synchronous read)
         const now = Date.now();
