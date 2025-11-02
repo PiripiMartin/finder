@@ -12,6 +12,7 @@ import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTutorial } from '../context/TutorialContext';
 import { applySavedOrder, loadLocationOrder, saveLocationOrder } from '../utils/locationOrderStorage';
+import { fetchSavedLocationsWithCache } from '../utils/savedLocationsCache';
 
 const { width } = Dimensions.get('window');
 const locationCardWidth = (width - 36) / 2; // Two cards per row with padding
@@ -108,152 +109,97 @@ export default function Saved() {
       const apiUrl = `${API_CONFIG.BASE_URL}/map/saved-new`;
       console.log('🌐 [Saved] API URL:', apiUrl);
       
-      // Retry logic with exponential backoff
-      const MAX_RETRIES = 3;
-      const TIMEOUT_MS = 15000; // 15 second timeout
-      let lastError: Error | null = null;
-      
-      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        try {
-          if (attempt > 0) {
-            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 1s, 2s, 4s max
-            console.log(`🔄 [Saved] Retry attempt ${attempt + 1}/${MAX_RETRIES} after ${delay}ms delay`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-          
-          // Create a timeout promise
-          const timeoutPromise = new Promise<Response>((_, reject) => {
-            setTimeout(() => reject(new Error('Request timeout')), TIMEOUT_MS);
-          });
-          
-          // Fetch saved locations from API
-          const fetchPromise = fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${sessionToken || ''}`,
-            },
-          });
-          
-          // Race between fetch and timeout
-          const response = await Promise.race([fetchPromise, timeoutPromise]);
-          
-          console.log(`📥 [Saved] Response Details (attempt ${attempt + 1}):`, {
-            status: response.status,
-            statusText: response.statusText,
-            ok: response.ok,
-            timestamp: new Date().toISOString()
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data: ApiResponse = await response.json();
-          console.log(`✅ [Saved] Successfully fetched data on attempt ${attempt + 1}`);
-          console.log('📚 [Saved] API response data:', data);
-      
-          // Extract uncategorised locations and folders with new format
-          let uncategorised: SavedLocation[] = [];
-          const folderMap: { [folderId: number]: SavedLocation[] } = {};
-          const extractedFolders: ApiFolder[] = [];
-          
-          // Process personal section
-          if (data.personal) {
-            Object.keys(data.personal).forEach(key => {
-              const folderData = data.personal[key];
-              
-              // Handle "uncategorised" key specially - it's just an array of locations
-              if (key === 'uncategorised' && Array.isArray(folderData)) {
-                uncategorised = folderData;
-                console.log('📚 [Saved] Uncategorised locations:', uncategorised.length);
-                return;
+      try {
+        // Fetch saved locations from API with caching (cache shared with map page)
+        const data: ApiResponse = await fetchSavedLocationsWithCache(apiUrl, sessionToken || '');
+        console.log('✅ [Saved] Successfully fetched data (cached or fresh)');
+        console.log('📚 [Saved] API response data:', data);
+        
+        // Extract uncategorised locations and folders with new format
+        let uncategorised: SavedLocation[] = [];
+        const folderMap: { [folderId: number]: SavedLocation[] } = {};
+        const extractedFolders: ApiFolder[] = [];
+        
+        // Process personal section
+        if (data.personal) {
+          Object.keys(data.personal).forEach(key => {
+            const folderData = data.personal[key];
+            
+            // Handle "uncategorised" key specially - it's just an array of locations
+            if (key === 'uncategorised' && Array.isArray(folderData)) {
+              uncategorised = folderData;
+              console.log('📚 [Saved] Uncategorised locations:', uncategorised.length);
+              return;
+            }
+            
+            // New format: folderId maps to { name, color, locations }
+            if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
+              const folderId = parseInt(key);
+              if (!isNaN(folderId)) {
+                folderMap[folderId] = folderData.locations || [];
+                extractedFolders.push({
+                  id: folderId,
+                  name: folderData.name || 'Unnamed Folder',
+                  color: folderData.color || '#808080',
+                  createdAt: new Date().toISOString(), // API doesn't return createdAt in new format
+                });
+                console.log(`📂 [Saved] Personal folder ${folderId}: ${folderData.name}, ${folderData.locations?.length || 0} locations`);
               }
-              
-              // New format: folderId maps to { name, color, locations }
-              if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
-                const folderId = parseInt(key);
-                if (!isNaN(folderId)) {
-                  folderMap[folderId] = folderData.locations || [];
-                  extractedFolders.push({
-                    id: folderId,
-                    name: folderData.name || 'Unnamed Folder',
-                    color: folderData.color || '#808080',
-                    createdAt: new Date().toISOString(), // API doesn't return createdAt in new format
-                  });
-                  console.log(`📂 [Saved] Personal folder ${folderId}: ${folderData.name}, ${folderData.locations?.length || 0} locations`);
-                }
-              }
-            });
-          }
-          
-          setUncategorisedLocations(uncategorised);
-          setFolderLocationsMap(folderMap);
-          console.log('📂 [Saved] Folder locations map:', Object.keys(folderMap).length, 'folders');
-          
-          // Process shared folders section with new format
-          const sharedLocMap: { [folderId: number]: SavedLocation[] } = {};
-          if (data.shared) {
-            Object.keys(data.shared).forEach(key => {
-              const folderData = data.shared[key];
-              
-              // New format: folderId maps to { name, color, locations }
-              if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
-                const folderId = parseInt(key);
-                if (!isNaN(folderId)) {
-                  sharedLocMap[folderId] = folderData.locations || [];
-                  extractedFolders.push({
-                    id: folderId,
-                    name: folderData.name || 'Unnamed Folder',
-                    color: folderData.color || '#808080',
-                    createdAt: new Date().toISOString(),
-                  });
-                  console.log(`🤝 [Saved] Shared folder ${folderId}: ${folderData.name}, ${folderData.locations?.length || 0} locations`);
-                }
-              }
-            });
-            setSharedFolderLocationsMap(sharedLocMap);
-            console.log('🤝 [Saved] Shared folder locations map:', Object.keys(sharedLocMap).length, 'folders');
-          }
-          
-          // Update folders state with extracted folders
-          setFolders(extractedFolders);
-          console.log('📂 [Saved] Total folders extracted:', extractedFolders.length);
-          
-          // Build flat list of all locations for search/filtering (include shared folders)
-          const allLocations: SavedLocation[] = [
-            ...uncategorised,
-            ...Object.values(folderMap).flat(),
-            ...Object.values(sharedLocMap).flat()
-          ];
-          setSavedLocations(allLocations);
-          setFilteredLocations(allLocations);
-          setReorderedLocations(uncategorised);
-          
-          // Update LocationContext so location details page can access ALL locations
-          setContextSavedLocations(allLocations);
-          console.log('📍 [Saved] Updated LocationContext with all locations:', allLocations.length);
-          
-          console.log('📚 [Saved] Total locations:', allLocations.length);
-          
-          // Success! Break out of the retry loop
-          break;
-          
-        } catch (retryError) {
-          // Capture the error for potential retry
-          lastError = retryError instanceof Error ? retryError : new Error(String(retryError));
-          console.error(`❌ [Saved] Attempt ${attempt + 1}/${MAX_RETRIES} failed:`, lastError.message);
-          
-          // If this was the last attempt, we'll handle the error outside the loop
-          if (attempt === MAX_RETRIES - 1) {
-            console.error(`❌ [Saved] All ${MAX_RETRIES} attempts failed`);
-          }
+            }
+          });
         }
-      }
-      
-      // If we exhausted all retries and still have an error, throw it
-      if (lastError) {
-        throw lastError;
+        
+        setUncategorisedLocations(uncategorised);
+        setFolderLocationsMap(folderMap);
+        console.log('📂 [Saved] Folder locations map:', Object.keys(folderMap).length, 'folders');
+        
+        // Process shared folders section with new format
+        const sharedLocMap: { [folderId: number]: SavedLocation[] } = {};
+        if (data.shared) {
+          Object.keys(data.shared).forEach(key => {
+            const folderData = data.shared[key];
+            
+            // New format: folderId maps to { name, color, locations }
+            if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
+              const folderId = parseInt(key);
+              if (!isNaN(folderId)) {
+                sharedLocMap[folderId] = folderData.locations || [];
+                extractedFolders.push({
+                  id: folderId,
+                  name: folderData.name || 'Unnamed Folder',
+                  color: folderData.color || '#808080',
+                  createdAt: new Date().toISOString(),
+                });
+                console.log(`🤝 [Saved] Shared folder ${folderId}: ${folderData.name}, ${folderData.locations?.length || 0} locations`);
+              }
+            }
+          });
+          setSharedFolderLocationsMap(sharedLocMap);
+          console.log('🤝 [Saved] Shared folder locations map:', Object.keys(sharedLocMap).length, 'folders');
+        }
+        
+        // Update folders state with extracted folders
+        setFolders(extractedFolders);
+        console.log('📂 [Saved] Total folders extracted:', extractedFolders.length);
+        
+        // Build flat list of all locations for search/filtering (include shared folders)
+        const allLocations: SavedLocation[] = [
+          ...uncategorised,
+          ...Object.values(folderMap).flat(),
+          ...Object.values(sharedLocMap).flat()
+        ];
+        setSavedLocations(allLocations);
+        setFilteredLocations(allLocations);
+        setReorderedLocations(uncategorised);
+        
+        // Update LocationContext so location details page can access ALL locations
+        setContextSavedLocations(allLocations);
+        console.log('📍 [Saved] Updated LocationContext with all locations:', allLocations.length);
+        
+        console.log('📚 [Saved] Total locations:', allLocations.length);
+      } catch (fetchError) {
+        console.error('❌ [Saved] Error fetching saved locations:', fetchError);
+        throw fetchError;
       }
       
     } catch (error) {

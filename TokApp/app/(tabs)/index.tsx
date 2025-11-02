@@ -17,6 +17,7 @@ import { useTutorial } from '../context/TutorialContext';
 import { MapPoint } from '../mapData';
 import { API_CONFIG } from '../config/api';
 import { cacheMapPoints, loadCachedMapPoints, clearMapPointsCache } from '../utils/mapPointsCache';
+import { fetchSavedLocationsWithCache } from '../utils/savedLocationsCache';
 
 import { videoUrls } from '../videoData';
 
@@ -320,115 +321,91 @@ export default function Index() {
           
           // Fetch ALL locations from /map/saved-new to get complete folder contents
           // This includes locations added by other co-owners to shared folders
+          // Using cache to avoid duplicate requests when switching between map and saved pages
           try {
             const savedNewUrl = `${API_CONFIG.BASE_URL}/map/saved-new`;
-            console.log(`🚀 [fetchMapPoints/saved-new] Initiating fetch request`);
-            console.log(`🚀 [fetchMapPoints/saved-new] Request URL: ${savedNewUrl}`);
-            console.log(`🚀 [fetchMapPoints/saved-new] Request method: GET`);
-            console.log(`🚀 [fetchMapPoints/saved-new] API_CONFIG.BASE_URL: ${API_CONFIG.BASE_URL}`);
+            console.log(`🚀 [fetchMapPoints/saved-new] Fetching with cache...`);
             
-            const savedNewResponse = await fetch(savedNewUrl, {
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${sessionToken || ''}`,
-              },
+            const savedNewData = await fetchSavedLocationsWithCache(savedNewUrl, sessionToken || '');
+            
+            console.log('✅ [fetchMapPoints/saved-new] Successfully got data (cached or fresh)');
+            console.log('📂 [fetchMapPoints/saved-new] Response data type:', typeof savedNewData);
+            console.log('📂 [fetchMapPoints/saved-new] Response data keys:', Object.keys(savedNewData));
+            console.log('📂 [fetchMapPoints/saved-new] Full response data:', JSON.stringify(savedNewData, null, 2));
+            
+            // Collect all locations and extract folder metadata
+            const allLocations: any[] = [];
+            const extractedFolders: Folder[] = [];
+            
+            // Process all folder sections (personal, shared, followed)
+            ['personal', 'shared', 'followed'].forEach((section) => {
+              if (savedNewData[section]) {
+                console.log(`📂 [fetchMapPoints/saved-new] Processing ${section} section...`);
+                
+                Object.keys(savedNewData[section]).forEach((folderId) => {
+                  const folderData = savedNewData[section][folderId];
+                  
+                  // Handle "uncategorised" key specially - it's just an array of locations
+                  if (folderId === 'uncategorised' && Array.isArray(folderData)) {
+                    console.log(`📂 [fetchMapPoints/saved-new] Found ${folderData.length} uncategorised locations in ${section}`);
+                    allLocations.push(...folderData);
+                    return;
+                  }
+                  
+                  // New format: folderId maps to { name, color, locations }
+                  if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
+                    console.log(`📂 [fetchMapPoints/saved-new] ${section} folder ${folderId}:`, {
+                      name: folderData.name,
+                      color: folderData.color,
+                      locationCount: folderData.locations?.length || 0
+                    });
+                    
+                    // Extract folder metadata
+                    const locationIds = folderData.locations
+                      .filter((loc: any) => loc.location?.id)
+                      .map((loc: any) => parseInt(loc.location.id));
+                    
+                    extractedFolders.push({
+                      id: parseInt(folderId),
+                      name: folderData.name || 'Unnamed Folder',
+                      title: folderData.name || 'Unnamed Folder',
+                      color: folderData.color || '#808080',
+                      locationIds: locationIds,
+                    });
+                    
+                    // Add locations to allLocations array
+                    if (Array.isArray(folderData.locations)) {
+                      allLocations.push(...folderData.locations);
+                    }
+                  }
+                });
+              }
             });
             
-            console.log(`📥 [fetchMapPoints/saved-new] Response received!`);
-            console.log(`📥 [fetchMapPoints/saved-new] Response status: ${savedNewResponse.status} ${savedNewResponse.statusText}`);
-            console.log(`📥 [fetchMapPoints/saved-new] Response ok: ${savedNewResponse.ok}`);
+            // Update folders state
+            console.log(`📂 [fetchMapPoints/saved-new] Total folders extracted: ${extractedFolders.length}`);
+            console.log(`📂 [fetchMapPoints/saved-new] Total locations collected: ${allLocations.length}`);
+            setFolders(extractedFolders);
             
-            if (savedNewResponse.ok) {
-              console.log(`🔄 [fetchMapPoints/saved-new] Parsing JSON response...`);
-              const savedNewData = await savedNewResponse.json();
-              console.log('✅ [fetchMapPoints/saved-new] Successfully parsed response');
-              console.log('📂 [fetchMapPoints/saved-new] Response data type:', typeof savedNewData);
-              console.log('📂 [fetchMapPoints/saved-new] Response data keys:', Object.keys(savedNewData));
-              console.log('📂 [fetchMapPoints/saved-new] Full response data:', JSON.stringify(savedNewData, null, 2));
-              
-              // Collect all locations and extract folder metadata
-              const allLocations: any[] = [];
-              const extractedFolders: Folder[] = [];
-              
-              // Process all folder sections (personal, shared, followed)
-              ['personal', 'shared', 'followed'].forEach((section) => {
-                if (savedNewData[section]) {
-                  console.log(`📂 [fetchMapPoints/saved-new] Processing ${section} section...`);
-                  
-                  Object.keys(savedNewData[section]).forEach((folderId) => {
-                    const folderData = savedNewData[section][folderId];
-                    
-                    // Handle "uncategorised" key specially - it's just an array of locations
-                    if (folderId === 'uncategorised' && Array.isArray(folderData)) {
-                      console.log(`📂 [fetchMapPoints/saved-new] Found ${folderData.length} uncategorised locations in ${section}`);
-                      allLocations.push(...folderData);
-                      return;
-                    }
-                    
-                    // New format: folderId maps to { name, color, locations }
-                    if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
-                      console.log(`📂 [fetchMapPoints/saved-new] ${section} folder ${folderId}:`, {
-                        name: folderData.name,
-                        color: folderData.color,
-                        locationCount: folderData.locations?.length || 0
-                      });
-                      
-                      // Extract folder metadata
-                      const locationIds = folderData.locations
-                        .filter((loc: any) => loc.location?.id)
-                        .map((loc: any) => parseInt(loc.location.id));
-                      
-                      extractedFolders.push({
-                        id: parseInt(folderId),
-                        name: folderData.name || 'Unnamed Folder',
-                        title: folderData.name || 'Unnamed Folder',
-                        color: folderData.color || '#808080',
-                        locationIds: locationIds,
-                      });
-                      
-                      // Add locations to allLocations array
-                      if (Array.isArray(folderData.locations)) {
-                        allLocations.push(...folderData.locations);
-                      }
-                    }
-                  });
-                }
-              });
-              
-              // Update folders state
-              console.log(`📂 [fetchMapPoints/saved-new] Total folders extracted: ${extractedFolders.length}`);
-              console.log(`📂 [fetchMapPoints/saved-new] Total locations collected: ${allLocations.length}`);
-              setFolders(extractedFolders);
-              
-              // Deduplicate locations by ID
-              console.log('🔄 [fetchMapPoints/saved-new] Deduplicating locations...');
-              console.log('🔄 [fetchMapPoints/saved-new] Total locations before deduplication:', allLocations.length);
-              const seenIds = new Set();
-              const duplicateIds: any[] = [];
-              savedLocationsData = allLocations.filter((loc: any) => {
-                if (loc.location?.id && !seenIds.has(loc.location.id)) {
-                  seenIds.add(loc.location.id);
-                  return true;
-                } else if (loc.location?.id) {
-                  duplicateIds.push(loc.location.id);
-                }
-                return false;
-              });
-              
-              console.log('✅ [fetchMapPoints/saved-new] Deduplication complete');
-              console.log('📂 [fetchMapPoints/saved-new] Total unique saved-new locations:', savedLocationsData.length);
-              console.log('📂 [fetchMapPoints/saved-new] Duplicate IDs found:', duplicateIds.length, duplicateIds);
-              console.log('📂 [fetchMapPoints/saved-new] Unique location IDs:', Array.from(seenIds));
-              
-              // Cache the saved-new data to avoid duplicate fetches
-              console.log('💾 [fetchMapPoints/saved-new] Caching saved-new data for folder loading');
-              setCachedSavedNewData(savedNewData);
-            } else {
-              console.error(`❌ [fetchMapPoints/saved-new] Response not OK`);
-              const errorText = await savedNewResponse.text();
-              console.error(`❌ [fetchMapPoints/saved-new] Response status: ${savedNewResponse.status}`);
-              console.error(`❌ [fetchMapPoints/saved-new] Response body:`, errorText);
-            }
+            // Deduplicate locations by ID
+            console.log('🔄 [fetchMapPoints/saved-new] Deduplicating locations...');
+            console.log('🔄 [fetchMapPoints/saved-new] Total locations before deduplication:', allLocations.length);
+            const seenIds = new Set();
+            const duplicateIds: any[] = [];
+            savedLocationsData = allLocations.filter((loc: any) => {
+              if (loc.location?.id && !seenIds.has(loc.location.id)) {
+                seenIds.add(loc.location.id);
+                return true;
+              } else if (loc.location?.id) {
+                duplicateIds.push(loc.location.id);
+              }
+              return false;
+            });
+            
+            console.log('✅ [fetchMapPoints/saved-new] Deduplication complete');
+            console.log('📂 [fetchMapPoints/saved-new] Total unique saved-new locations:', savedLocationsData.length);
+            console.log('📂 [fetchMapPoints/saved-new] Duplicate IDs found:', duplicateIds.length, duplicateIds);
+            console.log('📂 [fetchMapPoints/saved-new] Unique location IDs:', Array.from(seenIds));
           } catch (error) {
             console.error('❌ [fetchMapPoints/saved-new] Error fetching folder locations:', error);
             console.error('❌ [fetchMapPoints/saved-new] Error details:', {
