@@ -68,7 +68,8 @@ interface FriendReview {
       comment: string;
       createdAt: string;
     }>;
-    likes: number; // Added likes to the interface
+    likeCount: number;
+    userHasLiked: boolean;
   };
   location: LocationInvitation['location'];
   topPosts: Array<any>;
@@ -501,8 +502,8 @@ export default function ActivityScreen() {
   // Open review detail modal
   const openReviewDetailModal = (review: FriendReview) => {
     setSelectedReview(review);
-    setLikeCount(review.review.comments.length); // TODO: Get actual like count from API
-    setIsLiked(false); // TODO: Check if user already liked this review
+    setLikeCount(review.review.likeCount);
+    setIsLiked(review.review.userHasLiked);
     setShowReviewDetailModal(true);
   };
 
@@ -513,6 +514,13 @@ export default function ActivityScreen() {
     try {
       setIsTogglingLike(true);
       const method = isLiked ? 'DELETE' : 'POST';
+      
+      console.log('Toggling like:', { 
+        reviewId: selectedReview.review.id, 
+        method, 
+        currentIsLiked: isLiked,
+        url: `${API_CONFIG.BASE_URL}/friends/reviews/${selectedReview.review.id}/like` 
+      });
       
       const response = await fetch(
         `${API_CONFIG.BASE_URL}/friends/reviews/${selectedReview.review.id}/like`,
@@ -525,12 +533,20 @@ export default function ActivityScreen() {
         }
       );
 
+      console.log('Like response:', { status: response.status, ok: response.ok });
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Like error response:', errorText);
         throw new Error('Failed to update like');
       }
 
-      setIsLiked(!isLiked);
-      setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+      const data = await response.json();
+      console.log('Like success:', data);
+
+      // Update state based on the response
+      setIsLiked(data.liked);
+      setLikeCount(data.likeCount);
     } catch (error) {
       console.error('Error toggling like:', error);
       Alert.alert('Error', 'Failed to update like');
@@ -562,17 +578,21 @@ export default function ActivityScreen() {
         throw new Error('Failed to add comment');
       }
 
-      // Refresh reviews to get the new comment
-      await fetchReviews();
+      const newCommentData = await response.json();
       
-      // Update selected review with new comments
-      const updatedReview = reviews.find(r => r.review.id === selectedReview.review.id);
-      if (updatedReview) {
-        setSelectedReview(updatedReview);
-      }
+      // Immediately update the selected review with the new comment
+      setSelectedReview({
+        ...selectedReview,
+        review: {
+          ...selectedReview.review,
+          comments: [...selectedReview.review.comments, newCommentData],
+        },
+      });
       
       setNewComment('');
-      Alert.alert('Success', 'Comment added!');
+      
+      // Refresh reviews in the background to keep data in sync
+      fetchReviews();
     } catch (error) {
       console.error('Error adding comment:', error);
       Alert.alert('Error', 'Failed to add comment');
@@ -823,11 +843,11 @@ export default function ActivityScreen() {
         )}
         
         {/* Likes Count */}
-        {item.review.likes > 0 && (
+        {item.review.likeCount > 0 && (
           <View style={styles.likesCountContainer}>
             <Ionicons name="heart" size={16} color="#ff6b6b" />
             <Text style={[styles.likesCount, { color: theme.colors.textSecondary }]}>
-              {item.review.likes} {item.review.likes === 1 ? 'like' : 'likes'}
+              {item.review.likeCount} {item.review.likeCount === 1 ? 'like' : 'likes'}
             </Text>
           </View>
         )}
@@ -988,6 +1008,7 @@ export default function ActivityScreen() {
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
           >
             {/* Header */}
             <View style={[styles.modalHeader, { 
