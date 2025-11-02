@@ -405,6 +405,7 @@ export async function getFriendsReviews(req: BunRequest): Promise<Response> {
                 lr.map_point_id,
                 lr.rating,
                 lr.review,
+                lr.like_count as like_count,
                 lr.created_at as review_created_at,
                 mp.id as location_id,
                 mp.google_place_id,
@@ -530,6 +531,7 @@ export async function getFriendsReviews(req: BunRequest): Promise<Response> {
                     reviewerId: row.reviewerId,
                     rating: row.rating,
                     review: row.review,
+                    likeCount: row.likeCount,
                     createdAt: row.reviewCreatedAt,
                     comments: commentsByReviewId.get(row.reviewId) ?? []
                 },
