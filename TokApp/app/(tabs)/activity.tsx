@@ -21,9 +21,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { clearSavedLocationsCache } from '../utils/savedLocationsCache';
 import { useFocusEffect } from 'expo-router';
 import { useLocationContext } from '../context/LocationContext';
+import { clearSavedLocationsCache } from '../utils/savedLocationsCache';
 
 interface LocationInvitation {
   id: number;
@@ -301,6 +301,10 @@ export default function ActivityScreen() {
           throw new Error(`Failed to save location: ${errorText}`);
         }
       } else {
+        // Clear the saved locations cache so the map will fetch fresh data
+        clearSavedLocationsCache();
+        console.log('🗑️ [Activity] Cleared saved locations cache after saving from review');
+        
         // Refresh saved locations
         await refreshLocations();
         Alert.alert('Success', 'Location saved to your list!');
@@ -404,12 +408,12 @@ export default function ActivityScreen() {
 
       // Refresh locations if we successfully saved (or if already saved)
       if (saveSuccessful || alreadySaved) {
+        // Clear the saved locations cache so the map will fetch fresh data
+        clearSavedLocationsCache();
+        console.log('🗑️ [Activity] Cleared saved locations cache after saving');
+        
         try {
-          console.log('🔔 [Activity] Clearing saved locations cache and triggering refresh...');
-          // Clear the cache so the next fetch gets fresh data
-          await clearSavedLocationsCache();
-          // Trigger refresh callbacks (map and saved pages will refetch)
-          refreshLocations();
+          await refreshLocations();
         } catch (refreshError) {
           console.error('🔔 [Activity] Error refreshing locations:', refreshError);
         }

@@ -9,6 +9,7 @@ import { API_CONFIG, getMapPointsUrl, getEditLocationUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
+import { clearSavedLocationsCache } from '../utils/savedLocationsCache';
 
 const { width } = Dimensions.get('window');
 const tileWidth = (width - 30) / 2; // Less padding within video grid
@@ -693,6 +694,10 @@ export default function Location() {
               }
               
               console.log('✅ [Location] Location deleted successfully');
+              
+              // Clear the saved locations cache so the map will fetch fresh data
+              clearSavedLocationsCache();
+              console.log('🗑️ [Location] Cleared saved locations cache after deleting');
               
               // Refresh locations via context
               refreshLocations();

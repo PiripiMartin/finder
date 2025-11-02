@@ -105,6 +105,8 @@ export default function Index() {
   const [savedLocations, setSavedLocations] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(0);
+  const lastRefreshRef = useRef(0); // Use ref for immediate synchronous reads
+  const isFetchingRef = useRef(false); // Track if a fetch is already in progress
   const [isLoadingFromCache, setIsLoadingFromCache] = useState(true);
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
   const REFRESH_INTERVAL = 10000; // 10 seconds in milliseconds
@@ -205,6 +207,12 @@ export default function Index() {
   // Fetch map points from API with retry logic
   const fetchMapPoints = useCallback(async () => {
     try {
+      // Check if a fetch is already in progress
+      if (isFetchingRef.current) {
+        console.log('⏰ [fetchMapPoints] Skipping - fetch already in progress');
+        return;
+      }
+      
       // Check if enough time has passed since last refresh
       const now = Date.now();
       if (now - lastRefresh < REFRESH_INTERVAL) {
@@ -212,11 +220,15 @@ export default function Index() {
         return;
       }
       
+      // Mark fetch as in progress
+      isFetchingRef.current = true;
+      
       setError(null);
       
       // Check if we have user location before making the API call
       if (!userLocation) {
         console.log('No user location available, skipping API call');
+        isFetchingRef.current = false; // Reset flag
         return;
       }
       
@@ -495,7 +507,9 @@ export default function Index() {
          
           setMapPoints(transformedMapPoints);
           setError(null); // Clear any previous errors
-          setLastRefresh(Date.now()); // Update last refresh timestamp
+          const now = Date.now();
+          setLastRefresh(now); // Update last refresh timestamp
+          lastRefreshRef.current = now; // Update ref for synchronous reads
           setHasCompletedInitialLoad(true); // Mark that we've completed at least one successful load
           console.log('🎉 [fetchMapPoints] Successfully fetched data from API, total points:', transformedMapPoints.length);
           console.log('📱 [fetchMapPoints] State updated with map points:', transformedMapPoints);
@@ -512,6 +526,9 @@ export default function Index() {
           // Success! Clear any previous errors and break out of the retry loop
           lastError = null;
           console.log('✅ [fetchMapPoints] Retry succeeded, clearing error state');
+          
+          // Mark fetch as complete
+          isFetchingRef.current = false;
           break;
           
         } catch (retryError) {
@@ -554,11 +571,15 @@ export default function Index() {
       
       // If we exhausted all retries and still have an error, handle it
       if (lastError) {
+        // Mark fetch as complete even on error
+        isFetchingRef.current = false;
         throw lastError;
       }
       
     } catch (err) {
       console.error('❌ [fetchMapPoints] All retry attempts exhausted, using offline data:', err);
+      // Mark fetch as complete
+      isFetchingRef.current = false;
       
       // Only show offline data message after all retries have failed
       // Use fallback data if API fails after all retry attempts
@@ -659,36 +680,36 @@ export default function Index() {
   // Removed loadFoldersData - we only fetch from /map/saved-new on the map page
   // Folder metadata is not needed for the map view
 
-  // Refresh map points when screen is focused (after app closes/reopens)
+  // Refresh map points when screen is focused (includes initial mount and after app closes/reopens)
   useFocusEffect(
     useCallback(() => {
       console.log('🗺️ [Map] Screen focused, refreshing map points...');
       if (userLocation) {
+        // Check if enough time has passed since last refresh before resetting (use ref for synchronous read)
+        const now = Date.now();
+        const timeSinceLastRefresh = now - lastRefreshRef.current;
+        
+        if (timeSinceLastRefresh < 1000) {
+          // Less than 1 second since last refresh, skip (prevents double-call on focus)
+          console.log(`⏰ [Map] Skipping focus refresh - only ${timeSinceLastRefresh}ms since last refresh`);
+          return;
+        }
+        
         // Reset the last refresh time to allow immediate refresh
         setLastRefresh(0);
+        lastRefreshRef.current = 0; // Update ref immediately for synchronous reads
         fetchMapPoints();
+      } else {
+        console.log('📍 [Map] No user location available yet, skipping fetch');
       }
     }, [userLocation, fetchMapPoints])
   );
-
-  // Load map points when user location is available
-  useEffect(() => {
-    console.log('📍 [Map] useEffect triggered - userLocation:', userLocation);
-    if (userLocation) {
-      console.log('📍 [Map] User location available, calling fetchMapPoints');
-      fetchMapPoints();
-    } else {
-      console.log('📍 [Map] No user location available yet');
-    }
-  }, [userLocation]);
 
   // Register refresh callback with LocationContext
   useEffect(() => {
     const unregister = registerRefreshCallback(() => {
       console.log('🔄 [Map] Refresh triggered by LocationContext');
       if (userLocation) {
-        // Reset the last refresh time to allow immediate refresh
-        setLastRefresh(0);
         fetchMapPoints();
       }
     });
