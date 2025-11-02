@@ -90,7 +90,7 @@ const getVideoPlatform = (url: string): 'tiktok' | 'instagram' | 'unknown' => {
 
 export default function Location() {
   const router = useRouter();
-  const { id, needsCoordinates, readonly, source } = useLocalSearchParams();
+  const { id, needsCoordinates, readonly, source, locationData: locationDataParam } = useLocalSearchParams();
   const { theme } = useTheme();
   const { sessionToken } = useAuth();
   const { findLocationById, removeLocation, addBlockedLocation, refreshLocations } = useLocationContext();
@@ -203,11 +203,71 @@ export default function Location() {
     console.log('📍 [Location] Page accessed with location ID:', id);
     console.log('🚀 [Location] This could be from map marker tap or saved locations list');
     console.log('🗺️ [Location] needsCoordinates flag:', needsCoordinates);
+    console.log('📦 [Location] locationData param:', locationDataParam);
     
     if (id) {
       console.log('🔍 Looking up location data for ID:', id);
       
-      // Try to find the location in the stored locations first
+      // First, check if location data was passed directly (from reviews/activity)
+      if (locationDataParam) {
+        try {
+          const passedData = JSON.parse(decodeURIComponent(locationDataParam as string));
+          console.log('✅ Using passed location data from navigation:', passedData);
+          
+          const passedLocation = passedData.location;
+          const passedTopPosts = passedData.topPosts || [];
+          
+          // Transform the passed location data to LocationData format
+          const transformedLocation: LocationData = {
+            id: String(passedLocation.id),
+            title: passedLocation.title,
+            description: passedLocation.description,
+            emoji: passedLocation.emoji,
+            latitude: passedLocation.latitude || 0,
+            longitude: passedLocation.longitude || 0,
+            isValidLocation: passedLocation.isValidLocation,
+            websiteUrl: passedLocation.websiteUrl,
+            phoneNumber: passedLocation.phoneNumber,
+            address: passedLocation.address,
+            createdAt: passedLocation.createdAt,
+            tiktokVideos: [], // Will be set from topPosts
+          };
+          setLocationData(transformedLocation);
+          
+          // Use the topPosts that were passed instead of fetching
+          if (passedTopPosts.length > 0) {
+            console.log('📦 Using passed topPosts instead of fetching:', passedTopPosts);
+            const fetchedVideos: VideoPost[] = passedTopPosts.map((item: any) => ({
+              id: String(item.id),
+              url: item.url || '',
+              title: item.title || '',
+              description: item.description || ''
+            })).filter((video: VideoPost) => video.url);
+            
+            // Sort videos by platform priority (TikTok first)
+            const sortedVideos = fetchedVideos.sort((a, b) => {
+              const platformA = getVideoPlatform(a.url);
+              const platformB = getVideoPlatform(b.url);
+              if (platformA === 'tiktok' && platformB !== 'tiktok') return -1;
+              if (platformA !== 'tiktok' && platformB === 'tiktok') return 1;
+              return 0;
+            });
+            
+            setVideos(sortedVideos);
+          } else {
+            // No topPosts passed, fetch them
+            fetchLocationVideos(transformedLocation.id);
+          }
+          
+          setIsSelectingCoords(needsCoordinates === 'true');
+          return;
+        } catch (error) {
+          console.error('❌ Failed to parse passed location data:', error);
+          // Fall through to other methods
+        }
+      }
+      
+      // Try to find the location in the stored locations (user's saved locations)
       // This will be populated from the API call in the index page
       const storedLocation = findLocationById(id as string);
       
@@ -251,7 +311,7 @@ export default function Location() {
     }
     // Enter coordinate selection mode if requested via query param
     setIsSelectingCoords(needsCoordinates === 'true');
-  }, [id, sessionToken]);
+  }, [id, sessionToken, locationDataParam]);
 
   const handleMapPressForCoords = (event: any) => {
     const { latitude, longitude } = event.nativeEvent.coordinate;

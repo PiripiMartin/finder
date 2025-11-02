@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { clearSavedLocationsCache } from '../utils/savedLocationsCache';
 import { useFocusEffect } from 'expo-router';
 import { useLocationContext } from '../context/LocationContext';
 
@@ -326,66 +327,110 @@ export default function ActivityScreen() {
       console.log('🔔 [Activity] Accepting invitation:', invitation.id);
       console.log('🔔 [Activity] Location ID:', invitation.location.id);
 
-      // First, save the location
-      const saveResponse = await fetch(`${API_CONFIG.BASE_URL}/map/${invitation.location.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`,
-        },
-      });
+      let saveSuccessful = false;
+      let alreadySaved = false;
 
-      console.log('🔔 [Activity] Save location response status:', saveResponse.status);
-
-      if (!saveResponse.ok) {
-        const errorText = await saveResponse.text();
-        console.error('🔔 [Activity] Save location error:', errorText);
-        
-        // If location is already saved (likely a 409 or 500 with duplicate key error), 
-        // we can still proceed to delete the invitation
-        if (saveResponse.status === 409 || errorText.includes('duplicate') || errorText.includes('already')) {
-          console.log('🔔 [Activity] Location already saved, proceeding to delete invitation');
-        } else {
-          throw new Error(`Failed to save location: ${errorText}`);
-        }
-      }
-
-      // Then, delete the invitation
-      const deleteResponse = await fetch(
-        `${API_CONFIG.BASE_URL}/location-invitations/${invitation.id}`,
-        {
-          method: 'DELETE',
+      // First, try to save the location
+      try {
+        const saveResponse = await fetch(`${API_CONFIG.BASE_URL}/map/${invitation.location.id}`, {
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${sessionToken}`,
           },
+        });
+
+        console.log('🔔 [Activity] Save location response status:', saveResponse.status);
+
+        if (saveResponse.ok) {
+          saveSuccessful = true;
+          console.log('🔔 [Activity] Location saved successfully');
+        } else {
+          console.log('🔔 [Activity] Save location failed, attempting to read error...');
+          
+          let errorText = '';
+          try {
+            errorText = await saveResponse.text();
+            console.log('🔔 [Activity] Error text:', errorText);
+          } catch (textError) {
+            console.error('🔔 [Activity] Could not read error text:', textError);
+          }
+          
+          // Check if it's a duplicate/already saved error (500 often means duplicate)
+          if (saveResponse.status === 409 || 
+              saveResponse.status === 500 || 
+              errorText.toLowerCase().includes('duplicate') || 
+              errorText.toLowerCase().includes('already')) {
+            console.log('🔔 [Activity] Treating as duplicate/already saved');
+            alreadySaved = true;
+          } else {
+            console.log('🔔 [Activity] Unexpected save error, but continuing with cleanup');
+          }
         }
-      );
+      } catch (saveError) {
+        console.error('🔔 [Activity] Exception while saving location:', saveError);
+        // Continue to try deleting invitation anyway
+      }
+      
+      console.log('🔔 [Activity] Proceeding to delete invitation...');
 
-      console.log('🔔 [Activity] Delete invitation response status:', deleteResponse.status);
+      // Always try to delete the invitation, regardless of save result
+      try {
+        const deleteResponse = await fetch(
+          `${API_CONFIG.BASE_URL}/location-invitations/${invitation.id}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionToken}`,
+            },
+          }
+        );
 
-      if (!deleteResponse.ok) {
-        const deleteErrorText = await deleteResponse.text();
-        console.error('🔔 [Activity] Delete invitation error:', deleteErrorText);
-        throw new Error('Failed to remove invitation');
+        console.log('🔔 [Activity] Delete invitation response status:', deleteResponse.status);
+
+        if (!deleteResponse.ok) {
+          const deleteErrorText = await deleteResponse.text();
+          console.error('🔔 [Activity] Delete invitation error:', deleteErrorText);
+          // Don't throw - still remove from UI
+        }
+      } catch (deleteError) {
+        console.error('🔔 [Activity] Network error while deleting invitation:', deleteError);
+        // Still remove from UI
       }
 
-      console.log('🔔 [Activity] Invitation accepted and saved');
-      
-      // Refresh saved locations
-      await refreshLocations();
-
-      // Remove from list
+      // Always remove from UI
       setInvitations(prev => prev.filter(inv => inv.id !== invitation.id));
+
+      // Refresh locations if we successfully saved (or if already saved)
+      if (saveSuccessful || alreadySaved) {
+        try {
+          console.log('🔔 [Activity] Clearing saved locations cache and triggering refresh...');
+          // Clear the cache so the next fetch gets fresh data
+          await clearSavedLocationsCache();
+          // Trigger refresh callbacks (map and saved pages will refetch)
+          refreshLocations();
+        } catch (refreshError) {
+          console.error('🔔 [Activity] Error refreshing locations:', refreshError);
+        }
+      }
+
+      // Show appropriate message
+      if (saveSuccessful) {
+        Alert.alert('Success', 'Location saved!');
+      } else if (alreadySaved) {
+        Alert.alert('Already Saved', 'You already have this location saved.');
+      } else {
+        Alert.alert('Notice', 'The invitation has been removed, but there was an issue saving the location.');
+      }
       
-      Alert.alert('Success', 'Location saved!');
     } catch (error) {
-      console.error('🔔 [Activity] Error accepting invitation:', error);
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'Failed to accept invitation'
-      );
+      console.error('🔔 [Activity] Unexpected error accepting invitation:', error);
+      // Remove from UI even on error
+      setInvitations(prev => prev.filter(inv => inv.id !== invitation.id));
+      Alert.alert('Notice', 'The invitation has been removed.');
     } finally {
+      // Always clear loading state
       setAcceptingIds(prev => {
         const newSet = new Set(prev);
         newSet.delete(invitation.id);
@@ -435,8 +480,18 @@ export default function ActivityScreen() {
   };
 
   // View location details
-  const viewLocation = (locationId: number) => {
-    router.push(`/_location?id=${locationId}`);
+  const viewLocation = (locationId: number, locationData?: any, topPosts?: any[]) => {
+    if (locationData) {
+      // Pass location data and topPosts from review to avoid showing placeholder data
+      const dataToPass = {
+        location: locationData,
+        topPosts: topPosts || []
+      };
+      const encodedData = encodeURIComponent(JSON.stringify(dataToPass));
+      router.push(`/_location?id=${locationId}&locationData=${encodedData}`);
+    } else {
+      router.push(`/_location?id=${locationId}`);
+    }
   };
 
   // Open review detail modal
@@ -607,7 +662,7 @@ export default function ActivityScreen() {
         {/* Location Preview */}
         <TouchableOpacity
           style={styles.locationPreview}
-          onPress={() => viewLocation(item.location.id)}
+          onPress={() => viewLocation(item.location.id, item.location)}
         >
           <Text style={styles.locationEmoji}>{item.location.emoji}</Text>
           <View style={styles.locationInfo}>
@@ -687,7 +742,7 @@ export default function ActivityScreen() {
                 borderColor: theme.colors.border,
               },
             ]}
-            onPress={() => viewLocation(item.location.id)}
+            onPress={() => viewLocation(item.location.id, item.location)}
           >
             <Ionicons name="eye-outline" size={18} color={theme.colors.primary} />
             <Text style={[styles.viewButtonText, { color: theme.colors.primary }]}>
@@ -972,7 +1027,7 @@ export default function ActivityScreen() {
                 style={[styles.modalLocationSection, { backgroundColor: theme.colors.surface }]}
                 onPress={() => {
                   setShowReviewDetailModal(false);
-                  viewLocation(selectedReview.location.id);
+                  viewLocation(selectedReview.location.id, selectedReview.location, selectedReview.topPosts);
                 }}
               >
                 <Text style={styles.modalLocationEmoji}>{selectedReview.location.emoji}</Text>

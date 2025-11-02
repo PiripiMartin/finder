@@ -687,6 +687,8 @@ export default function Index() {
     const unregister = registerRefreshCallback(() => {
       console.log('🔄 [Map] Refresh triggered by LocationContext');
       if (userLocation) {
+        // Reset the last refresh time to allow immediate refresh
+        setLastRefresh(0);
         fetchMapPoints();
       }
     });
