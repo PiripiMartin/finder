@@ -1026,6 +1026,20 @@ export default function Index() {
         showsMyLocationButton={false}
         followsUserLocation={false}
         moveOnMarkerPress={false}
+        onPress={() => {
+          // Deselect pin when user touches the map
+          if (selectedMarkerId) {
+            setSelectedMarkerId(null);
+            setIsVideoVisible(false);
+          }
+        }}
+        onPanDrag={() => {
+          // Deselect pin when user drags/moves the map
+          if (selectedMarkerId) {
+            setSelectedMarkerId(null);
+            setIsVideoVisible(false);
+          }
+        }}
       >
 
         
