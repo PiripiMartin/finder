@@ -8,7 +8,7 @@ import { createUserLocationEdit } from "../user/queries";
 
 /**
  * Adds a friend relationship between the authenticated user and another user.
- * Expects JSON body: { friendUserId: number }
+ * Expects JSON body: { username: string }
  */
 export async function addFriend(req: BunRequest): Promise<Response> {
     const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
@@ -21,24 +21,25 @@ export async function addFriend(req: BunRequest): Promise<Response> {
         return new Response("Invalid or expired session token", { status: 401 });
     }
 
-    const data = await checkedExtractBody(req, ["friendUserId"]);
+    const data = await checkedExtractBody(req, ["username"]);
     if (!data) {
         return new Response("Malformed request body", { status: 400 });
     }
 
-    const friendUserId = Number((data as any).friendUserId);
-    if (!Number.isInteger(friendUserId) || friendUserId <= 0) {
-        return new Response("Invalid friend user id", { status: 400 });
+    const username = String((data as any).username ?? "").trim();
+    if (username.length === 0) {
+        return new Response("Username is required and must be a non-empty string", { status: 400 });
     }
 
-    if (friendUserId === userId) {
-        return new Response("Cannot add yourself as a friend", { status: 400 });
-    }
-
-    // Verify target user exists
-    const [userRows] = await db.execute("SELECT id FROM users WHERE id = ?", [friendUserId]) as [any[], any];
+    // Verify target user exists and get their ID
+    const [userRows] = await db.execute("SELECT id FROM users WHERE username = ?", [username]) as [any[], any];
     if ((userRows as any[]).length === 0) {
         return new Response("User not found", { status: 404 });
+    }
+
+    const friendUserId = userRows[0].id;
+    if (friendUserId === userId) {
+        return new Response("Cannot add yourself as a friend", { status: 400 });
     }
 
     // Normalize ordering so friendship is undirected and unique
