@@ -2,7 +2,7 @@ import type { BunRequest } from "bun";
 import { db, toCamelCase } from "../database";
 import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
-import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld, getCreatedFolderIds, getCoOwnedFolderIds, fetchUserLocationEditsForUsersAndMapPoints, getAllFolderLocationsWithTopPost, getAllFolderOwners, insertLocationForUser } from "./queries";
+import { fetchPostsForLocation, getRecommendedLocationsWithTopPost, fetchUserLocationEdits, getFollowedFolderIds, getFolderLocationsWithTopPost, getUncategorisedSavedLocationsWithTopPost, getSavedLocationsWithTopPost, getSavedLocationsWithTopPostOld, getCreatedFolderIds, getCoOwnedFolderIds, fetchUserLocationEditsForUsersAndMapPoints, getAllFolderLocationsWithTopPost, getAllFolderOwners, getAllFolderInfo, insertLocationForUser } from "./queries";
 import { getFolderOwners, removeLocationFromFolder } from "../folders/queries";
 import { removeSavedLocationForUser } from "../posts/queries";
 
@@ -69,10 +69,11 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
         const userEdits = await fetchUserLocationEdits(accountId);
         const editsMap = new Map(userEdits.map(edit => [edit.mapPointId, edit]));
 
-        // Batch fetch all folder locations and owners in parallel
-        const [folderLocationsMap, folderOwnersMap, uncategorisedRows] = await Promise.all([
+        // Batch fetch all folder locations, owners, and folder info in parallel
+        const [folderLocationsMap, folderOwnersMap, folderInfoMap, uncategorisedRows] = await Promise.all([
             getAllFolderLocationsWithTopPost(allFolderIds),
             getAllFolderOwners(allFolderIds),
+            getAllFolderInfo(allFolderIds),
             getUncategorisedSavedLocationsWithTopPost(accountId)
         ]);
 
@@ -154,7 +155,12 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
         const personal: any = { uncategorised: formatRows(uncategorisedRows) };
         for (const folderId of createdFolderIds) {
             const rows = folderLocationsMap.get(folderId) || [];
-            personal[folderId] = formatRows(rows);
+            const folderInfo = folderInfoMap.get(folderId) || { name: "", color: "" };
+            personal[folderId] = {
+                name: folderInfo.name,
+                color: folderInfo.color,
+                locations: formatRows(rows)
+            };
         }
 
         // Build shared folders object (folders co-owned but not created by user)
@@ -162,6 +168,7 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
         for (const folderId of coOwnedFolderIds) {
             const rows = folderLocationsMap.get(folderId) || [];
             const ownerIds = folderOwnersMap.get(folderId) || [];
+            const folderInfo = folderInfoMap.get(folderId) || { name: "", color: "" };
             
             // Create owner edits map for this folder's locations
             const folderOwnerEditsMap = new Map<number, any>();
@@ -172,7 +179,11 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
                 }
             }
             
-            shared[folderId] = formatRows(rows, folderOwnerEditsMap);
+            shared[folderId] = {
+                name: folderInfo.name,
+                color: folderInfo.color,
+                locations: formatRows(rows, folderOwnerEditsMap)
+            };
         }
 
         // Build followed folders object; apply fallbacks to owners' edits if viewer has none
@@ -180,6 +191,7 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
         for (const folderId of followedFolderIds) {
             const rows = folderLocationsMap.get(folderId) || [];
             const ownerIds = folderOwnersMap.get(folderId) || [];
+            const folderInfo = folderInfoMap.get(folderId) || { name: "", color: "" };
             
             // Create owner edits map for this folder's locations
             const folderOwnerEditsMap = new Map<number, any>();
@@ -190,7 +202,11 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
                 }
             }
             
-            followed[folderId] = formatRows(rows, folderOwnerEditsMap);
+            followed[folderId] = {
+                name: folderInfo.name,
+                color: folderInfo.color,
+                locations: formatRows(rows, folderOwnerEditsMap)
+            };
         }
 
         const payload = { personal, shared, followed };

@@ -675,6 +675,36 @@ export async function getAllFolderOwners(folderIds: number[]): Promise<Map<numbe
     return ownerMap;
 }
 
+/**
+ * Fetches folder info (name and color) for multiple folders in a single query.
+ * Returns a map of folder_id -> { name, color } for efficient processing.
+ */
+export async function getAllFolderInfo(folderIds: number[]): Promise<Map<number, { name: string; color: string }>> {
+    if (folderIds.length === 0) {
+        return new Map();
+    }
+
+    const folderPlaceholders = folderIds.map(() => '?').join(', ');
+    
+    const query = `
+        SELECT id, name, color
+        FROM folders
+        WHERE id IN (${folderPlaceholders})
+    `;
+    
+    const [rows] = await db.execute(query, folderIds) as [any[], any];
+    
+    const folderInfoMap = new Map<number, { name: string; color: string }>();
+    for (const row of rows) {
+        folderInfoMap.set(row.id, {
+            name: row.name,
+            color: row.color
+        });
+    }
+    
+    return folderInfoMap;
+}
+
 
 export async function insertLocationForUser(userId: number, locationId: number): Promise<void> {
     const query = `
