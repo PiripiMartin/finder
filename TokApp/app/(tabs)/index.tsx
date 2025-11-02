@@ -346,68 +346,59 @@ export default function Index() {
               console.log('📂 [fetchMapPoints/saved-new] Response data keys:', Object.keys(savedNewData));
               console.log('📂 [fetchMapPoints/saved-new] Full response data:', JSON.stringify(savedNewData, null, 2));
               
-              // Collect all locations from ALL sections
+              // Collect all locations and extract folder metadata
               const allLocations: any[] = [];
+              const extractedFolders: Folder[] = [];
               
-              // Extract locations from personal folders (includes co-owned folder locations)
-              console.log('📂 [fetchMapPoints/saved-new] Processing personal folders...');
-              if (savedNewData.personal) {
-                const personalFolderIds = Object.keys(savedNewData.personal);
-                console.log(`📂 [fetchMapPoints/saved-new] Found ${personalFolderIds.length} personal folders:`, personalFolderIds);
-                Object.keys(savedNewData.personal).forEach((folderId) => {
-                  const folderLocations = savedNewData.personal[folderId];
-                  console.log(`📂 [fetchMapPoints/saved-new] Personal folder ${folderId}:`, {
-                    isArray: Array.isArray(folderLocations),
-                    count: Array.isArray(folderLocations) ? folderLocations.length : 0,
-                    locations: folderLocations
+              // Process all folder sections (personal, shared, followed)
+              ['personal', 'shared', 'followed'].forEach((section) => {
+                if (savedNewData[section]) {
+                  console.log(`📂 [fetchMapPoints/saved-new] Processing ${section} section...`);
+                  
+                  Object.keys(savedNewData[section]).forEach((folderId) => {
+                    const folderData = savedNewData[section][folderId];
+                    
+                    // Handle "uncategorised" key specially - it's just an array of locations
+                    if (folderId === 'uncategorised' && Array.isArray(folderData)) {
+                      console.log(`📂 [fetchMapPoints/saved-new] Found ${folderData.length} uncategorised locations in ${section}`);
+                      allLocations.push(...folderData);
+                      return;
+                    }
+                    
+                    // New format: folderId maps to { name, color, locations }
+                    if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
+                      console.log(`📂 [fetchMapPoints/saved-new] ${section} folder ${folderId}:`, {
+                        name: folderData.name,
+                        color: folderData.color,
+                        locationCount: folderData.locations?.length || 0
+                      });
+                      
+                      // Extract folder metadata
+                      const locationIds = folderData.locations
+                        .filter((loc: any) => loc.location?.id)
+                        .map((loc: any) => parseInt(loc.location.id));
+                      
+                      extractedFolders.push({
+                        id: parseInt(folderId),
+                        name: folderData.name || 'Unnamed Folder',
+                        title: folderData.name || 'Unnamed Folder',
+                        color: folderData.color || '#808080',
+                        locationIds: locationIds,
+                      });
+                      
+                      // Add locations to allLocations array
+                      if (Array.isArray(folderData.locations)) {
+                        allLocations.push(...folderData.locations);
+                      }
+                    }
                   });
-                  if (Array.isArray(folderLocations)) {
-                    allLocations.push(...folderLocations);
-                  }
-                });
-              } else {
-                console.log('📂 [fetchMapPoints/saved-new] No personal folders found');
-              }
+                }
+              });
               
-              // Extract locations from shared folders
-              console.log('📂 [fetchMapPoints/saved-new] Processing shared folders...');
-              if (savedNewData.shared) {
-                const sharedFolderIds = Object.keys(savedNewData.shared);
-                console.log(`📂 [fetchMapPoints/saved-new] Found ${sharedFolderIds.length} shared folders:`, sharedFolderIds);
-                Object.keys(savedNewData.shared).forEach((folderId) => {
-                  const folderLocations = savedNewData.shared[folderId];
-                  console.log(`📂 [fetchMapPoints/saved-new] Shared folder ${folderId}:`, {
-                    isArray: Array.isArray(folderLocations),
-                    count: Array.isArray(folderLocations) ? folderLocations.length : 0,
-                    locations: folderLocations
-                  });
-                  if (Array.isArray(folderLocations)) {
-                    allLocations.push(...folderLocations);
-                  }
-                });
-              } else {
-                console.log('📂 [fetchMapPoints/saved-new] No shared folders found');
-              }
-              
-              // Extract locations from followed folders
-              console.log('📂 [fetchMapPoints/saved-new] Processing followed folders...');
-              if (savedNewData.followed) {
-                const followedFolderIds = Object.keys(savedNewData.followed);
-                console.log(`📂 [fetchMapPoints/saved-new] Found ${followedFolderIds.length} followed folders:`, followedFolderIds);
-                Object.keys(savedNewData.followed).forEach((folderId) => {
-                  const folderLocations = savedNewData.followed[folderId];
-                  console.log(`📂 [fetchMapPoints/saved-new] Followed folder ${folderId}:`, {
-                    isArray: Array.isArray(folderLocations),
-                    count: Array.isArray(folderLocations) ? folderLocations.length : 0,
-                    locations: folderLocations
-                  });
-                  if (Array.isArray(folderLocations)) {
-                    allLocations.push(...folderLocations);
-                  }
-                });
-              } else {
-                console.log('📂 [fetchMapPoints/saved-new] No followed folders found');
-              }
+              // Update folders state
+              console.log(`📂 [fetchMapPoints/saved-new] Total folders extracted: ${extractedFolders.length}`);
+              console.log(`📂 [fetchMapPoints/saved-new] Total locations collected: ${allLocations.length}`);
+              setFolders(extractedFolders);
               
               // Deduplicate locations by ID
               console.log('🔄 [fetchMapPoints/saved-new] Deduplicating locations...');

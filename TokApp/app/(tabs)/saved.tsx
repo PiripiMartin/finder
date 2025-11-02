@@ -46,16 +46,22 @@ interface ApiFolder {
   createdAt: string;
 }
 
+interface FolderData {
+  name: string;
+  color: string;
+  locations: SavedLocation[];
+}
+
 interface ApiResponse {
   personal: {
-    uncategorised: SavedLocation[];
-    [folderId: string]: SavedLocation[];
+    uncategorised?: SavedLocation[];
+    [folderId: string]: SavedLocation[] | FolderData | undefined;
   };
   shared: {
-    [folderId: string]: SavedLocation[];
+    [folderId: string]: FolderData;
   };
   followed: {
-    [folderId: string]: SavedLocation[];
+    [folderId: string]: FolderData;
   };
 }
 
@@ -92,33 +98,7 @@ export default function Saved() {
 
 
 
-  // Fetch owned folders from API
-  const fetchOwnedFolders = useCallback(async () => {
-    try {
-      console.log('📂 [Saved] Fetching owned folders...');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/folders/owned`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken || ''}`,
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const folders = await response.json();
-      console.log('📂 [Saved] Fetched folders:', folders.length);
-      setFolders(folders);
-      return folders;
-    } catch (error) {
-      console.error('📂 [Saved] Error fetching folders:', error);
-      return [];
-    }
-  }, [sessionToken]);
-
-  // Fetch saved locations from API with retry logic
+  // Fetch saved locations from API with retry logic (now also fetches folders from saved-new)
   const fetchSavedLocations = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -173,41 +153,72 @@ export default function Saved() {
           console.log(`✅ [Saved] Successfully fetched data on attempt ${attempt + 1}`);
           console.log('📚 [Saved] API response data:', data);
       
-          // Extract uncategorised locations
-          const uncategorised = data.personal.uncategorised || [];
-          setUncategorisedLocations(uncategorised);
-          console.log('📚 [Saved] Uncategorised locations:', uncategorised.length);
-          
-          // Extract folder locations (ignore 'uncategorised' key and 'followed')
+          // Extract uncategorised locations and folders with new format
+          let uncategorised: SavedLocation[] = [];
           const folderMap: { [folderId: number]: SavedLocation[] } = {};
-          Object.keys(data.personal).forEach(key => {
-            if (key !== 'uncategorised') {
-              const folderId = parseInt(key);
-              if (!isNaN(folderId)) {
-                folderMap[folderId] = data.personal[key];
+          const extractedFolders: ApiFolder[] = [];
+          
+          // Process personal section
+          if (data.personal) {
+            Object.keys(data.personal).forEach(key => {
+              const folderData = data.personal[key];
+              
+              // Handle "uncategorised" key specially - it's just an array of locations
+              if (key === 'uncategorised' && Array.isArray(folderData)) {
+                uncategorised = folderData;
+                console.log('📚 [Saved] Uncategorised locations:', uncategorised.length);
+                return;
               }
-            }
-          });
+              
+              // New format: folderId maps to { name, color, locations }
+              if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
+                const folderId = parseInt(key);
+                if (!isNaN(folderId)) {
+                  folderMap[folderId] = folderData.locations || [];
+                  extractedFolders.push({
+                    id: folderId,
+                    name: folderData.name || 'Unnamed Folder',
+                    color: folderData.color || '#808080',
+                    createdAt: new Date().toISOString(), // API doesn't return createdAt in new format
+                  });
+                  console.log(`📂 [Saved] Personal folder ${folderId}: ${folderData.name}, ${folderData.locations?.length || 0} locations`);
+                }
+              }
+            });
+          }
+          
+          setUncategorisedLocations(uncategorised);
           setFolderLocationsMap(folderMap);
           console.log('📂 [Saved] Folder locations map:', Object.keys(folderMap).length, 'folders');
           
-          // Process shared folders section - only process numeric folder IDs, skip invalid keys
+          // Process shared folders section with new format
           const sharedLocMap: { [folderId: number]: SavedLocation[] } = {};
           if (data.shared) {
             Object.keys(data.shared).forEach(key => {
-              // Skip 'personal' or any non-numeric keys that shouldn't be in shared
-              if (key === 'personal' || key === 'uncategorised') {
-                console.log('⚠️ [Saved] Skipping invalid key in shared section:', key);
-                return;
-              }
-              const folderId = parseInt(key);
-              if (!isNaN(folderId)) {
-                sharedLocMap[folderId] = data.shared[key] || [];
+              const folderData = data.shared[key];
+              
+              // New format: folderId maps to { name, color, locations }
+              if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
+                const folderId = parseInt(key);
+                if (!isNaN(folderId)) {
+                  sharedLocMap[folderId] = folderData.locations || [];
+                  extractedFolders.push({
+                    id: folderId,
+                    name: folderData.name || 'Unnamed Folder',
+                    color: folderData.color || '#808080',
+                    createdAt: new Date().toISOString(),
+                  });
+                  console.log(`🤝 [Saved] Shared folder ${folderId}: ${folderData.name}, ${folderData.locations?.length || 0} locations`);
+                }
               }
             });
             setSharedFolderLocationsMap(sharedLocMap);
             console.log('🤝 [Saved] Shared folder locations map:', Object.keys(sharedLocMap).length, 'folders');
           }
+          
+          // Update folders state with extracted folders
+          setFolders(extractedFolders);
+          console.log('📂 [Saved] Total folders extracted:', extractedFolders.length);
           
           // Build flat list of all locations for search/filtering (include shared folders)
           const allLocations: SavedLocation[] = [
@@ -361,10 +372,7 @@ export default function Saved() {
 
   // Refresh all data from API
   const refreshData = async () => {
-    await Promise.all([
-      fetchOwnedFolders(),
-      fetchSavedLocations()
-    ]);
+    await fetchSavedLocations(); // Now fetches both locations and folders from saved-new
   };
 
   // Handle folder creation
@@ -620,7 +628,7 @@ export default function Saved() {
   useEffect(() => {
     console.log('📚 [Saved] Page loaded, fetching data...');
     refreshData();
-  }, [sessionToken, fetchSavedLocations, fetchOwnedFolders]);
+  }, [sessionToken, fetchSavedLocations]);
 
   // Register refresh callback with LocationContext
   useEffect(() => {

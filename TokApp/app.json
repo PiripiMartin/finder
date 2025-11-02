@@ -3,7 +3,7 @@
     "name": "lai",
     "slug": "lai",
     "owner": "buffalodawg",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "lai",
@@ -11,7 +11,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "15",
+      "buildNumber": "16",
       "infoPlist": {
         "CFBundleURLTypes": [
           {
@@ -38,7 +38,7 @@
     },
     "android": {
       "package": "com.yourcompany.dew",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"

@@ -40,17 +40,17 @@ export default function FriendsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
 
   // Modal states
   const [showAddFriendModal, setShowAddFriendModal] = useState(false);
   const [friendInput, setFriendInput] = useState('');
   const [isAddingFriend, setIsAddingFriend] = useState(false);
 
-  // Fetch current user's userId from token validation
+  // Fetch current user's username from profile endpoint
   const fetchCurrentUser = async () => {
     try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/validate-token`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/profile`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -59,13 +59,14 @@ export default function FriendsScreen() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to validate token: ${response.status}`);
+        throw new Error(`Failed to fetch profile: ${response.status}`);
       }
 
       const data = await response.json();
       
-      if (data && data.userId) {
-        setCurrentUserId(data.userId);
+      // Profile endpoint returns an array with one object
+      if (data && data.length > 0 && data[0].username) {
+        setCurrentUsername(data[0].username);
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
@@ -106,34 +107,34 @@ export default function FriendsScreen() {
   const addFriend = async () => {
     const input = friendInput.trim();
     if (!input) {
-      Alert.alert('Invalid Input', 'Please enter a friend code or link');
+      Alert.alert('Invalid Input', 'Please enter a username');
       return;
     }
 
-    // Extract userId from input (could be just a number or a link)
-    let friendUserId: number;
+    // Extract username from input (could be just a username or a link)
+    let username: string;
     
-    // Check if it's a link format (lai://add-friend/123 or contains add-friend)
+    // Check if it's a link format (lai://add-friend/username or contains add-friend)
     if (input.includes('add-friend')) {
-      const match = input.match(/add-friend\/(\d+)/);
+      const match = input.match(/add-friend\/(.+)/);
       if (match && match[1]) {
-        friendUserId = parseInt(match[1], 10);
+        username = match[1];
       } else {
-        Alert.alert('Invalid Link', 'Could not extract friend code from link');
+        Alert.alert('Invalid Link', 'Could not extract username from link');
         return;
       }
     } else {
-      // Assume it's just a number
-      friendUserId = parseInt(input, 10);
-      if (isNaN(friendUserId)) {
-        Alert.alert('Invalid Input', 'Please enter a valid friend code (number)');
+      // Assume it's just a username, remove @ if present
+      username = input.replace('@', '');
+      if (!username) {
+        Alert.alert('Invalid Input', 'Please enter a valid username');
         return;
       }
     }
 
     try {
       setIsAddingFriend(true);
-      console.log('👥 [Friends] Adding friend with userId:', friendUserId);
+      console.log('👥 [Friends] Adding friend with username:', username);
 
       const response = await fetch(`${API_CONFIG.BASE_URL}/friends`, {
         method: 'POST',
@@ -141,14 +142,14 @@ export default function FriendsScreen() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionToken}`,
         },
-        body: JSON.stringify({ friendUserId }),
+        body: JSON.stringify({ username }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         if (response.status === 404) {
-          Alert.alert('User Not Found', 'No user exists with this friend code');
+          Alert.alert('User Not Found', 'No user exists with this username');
         } else if (response.status === 400) {
           Alert.alert('Cannot Add Friend', data.message || 'Invalid request');
         } else {
@@ -175,14 +176,14 @@ export default function FriendsScreen() {
 
   // Share friend code
   const shareFriendCode = async () => {
-    if (!currentUserId) {
-      Alert.alert('Error', 'Could not get your friend code');
+    if (!currentUsername) {
+      Alert.alert('Error', 'Could not get your username');
       return;
     }
 
     try {
-      const shareUrl = `lai://add-friend/${currentUserId}`;
-      const message = `Add me as a friend on Lai!\n\nMy Friend Code: ${currentUserId}\n\nOr use this link: ${shareUrl}`;
+      const shareUrl = `lai://add-friend/${currentUsername}`;
+      const message = `Add me as a friend on Lai!\n\nMy Username: @${currentUsername}\n\nOr use this link: ${shareUrl}`;
 
       await Share.share({
         message,
@@ -193,15 +194,15 @@ export default function FriendsScreen() {
     }
   };
 
-  // Copy friend code to clipboard
+  // Copy username to clipboard
   const copyFriendCode = async () => {
-    if (!currentUserId) {
-      Alert.alert('Error', 'Could not get your friend code');
+    if (!currentUsername) {
+      Alert.alert('Error', 'Could not get your username');
       return;
     }
 
-    await Clipboard.setStringAsync(currentUserId.toString());
-    Alert.alert('Copied!', 'Your friend code has been copied to clipboard');
+    await Clipboard.setStringAsync(currentUsername);
+    Alert.alert('Copied!', 'Your username has been copied to clipboard');
   };
 
   // Handle refresh
@@ -371,7 +372,7 @@ export default function FriendsScreen() {
             <View style={styles.modalContent}>
               {/* Add Friend Section */}
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                Enter Friend Code
+                Enter Username
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -379,7 +380,7 @@ export default function FriendsScreen() {
                   color: theme.colors.text,
                   borderColor: theme.colors.border,
                 }]}
-                placeholder="Enter friend code (e.g., 123) or paste link"
+                placeholder="Enter username (e.g., @johndoe)"
                 placeholderTextColor={theme.colors.textSecondary}
                 value={friendInput}
                 onChangeText={setFriendInput}
@@ -411,16 +412,16 @@ export default function FriendsScreen() {
               {/* Divider */}
               <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 
-              {/* Your Friend Code Section */}
+              {/* Your Username Section */}
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                Your Friend Code
+                Your Username
               </Text>
               <View style={[styles.codeContainer, { 
                 backgroundColor: theme.colors.surface,
                 borderColor: theme.colors.border,
               }]}>
                 <Text style={[styles.codeText, { color: theme.colors.text }]}>
-                  {currentUserId || '...'}
+                  @{currentUsername || '...'}
                 </Text>
               </View>
 
