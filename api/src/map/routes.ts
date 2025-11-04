@@ -156,11 +156,15 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
         for (const folderId of createdFolderIds) {
             const rows = folderLocationsMap.get(folderId) || [];
             const folderInfo = folderInfoMap.get(folderId) || { name: "", color: "" };
-            personal[folderId] = {
-                name: folderInfo.name,
-                color: folderInfo.color,
-                locations: formatRows(rows)
-            };
+
+            //personal[folderId] = {
+            //    name: folderInfo.name,
+            //    color: folderInfo.color,
+            //    locations: formatRows(rows)
+            //};
+
+            personal[folderId] = formatRows(rows);
+
         }
 
         // Build shared folders object (folders co-owned but not created by user)
@@ -179,11 +183,13 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
                 }
             }
             
-            shared[folderId] = {
-                name: folderInfo.name,
-                color: folderInfo.color,
-                locations: formatRows(rows, folderOwnerEditsMap)
-            };
+            //shared[folderId] = {
+            //    name: folderInfo.name,
+            //    color: folderInfo.color,
+            //    locations: formatRows(rows, folderOwnerEditsMap)
+            //};
+
+            shared[folderId] = formatRows(rows, folderOwnerEditsMap);
         }
 
         // Build followed folders object; apply fallbacks to owners' edits if viewer has none
@@ -202,14 +208,27 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
                 }
             }
             
-            followed[folderId] = {
-                name: folderInfo.name,
-                color: folderInfo.color,
-                locations: formatRows(rows, folderOwnerEditsMap)
+            //followed[folderId] = {
+            //    name: folderInfo.name,
+            //    color: folderInfo.color,
+            //    locations: formatRows(rows, folderOwnerEditsMap)
+            //};
+
+            followed[folderId] = formatRows(rows, folderOwnerEditsMap);
+
+        }
+
+        // Build folderInfo object with name and color for all folders
+        const folderInfo: any = {};
+        for (const folderId of allFolderIds) {
+            const info = folderInfoMap.get(folderId) || { name: "", color: "" };
+            folderInfo[folderId] = {
+                name: info.name,
+                color: info.color
             };
         }
 
-        const payload = { personal, shared, followed };
+        const payload = { personal, shared, followed, folderInfo };
         return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
     } catch (error) {
         console.error(`Error fetching saved locations for account ${accountId}:`, error);
