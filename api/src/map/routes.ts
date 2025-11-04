@@ -218,7 +218,17 @@ export async function getSavedLocations(req: BunRequest): Promise<Response> {
 
         }
 
-        const payload = { personal, shared, followed };
+        // Build folderInfo object with name and color for all folders
+        const folderInfo: any = {};
+        for (const folderId of allFolderIds) {
+            const info = folderInfoMap.get(folderId) || { name: "", color: "" };
+            folderInfo[folderId] = {
+                name: info.name,
+                color: info.color
+            };
+        }
+
+        const payload = { personal, shared, followed, folderInfo };
         return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
     } catch (error) {
         console.error(`Error fetching saved locations for account ${accountId}:`, error);
