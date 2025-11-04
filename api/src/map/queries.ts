@@ -511,6 +511,7 @@ export async function fetchPostsForLocation(locationId: number): Promise<Post[]>
         ) ranked_posts
         WHERE rn = 1
         ORDER BY posted_at DESC
+        LIMIT 8
     `;
 
     const [rows] = await db.execute(query, [locationId]) as [any[], any];
