@@ -341,64 +341,69 @@ export default function Index() {
             
             const savedNewData = await fetchSavedLocationsWithCache(savedNewUrl, sessionToken || '');
             
-            console.log('✅ [fetchMapPoints/saved-new] Successfully got data (cached or fresh)');
-            console.log('📂 [fetchMapPoints/saved-new] Response data type:', typeof savedNewData);
-            console.log('📂 [fetchMapPoints/saved-new] Response data keys:', Object.keys(savedNewData));
-            console.log('📂 [fetchMapPoints/saved-new] Full response data:', JSON.stringify(savedNewData, null, 2));
-            
-            // Collect all locations and extract folder metadata
-            const allLocations: any[] = [];
-            const extractedFolders: Folder[] = [];
-            
-            // Process all folder sections (personal, shared, followed)
-            ['personal', 'shared', 'followed'].forEach((section) => {
-              if (savedNewData[section]) {
-                console.log(`📂 [fetchMapPoints/saved-new] Processing ${section} section...`);
-                
-                Object.keys(savedNewData[section]).forEach((folderId) => {
-                  const folderData = savedNewData[section][folderId];
-                  
-                  // Handle "uncategorised" key specially - it's just an array of locations
-                  if (folderId === 'uncategorised' && Array.isArray(folderData)) {
-                    console.log(`📂 [fetchMapPoints/saved-new] Found ${folderData.length} uncategorised locations in ${section}`);
-                    allLocations.push(...folderData);
-                    return;
-                  }
-                  
-                  // New format: folderId maps to { name, color, locations }
-                  if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
-                    console.log(`📂 [fetchMapPoints/saved-new] ${section} folder ${folderId}:`, {
-                      name: folderData.name,
-                      color: folderData.color,
-                      locationCount: folderData.locations?.length || 0
-                    });
-                    
-                    // Extract folder metadata
-                    const locationIds = folderData.locations
-                      .filter((loc: any) => loc.location?.id)
-                      .map((loc: any) => parseInt(loc.location.id));
-                    
-                    extractedFolders.push({
-                      id: parseInt(folderId),
-                      name: folderData.name || 'Unnamed Folder',
-                      title: folderData.name || 'Unnamed Folder',
-                      color: folderData.color || '#808080',
-                      locationIds: locationIds,
-                    });
-                    
-                    // Add locations to allLocations array
-                    if (Array.isArray(folderData.locations)) {
-                      allLocations.push(...folderData.locations);
-                    }
-                  }
-                });
-              }
-            });
-            
-            // Update folders state
-            console.log(`📂 [fetchMapPoints/saved-new] Total folders extracted: ${extractedFolders.length}`);
-            console.log(`📂 [fetchMapPoints/saved-new] Total locations collected: ${allLocations.length}`);
-            setFolders(extractedFolders);
+             console.log('✅ [fetchMapPoints/saved-new] Successfully got data (cached or fresh)');
+             console.log('📂 [fetchMapPoints/saved-new] Response data type:', typeof savedNewData);
+             console.log('📂 [fetchMapPoints/saved-new] Response data keys:', Object.keys(savedNewData));
+             console.log('📂 [fetchMapPoints/saved-new] Full response data:', JSON.stringify(savedNewData, null, 2));
+             
+             // Collect all locations and extract folder metadata
+             const allLocations: any[] = [];
+             const extractedFolders: Folder[] = [];
+             
+             // Extract folder metadata from folderInfo object
+             const folderInfo = savedNewData.folderInfo || {};
+             console.log('📂 [fetchMapPoints/saved-new] Folder info:', folderInfo);
+             
+             // Process all folder sections (personal, shared, followed)
+             ['personal', 'shared', 'followed'].forEach((section) => {
+               if (savedNewData[section]) {
+                 console.log(`📂 [fetchMapPoints/saved-new] Processing ${section} section...`);
+                 
+                 Object.keys(savedNewData[section]).forEach((folderId) => {
+                   const folderLocations = savedNewData[section][folderId];
+                   
+                   // Handle "uncategorised" key specially - it's just an array of locations
+                   if (folderId === 'uncategorised' && Array.isArray(folderLocations)) {
+                     console.log(`📂 [fetchMapPoints/saved-new] Found ${folderLocations.length} uncategorised locations in ${section}`);
+                     allLocations.push(...folderLocations);
+                     return;
+                   }
+                   
+                   // Check if this is an array of locations (new format)
+                   if (Array.isArray(folderLocations)) {
+                     console.log(`📂 [fetchMapPoints/saved-new] ${section} folder ${folderId}: ${folderLocations.length} locations`);
+                     
+                     // Get folder metadata from folderInfo
+                     const folderMetadata = folderInfo[folderId];
+                     if (folderMetadata) {
+                       // Extract location IDs
+                       const locationIds = folderLocations
+                         .filter((loc: any) => loc.location?.id)
+                         .map((loc: any) => parseInt(loc.location.id));
+                       
+                       extractedFolders.push({
+                         id: parseInt(folderId),
+                         name: folderMetadata.name || 'Unnamed Folder',
+                         title: folderMetadata.name || 'Unnamed Folder',
+                         color: folderMetadata.color || '#808080',
+                         locationIds: locationIds,
+                       });
+                       
+                       console.log(`✅ [fetchMapPoints/saved-new] Added folder ${folderId}: ${folderMetadata.name} with ${locationIds.length} locations`);
+                     }
+                     
+                     // Add locations to allLocations array
+                     allLocations.push(...folderLocations);
+                   }
+                 });
+               }
+             });
+             
+             // Update folders state
+             console.log(`📂 [fetchMapPoints/saved-new] Total folders extracted: ${extractedFolders.length}`);
+             console.log(`📂 [fetchMapPoints/saved-new] Total locations collected: ${allLocations.length}`);
+             console.log(`📂 [fetchMapPoints/saved-new] Folders:`, extractedFolders.map(f => ({ id: f.id, name: f.name, count: f.locationIds.length })));
+             setFolders(extractedFolders);
             
             // Deduplicate locations by ID
             console.log('🔄 [fetchMapPoints/saved-new] Deduplicating locations...');

@@ -12,7 +12,7 @@ import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTutorial } from '../context/TutorialContext';
 import { applySavedOrder, loadLocationOrder, saveLocationOrder } from '../utils/locationOrderStorage';
-import { fetchSavedLocationsWithCache } from '../utils/savedLocationsCache';
+import { fetchSavedLocationsWithCache, clearSavedLocationsCache } from '../utils/savedLocationsCache';
 
 const { width } = Dimensions.get('window');
 const locationCardWidth = (width - 36) / 2; // Two cards per row with padding
@@ -47,22 +47,22 @@ interface ApiFolder {
   createdAt: string;
 }
 
-interface FolderData {
-  name: string;
-  color: string;
-  locations: SavedLocation[];
-}
-
 interface ApiResponse {
   personal: {
     uncategorised?: SavedLocation[];
-    [folderId: string]: SavedLocation[] | FolderData | undefined;
+    [folderId: string]: SavedLocation[] | undefined;
   };
   shared: {
-    [folderId: string]: FolderData;
+    [folderId: string]: SavedLocation[];
   };
   followed: {
-    [folderId: string]: FolderData;
+    [folderId: string]: SavedLocation[];
+  };
+  folderInfo: {
+    [folderId: string]: {
+      name: string;
+      color: string;
+    };
   };
 }
 
@@ -115,6 +115,10 @@ export default function Saved() {
         console.log('✅ [Saved] Successfully fetched data (cached or fresh)');
         console.log('📚 [Saved] API response data:', data);
         
+        // Extract folder metadata from folderInfo object
+        const folderInfo = data.folderInfo || {};
+        console.log('📂 [Saved] Folder info:', folderInfo);
+        
         // Extract uncategorised locations and folders with new format
         let uncategorised: SavedLocation[] = [];
         const folderMap: { [folderId: number]: SavedLocation[] } = {};
@@ -123,27 +127,32 @@ export default function Saved() {
         // Process personal section
         if (data.personal) {
           Object.keys(data.personal).forEach(key => {
-            const folderData = data.personal[key];
+            const folderLocations = data.personal[key];
             
             // Handle "uncategorised" key specially - it's just an array of locations
-            if (key === 'uncategorised' && Array.isArray(folderData)) {
-              uncategorised = folderData;
+            if (key === 'uncategorised' && Array.isArray(folderLocations)) {
+              uncategorised = folderLocations;
               console.log('📚 [Saved] Uncategorised locations:', uncategorised.length);
               return;
             }
             
-            // New format: folderId maps to { name, color, locations }
-            if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
+            // New format: folderId maps directly to array of locations
+            if (Array.isArray(folderLocations)) {
               const folderId = parseInt(key);
               if (!isNaN(folderId)) {
-                folderMap[folderId] = folderData.locations || [];
-                extractedFolders.push({
-                  id: folderId,
-                  name: folderData.name || 'Unnamed Folder',
-                  color: folderData.color || '#808080',
-                  createdAt: new Date().toISOString(), // API doesn't return createdAt in new format
-                });
-                console.log(`📂 [Saved] Personal folder ${folderId}: ${folderData.name}, ${folderData.locations?.length || 0} locations`);
+                folderMap[folderId] = folderLocations;
+                
+                // Get folder metadata from folderInfo
+                const metadata = folderInfo[folderId];
+                if (metadata) {
+                  extractedFolders.push({
+                    id: folderId,
+                    name: metadata.name || 'Unnamed Folder',
+                    color: metadata.color || '#808080',
+                    createdAt: new Date().toISOString(),
+                  });
+                  console.log(`📂 [Saved] Personal folder ${folderId}: ${metadata.name}, ${folderLocations.length} locations`);
+                }
               }
             }
           });
@@ -157,20 +166,25 @@ export default function Saved() {
         const sharedLocMap: { [folderId: number]: SavedLocation[] } = {};
         if (data.shared) {
           Object.keys(data.shared).forEach(key => {
-            const folderData = data.shared[key];
+            const folderLocations = data.shared[key];
             
-            // New format: folderId maps to { name, color, locations }
-            if (folderData && typeof folderData === 'object' && 'locations' in folderData) {
+            // New format: folderId maps directly to array of locations
+            if (Array.isArray(folderLocations)) {
               const folderId = parseInt(key);
               if (!isNaN(folderId)) {
-                sharedLocMap[folderId] = folderData.locations || [];
-                extractedFolders.push({
-                  id: folderId,
-                  name: folderData.name || 'Unnamed Folder',
-                  color: folderData.color || '#808080',
-                  createdAt: new Date().toISOString(),
-                });
-                console.log(`🤝 [Saved] Shared folder ${folderId}: ${folderData.name}, ${folderData.locations?.length || 0} locations`);
+                sharedLocMap[folderId] = folderLocations;
+                
+                // Get folder metadata from folderInfo
+                const metadata = folderInfo[folderId];
+                if (metadata) {
+                  extractedFolders.push({
+                    id: folderId,
+                    name: metadata.name || 'Unnamed Folder',
+                    color: metadata.color || '#808080',
+                    createdAt: new Date().toISOString(),
+                  });
+                  console.log(`🤝 [Saved] Shared folder ${folderId}: ${metadata.name}, ${folderLocations.length} locations`);
+                }
               }
             }
           });
@@ -341,6 +355,10 @@ export default function Saved() {
       const newFolder = await response.json();
       console.log('✅ [Saved] Created folder:', newFolder.id);
       
+      // Invalidate saved locations cache since folder was created
+      clearSavedLocationsCache();
+      console.log('🗑️ [Saved] Cleared saved locations cache after creating folder');
+      
       // Refresh data
       await refreshData();
     } catch (error) {
@@ -427,6 +445,11 @@ export default function Saved() {
               }
               
               console.log('✅ [Saved] Removed location from folder');
+              
+              // Invalidate saved locations cache since folder contents changed
+              clearSavedLocationsCache();
+              console.log('🗑️ [Saved] Cleared saved locations cache after removing from folder');
+              
               await refreshData();
             } catch (error) {
               console.error('❌ [Saved] Error removing from folder:', error);
@@ -475,6 +498,10 @@ export default function Saved() {
               }
               
               console.log('✅ [Saved] Folder deleted successfully');
+              
+              // Invalidate saved locations cache since folder was deleted
+              clearSavedLocationsCache();
+              console.log('🗑️ [Saved] Cleared saved locations cache after deleting folder');
               
               // Navigate back to main view if we're currently viewing this folder
               if (selectedFolderId === folderId) {
@@ -561,6 +588,11 @@ export default function Saved() {
       }
       
       console.log('✅ [Saved] Added', locationIds.length, 'locations to folder');
+      
+      // Invalidate saved locations cache since folder contents changed
+      clearSavedLocationsCache();
+      console.log('🗑️ [Saved] Cleared saved locations cache after adding to folder');
+      
       await refreshData();
     } catch (error) {
       console.error('❌ [Saved] Error adding locations to folder:', error);

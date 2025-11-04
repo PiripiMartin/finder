@@ -488,6 +488,10 @@ export default function Location() {
       const result = await response.json();
       console.log('✅ [Location] Edit successful:', result);
       
+      // Invalidate saved locations cache since location was edited
+      clearSavedLocationsCache();
+      console.log('🗑️ [Location] Cleared saved locations cache after edit');
+      
       // Update local location data immediately
       setLocationData({
         ...locationData,
