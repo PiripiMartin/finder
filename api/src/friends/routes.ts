@@ -771,3 +771,45 @@ export async function unlikeFriendReview(req: BunRequest): Promise<Response> {
         { status: 200, headers: { "Content-Type": "application/json" } }
     );
 }
+
+
+export async function removeFriend(req: BunRequest): Promise<Response> {
+
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const friendId = parseInt((req.params as {id: string}).id);
+
+    if (!friendId) {
+        return new Response("Missing friend ID.", { status: 400 });
+    }
+
+    // Normalize ordering to match friend relation invariant (user_id_1 < user_id_2)
+    const userId1 = Math.min(userId, friendId);
+    const userId2 = Math.max(userId, friendId);
+
+
+    const [res] = await db.execute(
+        "DELETE FROM friends WHERE user_id_1 = ? AND user_id_2 = ?;",
+        [userId1, userId2]
+    ) as [any, any];
+
+    if (res.affectedRows && res.affectedRows <= 0) {
+        // No friend was removed
+
+        return new Response("No friendship was affected.", { status: 204 });
+    }
+
+    
+    return new Response("Success", { status: 200 });
+}
+
+
+
