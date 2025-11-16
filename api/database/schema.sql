@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS posts (
     url VARCHAR(2048) NOT NULL,
     posted_by INT NULL,
     map_point_id INT NOT NULL,
+    post_type VARCHAR(64) NULL,
     FOREIGN KEY (posted_by) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (map_point_id) REFERENCES map_points(id) ON DELETE CASCADE,
 
