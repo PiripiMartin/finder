@@ -7,8 +7,8 @@ import { createUserLocationEdit, updateUserLocationEdit } from "./queries";
 import { getGooglePlaceDetails, searchGooglePlaces } from "../posts/get-location";
 import type { LocationEdit } from "../map/types";
 import { s3, write as bunWrite } from "bun";
-import { Resend } from "resend";
 import { createAuthChallenge } from "../email/queries";
+import { sendPasswordResetEmail } from "../email/utils";
 
 /**
  * Represents the request body for a user login.
@@ -426,32 +426,11 @@ export async function initiatePasswordReset(req: BunRequest): Promise<Response> 
         await createAuthChallenge(user.id, challengeCode, expiresAt);
 
         // Send email via Resend
-        const resendApiKey = process.env.RESEND_API_KEY;
-        if (resendApiKey) {
-            try {
-                const resend = new Resend(resendApiKey);
-                const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@example.com";
-                
-                await resend.emails.send({
-                    from: fromEmail,
-                    to: user.email,
-                    subject: "Password Reset Code",
-                    html: `
-                        <h2>Password Reset Request</h2>
-                        <p>You requested to reset your password. Use the following code to complete the reset:</p>
-                        <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; text-align: center; padding: 20px; background-color: #f5f5f5; border-radius: 8px; margin: 20px 0;">
-                            ${challengeCode}
-                        </p>
-                        <p>This code will expire in 15 minutes.</p>
-                        <p>If you didn't request this password reset, please ignore this email.</p>
-                    `,
-                });
-            } catch (error) {
-                // Log error but don't expose it to the user
-                console.error("Failed to send password reset email:", error);
-            }
-        } else {
-            console.warn("RESEND_API_KEY not configured, skipping email send");
+        try {
+            await sendPasswordResetEmail(user.email, challengeCode);
+        } catch (error) {
+            // Log error but don't expose it to the user
+            // The email sending failure is already logged in sendPasswordResetEmail
         }
     }
 
