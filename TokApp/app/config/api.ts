@@ -9,6 +9,8 @@ export const API_CONFIG = {
     MAP_POINTS: '/map/saved-new', 
     VALIDATE_TOKEN: '/validate-token',
     PROFILE: '/profile',
+    NOTIFICATIONS: '/notifications',
+    NOTIFICATIONS_SEEN: '/notifications/seen',
   },
 };
 
