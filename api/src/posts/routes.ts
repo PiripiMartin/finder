@@ -83,7 +83,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
         // Fallback to mobile page scraper if embed API fails
         if (!postInformation || !postInformation.embedProductId) {
-            console.log("TikTok embed API failed, falling back to mobile page scraper...");
+            //console.log("TikTok embed API failed, falling back to mobile page scraper...");
             postInformation = await getTikTokInfoFromMobilePage(data.url) as TikTokEmbedResponse | null;
         }
 

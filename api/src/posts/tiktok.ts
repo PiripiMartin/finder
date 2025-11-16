@@ -108,17 +108,17 @@ export async function getTikTokInfoFromMobilePage(postUrl: string): Promise<TikT
         const html = await response.text();
 
         // Save HTML to file for debugging purposes
-        try {
-            const timestamp = Date.now();
-            const debugDir = "./scraper/debug";
-            const filename = `${debugDir}/tiktok-${videoId}-${timestamp}.html`;
-            // Bun.write will create the directory if it doesn't exist
-            await Bun.write(filename, html);
-            //console.log(`Saved HTML to ${filename}`);
-        } catch (fileError) {
-            // Don't fail the whole operation if file saving fails
-            //console.warn("Failed to save HTML to file:", fileError);
-        }
+        //try {
+        //    const timestamp = Date.now();
+        //    const debugDir = "./scraper/debug";
+        //    const filename = `${debugDir}/tiktok-${videoId}-${timestamp}.html`;
+        //    // Bun.write will create the directory if it doesn't exist
+        //    await Bun.write(filename, html);
+        //    //console.log(`Saved HTML to ${filename}`);
+        //} catch (fileError) {
+        //    // Don't fail the whole operation if file saving fails
+        //    //console.warn("Failed to save HTML to file:", fileError);
+        //}
 
         // Extract the JSON data from the script tag
         const scriptMatch = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">(.*?)<\/script>/s);
