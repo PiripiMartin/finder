@@ -298,15 +298,19 @@ export async function getNotifications(req: BunRequest): Promise<Response> {
     }
 
     // Get all unseen notifications for this user using LEFT JOIN
+    // Only include notifications created after the user's account was created
     const [results] = await db.execute(`
         SELECT n.*
         FROM notifications n
         LEFT JOIN notifications_seen s 
             ON s.notification_id = n.id 
             AND s.user_id = ?
+        JOIN users u
+            ON u.id = ?
         WHERE s.notification_id IS NULL
+          AND n.created_at >= u.created_at
         ORDER BY n.created_at DESC
-    `, [userId]) as [any[], any];
+    `, [userId, userId]) as [any[], any];
 
     return new Response(JSON.stringify(results), {
         status: 200,
