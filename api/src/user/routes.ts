@@ -7,6 +7,8 @@ import { createUserLocationEdit, updateUserLocationEdit } from "./queries";
 import { getGooglePlaceDetails, searchGooglePlaces } from "../posts/get-location";
 import type { LocationEdit } from "../map/types";
 import { s3, write as bunWrite } from "bun";
+import { Resend } from "resend";
+import { createAuthChallenge } from "../email/queries";
 
 /**
  * Represents the request body for a user login.
@@ -23,6 +25,14 @@ interface SignupRequest {
     username: string;
     password: string;
     email: string;
+}
+
+/**
+ * Represents the request body for initiating a password reset.
+ */
+interface InitiatePasswordResetRequest {
+    username?: string;
+    email?: string;
 }
 
 /**
@@ -361,6 +371,91 @@ export async function markNotificationsSeen(req: BunRequest): Promise<Response> 
         VALUES ${placeholders}
     `, flatValues);
 
+    return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+    });
+}
+
+/**
+ * Handles password reset initiation.
+ * Generates a 6-digit code, stores it in the database, and emails it to the user.
+ * For security, always returns success even if the account doesn't exist.
+ *
+ * @param req - The Bun request, containing the username or email.
+ * @returns A response indicating success (always, for security).
+ */
+export async function initiatePasswordReset(req: BunRequest): Promise<Response> {
+    // Note: We don't use checkedExtractBody here because username/email are optional (either one is required)
+    let data: InitiatePasswordResetRequest;
+    try {
+        data = await req.json() as InitiatePasswordResetRequest;
+    } catch {
+        return new Response("Malformed request body", { status: 400 });
+    }
+    
+    // Must provide either username or email
+    if (!data || (!data.username && !data.email)) {
+        return new Response("Must provide either username or email", { status: 400 });
+    }
+
+    // Find the user by username or email
+    let user: User | null = null;
+    if (data.username) {
+        const [rows] = await db.execute("SELECT * FROM users WHERE username = ?", [data.username]) as [any[], any];
+        if (rows.length > 0) {
+            user = toCamelCase(rows[0]) as User;
+        }
+    } else if (data.email) {
+        const [rows] = await db.execute("SELECT * FROM users WHERE email = ?", [data.email]) as [any[], any];
+        if (rows.length > 0) {
+            user = toCamelCase(rows[0]) as User;
+        }
+    }
+
+    // If user exists, generate code and send email
+    if (user) {
+        // Generate a 6-digit numeric code
+        const challengeCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Set expiration to 15 minutes from now
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+        // Create the challenge in the database
+        await createAuthChallenge(user.id, challengeCode, expiresAt);
+
+        // Send email via Resend
+        const resendApiKey = process.env.RESEND_API_KEY;
+        if (resendApiKey) {
+            try {
+                const resend = new Resend(resendApiKey);
+                const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@example.com";
+                
+                await resend.emails.send({
+                    from: fromEmail,
+                    to: user.email,
+                    subject: "Password Reset Code",
+                    html: `
+                        <h2>Password Reset Request</h2>
+                        <p>You requested to reset your password. Use the following code to complete the reset:</p>
+                        <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; text-align: center; padding: 20px; background-color: #f5f5f5; border-radius: 8px; margin: 20px 0;">
+                            ${challengeCode}
+                        </p>
+                        <p>This code will expire in 15 minutes.</p>
+                        <p>If you didn't request this password reset, please ignore this email.</p>
+                    `,
+                });
+            } catch (error) {
+                // Log error but don't expose it to the user
+                console.error("Failed to send password reset email:", error);
+            }
+        } else {
+            console.warn("RESEND_API_KEY not configured, skipping email send");
+        }
+    }
+
+    // Always return success for security (don't reveal if account exists)
     return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" }

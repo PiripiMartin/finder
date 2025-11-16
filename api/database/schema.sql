@@ -30,6 +30,21 @@ CREATE TABLE IF NOT EXISTS user_sessions(
 );
 
 
+/*
+  Auth challenges table (for password reset codes)
+*/
+CREATE TABLE IF NOT EXISTS auth_challenges(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    challenge_code VARCHAR(6) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_code (user_id, challenge_code),
+    INDEX idx_expires (expires_at)
+);
+
+
 ----------------------------- NOTIFICATIONS -----------------------------
 
 /*
