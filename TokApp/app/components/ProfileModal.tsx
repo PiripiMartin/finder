@@ -1,20 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-
-const PROFILE_PHOTO_KEY = '@profile_photo';
-const AVAILABLE_AVATARS = ['🐶', '🐱', '🐼', '🦊', '🐨', '🐯', '🦁', '🐷', '🐸', '🐵', '🦄', '🦋', '🐙', '🦖', '🌻', '🌈', '⭐', '🌙', '🔥', '⚡'];
 
 interface ProfileData {
   username: string;
   email: string;
   createdAt: string;
+  pfpUrl?: string;
 }
 
 interface ProfileModalProps {
@@ -24,7 +24,7 @@ interface ProfileModalProps {
 
 export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
-  const { sessionToken, isGuest, logout } = useAuth();
+  const { sessionToken, logout } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   
@@ -33,30 +33,96 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [mapsPref, setMapsPref] = useState<'apple' | 'google'>('apple');
   const MAPS_PREF_KEY = 'DEFAULT_MAPS_APP';
-  const [profilePhoto, setProfilePhoto] = useState<string>('🐶');
-  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [pfpUrl, setPfpUrl] = useState<string | null>(null);
+  const [isUploadingPfp, setIsUploadingPfp] = useState(false);
 
-  // Load profile photo from AsyncStorage
-  const loadProfilePhoto = async () => {
+  // Handle image picker
+  const pickImage = async () => {
     try {
-      const saved = await AsyncStorage.getItem(PROFILE_PHOTO_KEY);
-      if (saved) {
-        setProfilePhoto(saved);
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Please allow access to your photo library to upload a profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
+        await uploadProfilePicture(uri);
       }
     } catch (error) {
-      console.error('Error loading profile photo:', error);
+      console.error('👤 [Profile] Error picking image:', error);
+      Alert.alert('Error', 'Failed to select image. Please try again.');
     }
   };
 
-  // Save profile photo to AsyncStorage
-  const saveProfilePhoto = async (emoji: string) => {
+  // Upload profile picture to API
+  const uploadProfilePicture = async (uri: string) => {
     try {
-      await AsyncStorage.setItem(PROFILE_PHOTO_KEY, emoji);
-      setProfilePhoto(emoji);
-      setShowAvatarPicker(false);
+      setIsUploadingPfp(true);
+      console.log('👤 [Profile] Uploading profile picture from URI:', uri);
+
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      if (!fileInfo.exists) {
+        throw new Error('Image file not found');
+      }
+
+      if (fileInfo.size && fileInfo.size > 5 * 1024 * 1024) {
+        Alert.alert('File Too Large', 'Please select an image smaller than 5MB.');
+        return;
+      }
+
+      let contentType = 'image/jpeg';
+      if (uri.toLowerCase().endsWith('.png')) {
+        contentType = 'image/png';
+      } else if (uri.toLowerCase().endsWith('.webp')) {
+        contentType = 'image/webp';
+      }
+
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const apiUrl = `${API_CONFIG.BASE_URL}/profile/pfp`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sessionToken}`,
+          'Content-Type': contentType,
+        },
+        body: bytes,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('👤 [Profile] Upload error:', errorText);
+        throw new Error(`Upload failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('👤 [Profile] Upload successful:', data);
+
+      setPfpUrl(data.pfpUrl);
+      Alert.alert('Success', 'Profile picture updated successfully!');
+
     } catch (error) {
-      console.error('Error saving profile photo:', error);
-      Alert.alert('Error', 'Failed to save profile photo');
+      console.error('👤 [Profile] Error uploading profile picture:', error);
+      Alert.alert('Upload Failed', error instanceof Error ? error.message : 'Failed to upload profile picture. Please try again.');
+    } finally {
+      setIsUploadingPfp(false);
     }
   };
 
@@ -97,7 +163,9 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
       
       if (profile) {
         setProfileData(profile);
+        setPfpUrl(profile.pfpUrl || null);
         console.log('👤 [Profile] Profile data set:', profile);
+        console.log('👤 [Profile] Profile picture URL:', profile.pfpUrl);
       } else {
         throw new Error('No profile data received');
       }
@@ -170,7 +238,6 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
     if (visible && sessionToken) {
       console.log('👤 [Profile] Modal opened, fetching profile data...');
       fetchProfileData();
-      loadProfilePhoto();
     }
     // Load maps preference
     (async () => {
@@ -202,32 +269,6 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading profile...</Text>
           </View>
-        ) : isGuest ? (
-          <View style={styles.guestContainer}>
-            <Ionicons name="person-outline" size={80} color={theme.colors.textSecondary} />
-            <Text style={[styles.guestTitle, { color: theme.colors.text }]}>Login to Access Profile</Text>
-            <Text style={[styles.guestSubtitle, { color: theme.colors.textSecondary }]}>
-              Create an account or sign in to access your profile, saved locations, and preferences.
-            </Text>
-            <TouchableOpacity
-              style={[styles.loginButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() => {
-                onClose();
-                router.push('/auth/login');
-              }}
-            >
-              <Text style={[styles.loginButtonText, { color: theme.colors.surface }]}>Login</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.createAccountButton, { borderColor: theme.colors.primary }]}
-              onPress={() => {
-                onClose();
-                router.push('/auth/create-account');
-              }}
-            >
-              <Text style={[styles.createAccountButtonText, { color: theme.colors.primary }]}>Create Account</Text>
-            </TouchableOpacity>
-          </View>
         ) : error ? (
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle" size={48} color="#ff6b6b" />
@@ -248,13 +289,33 @@ export default function ProfileModal({ visible, onClose }: ProfileModalProps) {
             {/* Header with Avatar */}
             <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
               <View style={styles.avatarContainer}>
-                <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
-                  <Text style={styles.avatarEmoji}>🐶</Text>
-                </View>
+                <TouchableOpacity 
+                  style={[styles.avatar, { backgroundColor: pfpUrl ? 'transparent' : theme.colors.primary }]}
+                  onPress={pickImage}
+                  disabled={isUploadingPfp}
+                >
+                  {isUploadingPfp ? (
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                  ) : pfpUrl ? (
+                    <Image 
+                      source={{ uri: pfpUrl }} 
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <Ionicons name="person" size={50} color={theme.colors.surface} />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.cameraButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={pickImage}
+                  disabled={isUploadingPfp}
+                >
+                  <Ionicons name="camera" size={16} color={theme.colors.surface} />
+                </TouchableOpacity>
               </View>
               
               <Text style={[styles.username, { color: theme.colors.text }]}>
-                @{profileData?.username || 'loading...'}
+                {profileData?.username || 'loading...'}
               </Text>
               <Text style={[styles.displayName, { color: theme.colors.textSecondary }]}>
                 {profileData?.email || 'loading...'}
@@ -403,9 +464,23 @@ const styles = StyleSheet.create({
     borderColor: '#A8C3A0',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
-  avatarEmoji: {
-    fontSize: 50,
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cameraButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   username: {
     fontSize: 18,

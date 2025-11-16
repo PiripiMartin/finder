@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, KeyboardAvoidingView, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
@@ -9,6 +9,7 @@ import { API_CONFIG, getMapPointsUrl, getEditLocationUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
+import { clearSavedLocationsCache } from '../utils/savedLocationsCache';
 
 const { width } = Dimensions.get('window');
 const tileWidth = (width - 30) / 2; // Less padding within video grid
@@ -90,7 +91,7 @@ const getVideoPlatform = (url: string): 'tiktok' | 'instagram' | 'unknown' => {
 
 export default function Location() {
   const router = useRouter();
-  const { id, needsCoordinates, readonly, source } = useLocalSearchParams();
+  const { id, needsCoordinates, readonly, source, locationData: locationDataParam } = useLocalSearchParams();
   const { theme } = useTheme();
   const { sessionToken } = useAuth();
   const { findLocationById, removeLocation, addBlockedLocation, refreshLocations } = useLocationContext();
@@ -118,6 +119,21 @@ export default function Location() {
     phoneNumber: '',
   });
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  
+  // Send invitation state
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [friends, setFriends] = useState<any[]>([]);
+  const [isLoadingFriends, setIsLoadingFriends] = useState(false);
+  const [selectedFriendId, setSelectedFriendId] = useState<number | null>(null);
+  const [invitationMessage, setInvitationMessage] = useState('');
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false);
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  
+  // Review creation state
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Fetch videos for the current location
   const fetchLocationVideos = async (locationId: string) => {
@@ -188,11 +204,71 @@ export default function Location() {
     console.log('📍 [Location] Page accessed with location ID:', id);
     console.log('🚀 [Location] This could be from map marker tap or saved locations list');
     console.log('🗺️ [Location] needsCoordinates flag:', needsCoordinates);
+    console.log('📦 [Location] locationData param:', locationDataParam);
     
     if (id) {
       console.log('🔍 Looking up location data for ID:', id);
       
-      // Try to find the location in the stored locations first
+      // First, check if location data was passed directly (from reviews/activity)
+      if (locationDataParam) {
+        try {
+          const passedData = JSON.parse(decodeURIComponent(locationDataParam as string));
+          console.log('✅ Using passed location data from navigation:', passedData);
+          
+          const passedLocation = passedData.location;
+          const passedTopPosts = passedData.topPosts || [];
+          
+          // Transform the passed location data to LocationData format
+          const transformedLocation: LocationData = {
+            id: String(passedLocation.id),
+            title: passedLocation.title,
+            description: passedLocation.description,
+            emoji: passedLocation.emoji,
+            latitude: passedLocation.latitude || 0,
+            longitude: passedLocation.longitude || 0,
+            isValidLocation: passedLocation.isValidLocation,
+            websiteUrl: passedLocation.websiteUrl,
+            phoneNumber: passedLocation.phoneNumber,
+            address: passedLocation.address,
+            createdAt: passedLocation.createdAt,
+            tiktokVideos: [], // Will be set from topPosts
+          };
+          setLocationData(transformedLocation);
+          
+          // Use the topPosts that were passed instead of fetching
+          if (passedTopPosts.length > 0) {
+            console.log('📦 Using passed topPosts instead of fetching:', passedTopPosts);
+            const fetchedVideos: VideoPost[] = passedTopPosts.map((item: any) => ({
+              id: String(item.id),
+              url: item.url || '',
+              title: item.title || '',
+              description: item.description || ''
+            })).filter((video: VideoPost) => video.url);
+            
+            // Sort videos by platform priority (TikTok first)
+            const sortedVideos = fetchedVideos.sort((a, b) => {
+              const platformA = getVideoPlatform(a.url);
+              const platformB = getVideoPlatform(b.url);
+              if (platformA === 'tiktok' && platformB !== 'tiktok') return -1;
+              if (platformA !== 'tiktok' && platformB === 'tiktok') return 1;
+              return 0;
+            });
+            
+            setVideos(sortedVideos);
+          } else {
+            // No topPosts passed, fetch them
+            fetchLocationVideos(transformedLocation.id);
+          }
+          
+          setIsSelectingCoords(needsCoordinates === 'true');
+          return;
+        } catch (error) {
+          console.error('❌ Failed to parse passed location data:', error);
+          // Fall through to other methods
+        }
+      }
+      
+      // Try to find the location in the stored locations (user's saved locations)
       // This will be populated from the API call in the index page
       const storedLocation = findLocationById(id as string);
       
@@ -236,7 +312,7 @@ export default function Location() {
     }
     // Enter coordinate selection mode if requested via query param
     setIsSelectingCoords(needsCoordinates === 'true');
-  }, [id, sessionToken]);
+  }, [id, sessionToken, locationDataParam]);
 
   const handleMapPressForCoords = (event: any) => {
     const { latitude, longitude } = event.nativeEvent.coordinate;
@@ -412,6 +488,10 @@ export default function Location() {
       const result = await response.json();
       console.log('✅ [Location] Edit successful:', result);
       
+      // Invalidate saved locations cache since location was edited
+      clearSavedLocationsCache();
+      console.log('🗑️ [Location] Cleared saved locations cache after edit');
+      
       // Update local location data immediately
       setLocationData({
         ...locationData,
@@ -442,6 +522,149 @@ export default function Location() {
 
   const handleCancelEdit = () => {
     setIsEditModalVisible(false);
+  };
+
+  // Fetch friends list
+  const fetchFriends = async () => {
+    try {
+      setIsLoadingFriends(true);
+      console.log('👥 [Location] Fetching friends list...');
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/friends`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch friends: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('👥 [Location] Fetched friends:', data.length);
+      setFriends(data);
+    } catch (error) {
+      console.error('👥 [Location] Error fetching friends:', error);
+      Alert.alert('Error', 'Failed to load friends list');
+    } finally {
+      setIsLoadingFriends(false);
+    }
+  };
+
+  // Send location invitation
+  const sendInvitation = async () => {
+    if (!selectedFriendId || !locationData) {
+      Alert.alert('Error', 'Please select a friend');
+      return;
+    }
+
+    try {
+      setIsSendingInvitation(true);
+      console.log('📤 [Location] Sending invitation...');
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/location-invitation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({
+          recipientUserId: selectedFriendId,
+          mapPointId: parseInt(locationData.id),
+          message: invitationMessage.trim() || '',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Failed to send invitation: ${response.status}`);
+      }
+
+      console.log('📤 [Location] Invitation sent successfully');
+      
+      // Reset modal state
+      setShowSendModal(false);
+      setSelectedFriendId(null);
+      setInvitationMessage('');
+      
+      Alert.alert('Success', 'Location invitation sent!');
+    } catch (error) {
+      console.error('📤 [Location] Error sending invitation:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to send invitation'
+      );
+    } finally {
+      setIsSendingInvitation(false);
+    }
+  };
+
+  // Open send modal
+  const handleOpenSendModal = () => {
+    setShowSendModal(true);
+    setFriendSearchQuery('');
+    setSelectedFriendId(null);
+    setInvitationMessage('');
+    fetchFriends();
+  };
+
+  // Filter friends based on search query
+  const filteredFriends = friends.filter(friend => 
+    friend.username.toLowerCase().includes(friendSearchQuery.toLowerCase()) ||
+    (friend.email && friend.email.toLowerCase().includes(friendSearchQuery.toLowerCase()))
+  );
+
+  // Submit review
+  const submitReview = async () => {
+    if (!locationData || !sessionToken) return;
+
+    // Validation
+    if (reviewRating < 1 || reviewRating > 5) {
+      Alert.alert('Error', 'Please select a rating (1-5 stars)');
+      return;
+    }
+
+    try {
+      setIsSubmittingReview(true);
+      console.log('📝 [Location] Submitting review...');
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/location-review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({
+          mapPointId: parseInt(locationData.id),
+          rating: reviewRating,
+          review: reviewText.trim() || '',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Failed to submit review: ${response.status}`);
+      }
+
+      console.log('📝 [Location] Review submitted successfully');
+      
+      // Reset and close modal
+      setShowReviewModal(false);
+      setReviewRating(0);
+      setReviewText('');
+      
+      Alert.alert('Success', 'Your review has been submitted!');
+    } catch (error) {
+      console.error('📝 [Location] Error submitting review:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to submit review'
+      );
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   const handleDeleteLocation = async () => {
@@ -475,6 +698,10 @@ export default function Location() {
               }
               
               console.log('✅ [Location] Location deleted successfully');
+              
+              // Clear the saved locations cache so the map will fetch fresh data
+              clearSavedLocationsCache();
+              console.log('🗑️ [Location] Cleared saved locations cache after deleting');
               
               // Refresh locations via context
               refreshLocations();
@@ -588,12 +815,14 @@ export default function Location() {
             <Text style={[styles.locationName, { color: theme.colors.text }]}>{locationData.title}</Text>
             {/* Action Icons */}
             <View style={styles.actionIconsContainer}>
-              <TouchableOpacity 
-                style={styles.actionIcon}
-                onPress={openDirections}
-              >
-                <Ionicons name="navigate" size={28} color={theme.colors.primary} />
-              </TouchableOpacity>
+              {!isReadOnly && (
+                <TouchableOpacity 
+                  style={styles.actionIcon}
+                  onPress={handleOpenSendModal}
+                >
+                  <Ionicons name="paper-plane-outline" size={28} color={theme.colors.primary} />
+                </TouchableOpacity>
+              )}
               {!isReadOnly && (
                 <TouchableOpacity 
                   style={styles.actionIcon}
@@ -611,6 +840,16 @@ export default function Location() {
                 </TouchableOpacity>
               )}
             </View>
+            
+            {/* Review Button */}
+            {!isReadOnly && (
+              <TouchableOpacity 
+                style={[styles.reviewButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => setShowReviewModal(true)}
+              >
+                <Text style={styles.reviewButtonText}>Review</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -624,10 +863,17 @@ export default function Location() {
         <View style={[styles.section, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Contact & Hours</Text>
           
-          <View style={styles.contactItem}>
+          <TouchableOpacity 
+            style={styles.contactItem}
+            onPress={openDirections}
+            activeOpacity={0.7}
+          >
             <Ionicons name="location" size={20} color={theme.colors.primary} />
-            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{locationData.address}</Text>
-          </View>
+            <Text style={[styles.contactText, styles.clickableAddress, { color: theme.colors.primary }]}>
+              {locationData.address}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
           
           <View style={styles.contactItem}>
             <Ionicons name="time" size={20} color={theme.colors.primary} />
@@ -1211,6 +1457,364 @@ export default function Location() {
           </View>
         </View>
       </Modal>
+
+      {/* Send to Friend Modal */}
+      <Modal
+        visible={showSendModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSendModal(false)}
+      >
+        <View style={styles.editModalOverlay}>
+          <View style={[styles.editModalContent, { backgroundColor: theme.colors.surface }]}>
+            {/* Modal Header */}
+            <View style={[styles.editModalHeader, { 
+              backgroundColor: theme.colors.surface,
+            }]}>
+              <View style={styles.editModalHandleBar} />
+              <View style={styles.editModalHeaderContent}>
+                <Text style={[styles.editModalTitle, { color: theme.colors.text }]}>
+                  Send to Friend
+                </Text>
+                <TouchableOpacity 
+                  style={styles.editModalCloseButton} 
+                  onPress={() => setShowSendModal(false)}
+                  disabled={isSendingInvitation}
+                >
+                  <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <ScrollView 
+              style={styles.editModalScrollView}
+              contentContainerStyle={styles.sendModalScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Message Input */}
+              <View style={styles.sendModalSection}>
+                <Text style={[styles.sendModalSectionTitle, { color: theme.colors.text }]}>
+                  Your Message (Optional)
+                </Text>
+                <TextInput
+                  style={[styles.sendModalTextArea, { 
+                    backgroundColor: theme.colors.background,
+                    color: theme.colors.text,
+                    borderColor: theme.colors.border,
+                  }]}
+                  value={invitationMessage}
+                  onChangeText={setInvitationMessage}
+                  placeholder="Write a message to your friend..."
+                  placeholderTextColor={theme.colors.textSecondary}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              {/* Friends List */}
+              <View style={styles.sendModalSection}>
+                <Text style={[styles.sendModalSectionTitle, { color: theme.colors.text }]}>
+                  Select Friend
+                </Text>
+                
+                {/* Search Input */}
+                {friends.length > 0 && (
+                  <View style={styles.searchInputContainer}>
+                    <Ionicons name="search" size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
+                    <TextInput
+                      style={[styles.searchInput, { 
+                        backgroundColor: theme.colors.background,
+                        color: theme.colors.text,
+                        borderColor: theme.colors.border,
+                      }]}
+                      value={friendSearchQuery}
+                      onChangeText={setFriendSearchQuery}
+                      placeholder="Search friends..."
+                      placeholderTextColor={theme.colors.textSecondary}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    {friendSearchQuery.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.clearSearchButton}
+                        onPress={() => setFriendSearchQuery('')}
+                      >
+                        <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+                
+                {isLoadingFriends ? (
+                  <View style={styles.loadingFriendsContainer}>
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                    <Text style={[styles.loadingFriendsText, { color: theme.colors.textSecondary }]}>
+                      Loading friends...
+                    </Text>
+                  </View>
+                ) : friends.length === 0 ? (
+                  <View style={styles.noFriendsContainer}>
+                    <Ionicons name="person-add-outline" size={48} color={theme.colors.textSecondary} />
+                    <Text style={[styles.noFriendsText, { color: theme.colors.textSecondary }]}>
+                      No friends yet
+                    </Text>
+                    <Text style={[styles.noFriendsSubtext, { color: theme.colors.textSecondary }]}>
+                      Add friends to share locations with them
+                    </Text>
+                  </View>
+                ) : filteredFriends.length === 0 ? (
+                  <View style={styles.noSearchResultsContainer}>
+                    <Ionicons name="search-outline" size={48} color={theme.colors.textSecondary} />
+                    <Text style={[styles.noSearchResultsText, { color: theme.colors.textSecondary }]}>
+                      No friends found
+                    </Text>
+                    <Text style={[styles.noSearchResultsSubtext, { color: theme.colors.textSecondary }]}>
+                      Try a different search term
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.sendModalFriendsList}>
+                    {filteredFriends.map((friend: any) => (
+                      <TouchableOpacity
+                        key={friend.id}
+                        style={[
+                          styles.sendModalFriendItem,
+                          {
+                            backgroundColor: selectedFriendId === friend.id 
+                              ? theme.colors.primary + '15' 
+                              : theme.colors.background,
+                            borderColor: selectedFriendId === friend.id
+                              ? theme.colors.primary
+                              : theme.colors.border,
+                          }
+                        ]}
+                        onPress={() => setSelectedFriendId(friend.id)}
+                      >
+                        {friend.pfpUrl ? (
+                          <Image 
+                            source={{ uri: friend.pfpUrl }} 
+                            style={styles.sendModalFriendAvatar} 
+                          />
+                        ) : (
+                          <View style={[styles.sendModalFriendAvatarPlaceholder, { 
+                            backgroundColor: theme.colors.primary 
+                          }]}>
+                            <Ionicons name="person" size={22} color={theme.colors.surface} />
+                          </View>
+                        )}
+                        <View style={styles.sendModalFriendInfo}>
+                          <Text style={[styles.sendModalFriendName, { color: theme.colors.text }]}>
+                            {friend.username}
+                          </Text>
+                          {friend.email && (
+                            <Text style={[styles.sendModalFriendEmail, { color: theme.colors.textSecondary }]}>
+                              {friend.username}
+                            </Text>
+                          )}
+                        </View>
+                        {selectedFriendId === friend.id && (
+                          <Ionicons name="checkmark-circle" size={26} color={theme.colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+
+            {/* Footer Buttons */}
+            <View style={[styles.editModalFooter, { 
+              backgroundColor: theme.colors.surface,
+            }]}>
+              <TouchableOpacity
+                style={[styles.editModalButton, styles.cancelButton, { 
+                  backgroundColor: 'transparent',
+                  borderWidth: 2,
+                  borderColor: theme.colors.border,
+                }]}
+                onPress={() => setShowSendModal(false)}
+                disabled={isSendingInvitation}
+              >
+                <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.editModalButton, styles.saveButton, { 
+                  backgroundColor: theme.colors.primary,
+                  opacity: isSendingInvitation || !selectedFriendId ? 0.5 : 1,
+                }]}
+                onPress={sendInvitation}
+                disabled={isSendingInvitation || !selectedFriendId}
+              >
+                {isSendingInvitation ? (
+                  <View style={styles.savingContainer}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={[styles.saveButtonText, { color: '#FFFFFF', marginLeft: 8 }]}>
+                      Sending
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.saveButtonText, { color: '#FFFFFF' }]}>
+                    Send Invitation
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Review Creation Modal */}
+      <Modal
+        visible={showReviewModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowReviewModal(false)}
+      >
+        <View style={styles.editModalOverlay}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardAvoidingView}
+            keyboardVerticalOffset={0}
+          >
+            <View style={[styles.editModalContent, { backgroundColor: theme.colors.surface }]}>
+              {/* Header */}
+              <View style={[styles.editModalHeader, { 
+                backgroundColor: theme.colors.surface,
+              }]}>
+                <View style={styles.editModalHandleBar} />
+                <View style={styles.editModalHeaderContent}>
+                  <Text style={[styles.editModalTitle, { color: theme.colors.text }]}>
+                    Write Review
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.editModalCloseButton} 
+                    onPress={() => setShowReviewModal(false)}
+                    disabled={isSubmittingReview}
+                  >
+                    <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <ScrollView 
+                style={styles.editModalScrollView}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.editModalScrollContent}
+                keyboardShouldPersistTaps="handled"
+                scrollEnabled={true}
+              >
+                {/* Location Preview */}
+                <View style={[styles.reviewLocationPreview, { backgroundColor: theme.colors.background }]}>
+                  <Text style={styles.reviewLocationEmoji}>{locationData.emoji}</Text>
+                  <Text style={[styles.reviewLocationTitle, { color: theme.colors.text }]}>
+                    {locationData.title}
+                  </Text>
+                </View>
+
+                {/* Rating Selector */}
+                <View style={styles.ratingSelector}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      style={styles.starButton}
+                      onPress={() => setReviewRating(star)}
+                    >
+                      <Ionicons
+                        name={reviewRating >= star ? "star" : "star-outline"}
+                        size={40}
+                        color="#FFD700"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Review Text Input */}
+                <View style={styles.inputGroup}>
+                <Text style={[styles.editFormLabel, { color: theme.colors.text }]}>
+                  Your Review (Optional)
+                </Text>
+                  <View style={[styles.reviewTextInputContainer, {
+                    backgroundColor: theme.colors.background,
+                    borderColor: theme.colors.border,
+                  }]}>
+                    <TextInput
+                      style={[styles.reviewTextInput, { 
+                        color: theme.colors.text,
+                      }]}
+                      value={reviewText}
+                      onChangeText={(text) => {
+                        if (text.length <= 1000) {
+                          setReviewText(text);
+                        }
+                      }}
+                    placeholder="Share your experience with your friends..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                    multiline
+                    numberOfLines={5}
+                    textAlignVertical="top"
+                    maxLength={1000}
+                    />
+                    <View style={styles.reviewTextInputFooter}>
+                      <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
+                        {reviewText.length}/1000
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* Footer Buttons */}
+              <View style={[styles.editModalFooter, { 
+                backgroundColor: theme.colors.surface,
+              }]}>
+                <TouchableOpacity
+                  style={[styles.editModalButton, styles.cancelButton, { 
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderColor: theme.colors.border,
+                  }]}
+                  onPress={() => {
+                    setShowReviewModal(false);
+                    setReviewRating(0);
+                    setReviewText('');
+                  }}
+                  disabled={isSubmittingReview}
+                >
+                  <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.editModalButton, styles.saveButton, { 
+                    backgroundColor: theme.colors.primary,
+                    opacity: (isSubmittingReview || reviewRating === 0) ? 0.5 : 1,
+                  }]}
+                  onPress={submitReview}
+                  disabled={isSubmittingReview || reviewRating === 0}
+                >
+                  {isSubmittingReview ? (
+                    <View style={styles.savingContainer}>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <Text style={[styles.saveButtonText, { color: '#FFFFFF', marginLeft: 8 }]}>
+                        Submitting
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.saveButtonText, { color: '#FFFFFF' }]}>
+                      Submit Review
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1269,6 +1873,28 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  reviewButton: {
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  reviewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
   locationName: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -1311,6 +1937,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 12,
     flex: 1,
+  },
+  clickableAddress: {
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   videoGrid: {
     flexDirection: 'row',
@@ -1556,6 +2186,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
+  keyboardAvoidingView: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   editModalContent: {
     width: '100%',
     height: '92%',
@@ -1605,12 +2239,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   editModalScrollContent: {
-    padding: 24,
-    paddingTop: 8,
-    paddingBottom: 40,
+    padding: 20,
+    paddingTop: 12,
+    paddingBottom: 32,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   editFormLabel: {
     fontSize: 15,
@@ -1734,5 +2368,183 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  // Send to Friend Modal Styles
+  sendModalScrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  sendModalSection: {
+    marginBottom: 28,
+  },
+  sendModalSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 14,
+    letterSpacing: -0.3,
+  },
+  searchInputContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: 14,
+    top: 14,
+    zIndex: 1,
+  },
+  searchInput: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingLeft: 44,
+    paddingRight: 44,
+    paddingVertical: 12,
+    fontSize: 16,
+  },
+  clearSearchButton: {
+    position: 'absolute',
+    right: 14,
+    top: 14,
+    zIndex: 1,
+  },
+  sendModalTextArea: {
+    borderWidth: 1.5,
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 16,
+    minHeight: 110,
+    lineHeight: 22,
+  },
+  sendModalFriendsList: {
+    gap: 12,
+  },
+  sendModalFriendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 2,
+    gap: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  sendModalFriendAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  sendModalFriendAvatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendModalFriendInfo: {
+    flex: 1,
+  },
+  sendModalFriendName: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 3,
+    letterSpacing: -0.2,
+  },
+  sendModalFriendEmail: {
+    fontSize: 14,
+  },
+  loadingFriendsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    gap: 12,
+  },
+  loadingFriendsText: {
+    fontSize: 16,
+  },
+  noFriendsContainer: {
+    alignItems: 'center',
+    padding: 50,
+    gap: 12,
+  },
+  noFriendsText: {
+    fontSize: 19,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  noFriendsSubtext: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  noSearchResultsContainer: {
+    alignItems: 'center',
+    padding: 40,
+    gap: 12,
+  },
+  noSearchResultsText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  noSearchResultsSubtext: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  // Review Creation Modal Styles
+  reviewLocationPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  reviewLocationEmoji: {
+    fontSize: 32,
+  },
+  reviewLocationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  ratingSelector: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  starButton: {
+    padding: 4,
+  },
+  reviewTextInputContainer: {
+    borderWidth: 2,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  reviewTextInput: {
+    minHeight: 140,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 12,
+    fontSize: 16,
+    lineHeight: 24,
+    textAlignVertical: 'top',
+  },
+  reviewTextInputFooter: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.06)',
+    alignItems: 'flex-end',
   },
 });

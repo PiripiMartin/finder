@@ -7,12 +7,10 @@ import SharedUserDefaults from '../utils/SharedUserDefaults';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  isGuest: boolean;
   sessionToken: string | null;
   isLoading: boolean;
   login: (username: string, password: string, coordinates?: { latitude: number; longitude: number }) => Promise<boolean>;
   createAccount: (username: string, password: string, email: string) => Promise<boolean>;
-  guestLogin: () => Promise<void>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
 }
@@ -29,7 +27,6 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isGuest, setIsGuest] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -88,21 +85,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const guestLogin = async () => {
-    logger.info('AuthContext', 'Starting guest login');
-    try {
-      setIsGuest(true);
-      setIsAuthenticated(false);
-      setSessionToken(null);
-      logger.info('AuthContext', 'Guest login completed successfully');
-    } catch (error) {
-      logger.error('AuthContext', 'Guest login error', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
-    }
-  };
-
   const checkAuthStatus = async () => {
     logger.info('AuthContext', 'Checking authentication status');
     try {
@@ -140,18 +122,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await storeSessionToken(token);
           setSessionToken(token);
           setIsAuthenticated(true);
-          setIsGuest(false);
         } else {
           logger.warn('AuthContext', 'Token validation failed, removing invalid token');
           // Token is invalid, remove it from all locations
           await removeSessionToken();
           setSessionToken(null);
           setIsAuthenticated(false);
-          setIsGuest(true); // Set guest mode when token is invalid
         }
       } else {
         logger.debug('AuthContext', 'No stored session token found in any location, user needs to log in');
-        setIsGuest(false); // User needs to authenticate, not guest mode
         setIsAuthenticated(false);
         setSessionToken(null);
       }
@@ -164,7 +143,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await removeSessionToken();
       setSessionToken(null);
       setIsAuthenticated(false);
-      setIsGuest(false);
     } finally {
       logger.debug('AuthContext', 'Auth status check completed, setting loading to false');
       setIsLoading(false);
@@ -215,7 +193,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await storeSessionToken(token);
           setSessionToken(token);
           setIsAuthenticated(true);
-          setIsGuest(false); // Clear guest mode when login is successful
           logger.info('AuthContext', 'Login completed successfully');
           return true;
         } else {
@@ -228,7 +205,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               await storeSessionToken(data[field]);
               setSessionToken(data[field]);
               setIsAuthenticated(true);
-              setIsGuest(false);
               logger.info('AuthContext', 'Login completed successfully using alternative token field');
               return true;
             }
@@ -343,7 +319,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           logger.info('AuthContext', 'Updating authentication state');
           setSessionToken(token);
           setIsAuthenticated(true);
-          setIsGuest(false); // Clear guest mode when account creation is successful
           logger.info('AuthContext', 'Authentication state updated successfully');
           
           return true;
@@ -357,7 +332,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               await storeSessionToken(data[field]);
               setSessionToken(data[field]);
               setIsAuthenticated(true);
-              setIsGuest(false);
               logger.info('AuthContext', 'Account creation completed successfully using alternative token field');
               return true;
             }
@@ -395,7 +369,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await removeSessionToken();
       setSessionToken(null);
       setIsAuthenticated(false);
-      setIsGuest(false);
       logger.info('AuthContext', 'Logout completed successfully');
     } catch (error) {
       logger.error('AuthContext', 'Logout error', {
@@ -412,12 +385,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value: AuthContextType = {
     isAuthenticated,
-    isGuest,
     sessionToken,
     isLoading,
     login,
     createAccount,
-    guestLogin,
     logout,
     checkAuthStatus,
   };

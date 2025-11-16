@@ -12,6 +12,7 @@ import { useLocationContext } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTutorial } from '../context/TutorialContext';
 import { applySavedOrder, loadLocationOrder, saveLocationOrder } from '../utils/locationOrderStorage';
+import { fetchSavedLocationsWithCache, clearSavedLocationsCache } from '../utils/savedLocationsCache';
 
 const { width } = Dimensions.get('window');
 const locationCardWidth = (width - 36) / 2; // Two cards per row with padding
@@ -48,8 +49,8 @@ interface ApiFolder {
 
 interface ApiResponse {
   personal: {
-    uncategorised: SavedLocation[];
-    [folderId: string]: SavedLocation[];
+    uncategorised?: SavedLocation[];
+    [folderId: string]: SavedLocation[] | undefined;
   };
   shared: {
     [folderId: string]: SavedLocation[];
@@ -57,12 +58,18 @@ interface ApiResponse {
   followed: {
     [folderId: string]: SavedLocation[];
   };
+  folderInfo: {
+    [folderId: string]: {
+      name: string;
+      color: string;
+    };
+  };
 }
 
 export default function Saved() {
   const router = useRouter();
   const { theme } = useTheme();
-  const { sessionToken, isGuest } = useAuth();
+  const { sessionToken } = useAuth();
   const { registerRefreshCallback, setSavedLocations: setContextSavedLocations } = useLocationContext();
   const { showTutorial, tutorialFeatureEnabled } = useTutorial();
   
@@ -92,33 +99,7 @@ export default function Saved() {
 
 
 
-  // Fetch owned folders from API
-  const fetchOwnedFolders = useCallback(async () => {
-    try {
-      console.log('📂 [Saved] Fetching owned folders...');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/folders/owned`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken || ''}`,
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const folders = await response.json();
-      console.log('📂 [Saved] Fetched folders:', folders.length);
-      setFolders(folders);
-      return folders;
-    } catch (error) {
-      console.error('📂 [Saved] Error fetching folders:', error);
-      return [];
-    }
-  }, [sessionToken]);
-
-  // Fetch saved locations from API
+  // Fetch saved locations from API with retry logic (now also fetches folders from saved-new)
   const fetchSavedLocations = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -128,82 +109,115 @@ export default function Saved() {
       const apiUrl = `${API_CONFIG.BASE_URL}/map/saved-new`;
       console.log('🌐 [Saved] API URL:', apiUrl);
       
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken || ''}`,
-        },
-      });
-      
-      console.log('📥 [Saved] Response Details:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        timestamp: new Date().toISOString()
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data: ApiResponse = await response.json();
-      console.log('📚 [Saved] API response data:', data);
-      
-      // Extract uncategorised locations
-      const uncategorised = data.personal.uncategorised || [];
-      setUncategorisedLocations(uncategorised);
-      console.log('📚 [Saved] Uncategorised locations:', uncategorised.length);
-      
-      // Extract folder locations (ignore 'uncategorised' key and 'followed')
-      const folderMap: { [folderId: number]: SavedLocation[] } = {};
-      Object.keys(data.personal).forEach(key => {
-        if (key !== 'uncategorised') {
-          const folderId = parseInt(key);
-          if (!isNaN(folderId)) {
-            folderMap[folderId] = data.personal[key];
-          }
+      try {
+        // Fetch saved locations from API with caching (cache shared with map page)
+        const data: ApiResponse = await fetchSavedLocationsWithCache(apiUrl, sessionToken || '');
+        console.log('✅ [Saved] Successfully fetched data (cached or fresh)');
+        console.log('📚 [Saved] API response data:', data);
+        
+        // Extract folder metadata from folderInfo object
+        const folderInfo = data.folderInfo || {};
+        console.log('📂 [Saved] Folder info:', folderInfo);
+        
+        // Extract uncategorised locations and folders with new format
+        let uncategorised: SavedLocation[] = [];
+        const folderMap: { [folderId: number]: SavedLocation[] } = {};
+        const extractedFolders: ApiFolder[] = [];
+        
+        // Process personal section
+        if (data.personal) {
+          Object.keys(data.personal).forEach(key => {
+            const folderLocations = data.personal[key];
+            
+            // Handle "uncategorised" key specially - it's just an array of locations
+            if (key === 'uncategorised' && Array.isArray(folderLocations)) {
+              uncategorised = folderLocations;
+              console.log('📚 [Saved] Uncategorised locations:', uncategorised.length);
+              return;
+            }
+            
+            // New format: folderId maps directly to array of locations
+            if (Array.isArray(folderLocations)) {
+              const folderId = parseInt(key);
+              if (!isNaN(folderId)) {
+                folderMap[folderId] = folderLocations;
+                
+                // Get folder metadata from folderInfo
+                const metadata = folderInfo[folderId];
+                if (metadata) {
+                  extractedFolders.push({
+                    id: folderId,
+                    name: metadata.name || 'Unnamed Folder',
+                    color: metadata.color || '#808080',
+                    createdAt: new Date().toISOString(),
+                  });
+                  console.log(`📂 [Saved] Personal folder ${folderId}: ${metadata.name}, ${folderLocations.length} locations`);
+                }
+              }
+            }
+          });
         }
-      });
-      setFolderLocationsMap(folderMap);
-      console.log('📂 [Saved] Folder locations map:', Object.keys(folderMap).length, 'folders');
-      
-      // Process shared folders section - only process numeric folder IDs, skip invalid keys
-      const sharedLocMap: { [folderId: number]: SavedLocation[] } = {};
-      if (data.shared) {
-        Object.keys(data.shared).forEach(key => {
-          // Skip 'personal' or any non-numeric keys that shouldn't be in shared
-          if (key === 'personal' || key === 'uncategorised') {
-            console.log('⚠️ [Saved] Skipping invalid key in shared section:', key);
-            return;
-          }
-          const folderId = parseInt(key);
-          if (!isNaN(folderId)) {
-            sharedLocMap[folderId] = data.shared[key] || [];
-          }
-        });
-        setSharedFolderLocationsMap(sharedLocMap);
-        console.log('🤝 [Saved] Shared folder locations map:', Object.keys(sharedLocMap).length, 'folders');
+        
+        setUncategorisedLocations(uncategorised);
+        setFolderLocationsMap(folderMap);
+        console.log('📂 [Saved] Folder locations map:', Object.keys(folderMap).length, 'folders');
+        
+        // Process shared folders section with new format
+        const sharedLocMap: { [folderId: number]: SavedLocation[] } = {};
+        if (data.shared) {
+          Object.keys(data.shared).forEach(key => {
+            const folderLocations = data.shared[key];
+            
+            // New format: folderId maps directly to array of locations
+            if (Array.isArray(folderLocations)) {
+              const folderId = parseInt(key);
+              if (!isNaN(folderId)) {
+                sharedLocMap[folderId] = folderLocations;
+                
+                // Get folder metadata from folderInfo
+                const metadata = folderInfo[folderId];
+                if (metadata) {
+                  extractedFolders.push({
+                    id: folderId,
+                    name: metadata.name || 'Unnamed Folder',
+                    color: metadata.color || '#808080',
+                    createdAt: new Date().toISOString(),
+                  });
+                  console.log(`🤝 [Saved] Shared folder ${folderId}: ${metadata.name}, ${folderLocations.length} locations`);
+                }
+              }
+            }
+          });
+          setSharedFolderLocationsMap(sharedLocMap);
+          console.log('🤝 [Saved] Shared folder locations map:', Object.keys(sharedLocMap).length, 'folders');
+        }
+        
+        // Update folders state with extracted folders
+        setFolders(extractedFolders);
+        console.log('📂 [Saved] Total folders extracted:', extractedFolders.length);
+        
+        // Build flat list of all locations for search/filtering (include shared folders)
+        const allLocations: SavedLocation[] = [
+          ...uncategorised,
+          ...Object.values(folderMap).flat(),
+          ...Object.values(sharedLocMap).flat()
+        ];
+        setSavedLocations(allLocations);
+        setFilteredLocations(allLocations);
+        setReorderedLocations(uncategorised);
+        
+        // Update LocationContext so location details page can access ALL locations
+        setContextSavedLocations(allLocations);
+        console.log('📍 [Saved] Updated LocationContext with all locations:', allLocations.length);
+        
+        console.log('📚 [Saved] Total locations:', allLocations.length);
+      } catch (fetchError) {
+        console.error('❌ [Saved] Error fetching saved locations:', fetchError);
+        throw fetchError;
       }
-      
-      // Build flat list of all locations for search/filtering (include shared folders)
-      const allLocations: SavedLocation[] = [
-        ...uncategorised,
-        ...Object.values(folderMap).flat(),
-        ...Object.values(sharedLocMap).flat()
-      ];
-      setSavedLocations(allLocations);
-      setFilteredLocations(allLocations);
-      setReorderedLocations(uncategorised);
-      
-      // Update LocationContext so location details page can access ALL locations
-      setContextSavedLocations(allLocations);
-      console.log('📍 [Saved] Updated LocationContext with all locations:', allLocations.length);
-      
-      console.log('📚 [Saved] Total locations:', allLocations.length);
       
     } catch (error) {
-      console.error('📚 [Saved] Error fetching saved locations:', error);
+      console.error('❌ [Saved] Error fetching saved locations after all retries:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch saved locations');
     } finally {
       setIsLoading(false);
@@ -318,10 +332,7 @@ export default function Saved() {
 
   // Refresh all data from API
   const refreshData = async () => {
-    await Promise.all([
-      fetchOwnedFolders(),
-      fetchSavedLocations()
-    ]);
+    await fetchSavedLocations(); // Now fetches both locations and folders from saved-new
   };
 
   // Handle folder creation
@@ -343,6 +354,10 @@ export default function Saved() {
       
       const newFolder = await response.json();
       console.log('✅ [Saved] Created folder:', newFolder.id);
+      
+      // Invalidate saved locations cache since folder was created
+      clearSavedLocationsCache();
+      console.log('🗑️ [Saved] Cleared saved locations cache after creating folder');
       
       // Refresh data
       await refreshData();
@@ -430,6 +445,11 @@ export default function Saved() {
               }
               
               console.log('✅ [Saved] Removed location from folder');
+              
+              // Invalidate saved locations cache since folder contents changed
+              clearSavedLocationsCache();
+              console.log('🗑️ [Saved] Cleared saved locations cache after removing from folder');
+              
               await refreshData();
             } catch (error) {
               console.error('❌ [Saved] Error removing from folder:', error);
@@ -478,6 +498,10 @@ export default function Saved() {
               }
               
               console.log('✅ [Saved] Folder deleted successfully');
+              
+              // Invalidate saved locations cache since folder was deleted
+              clearSavedLocationsCache();
+              console.log('🗑️ [Saved] Cleared saved locations cache after deleting folder');
               
               // Navigate back to main view if we're currently viewing this folder
               if (selectedFolderId === folderId) {
@@ -564,6 +588,11 @@ export default function Saved() {
       }
       
       console.log('✅ [Saved] Added', locationIds.length, 'locations to folder');
+      
+      // Invalidate saved locations cache since folder contents changed
+      clearSavedLocationsCache();
+      console.log('🗑️ [Saved] Cleared saved locations cache after adding to folder');
+      
       await refreshData();
     } catch (error) {
       console.error('❌ [Saved] Error adding locations to folder:', error);
@@ -577,7 +606,7 @@ export default function Saved() {
   useEffect(() => {
     console.log('📚 [Saved] Page loaded, fetching data...');
     refreshData();
-  }, [sessionToken, fetchSavedLocations, fetchOwnedFolders]);
+  }, [sessionToken, fetchSavedLocations]);
 
   // Register refresh callback with LocationContext
   useEffect(() => {
@@ -603,36 +632,6 @@ export default function Saved() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading saved locations...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  // Show guest message if user is not authenticated
-  if (isGuest) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Saved Locations</Text>
-        </View>
-        <View style={styles.guestContainer}>
-          <Ionicons name="bookmark-outline" size={80} color={theme.colors.textSecondary} />
-          <Text style={[styles.guestTitle, { color: theme.colors.text }]}>Login to Save Locations</Text>
-          <Text style={[styles.guestSubtitle, { color: theme.colors.textSecondary }]}>
-            Create an account or sign in to save your favorite places and access them from anywhere.
-          </Text>
-          <TouchableOpacity
-            style={[styles.loginButton, { backgroundColor: theme.colors.primary }]}
-            onPress={() => router.push('/auth/login')}
-          >
-            <Text style={[styles.loginButtonText, { color: theme.colors.surface }]}>Login</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.createAccountButton, { borderColor: theme.colors.primary }]}
-            onPress={() => router.push('/auth/create-account')}
-          >
-            <Text style={[styles.createAccountButtonText, { color: theme.colors.primary }]}>Create Account</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );

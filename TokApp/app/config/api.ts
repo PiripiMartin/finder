@@ -6,10 +6,9 @@ export const API_CONFIG = {
   ENDPOINTS: {
     LOGIN: '/login',
     CREATE_ACCOUNT: '/signup', // Note: API uses /signup, not /create-account
-    MAP_POINTS: '/map/saved-and-recommended', 
+    MAP_POINTS: '/map/saved-new', 
     VALIDATE_TOKEN: '/validate-token',
     PROFILE: '/profile',
-    GUEST_POSTS: '/map/guest-posts',
   },
 };
 
@@ -26,11 +25,6 @@ export const getApiUrl = (endpointKey: keyof typeof API_CONFIG.ENDPOINTS): strin
 // Helper function to get map points URL with specific location ID
 export const getMapPointsUrl = (locationId: number): string => {
   return `${API_CONFIG.BASE_URL}/map/${locationId}/posts`;
-};
-
-// Helper function to get guest posts URL with coordinates
-export const getGuestPostsUrl = (latitude: number, longitude: number): string => {
-  return `${API_CONFIG.BASE_URL}/map/guest-posts?lat=${latitude}&lon=${longitude}`;
 };
 
 // Helper function to get edit location URL with specific location ID

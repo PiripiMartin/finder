@@ -407,6 +407,7 @@ export async function getFriendsReviews(req: BunRequest): Promise<Response> {
                 lr.review,
                 lr.like_count as like_count,
                 lr.created_at as review_created_at,
+                lr.like_count,
                 mp.id as location_id,
                 mp.google_place_id,
                 mp.title,
@@ -462,8 +463,12 @@ export async function getFriendsReviews(req: BunRequest): Promise<Response> {
         // Fetch comments for all reviews
         const reviewIds = Array.from(new Set(results.map(r => r.reviewId as number)));
         const commentsByReviewId = new Map<number, any[]>();
+        const userLikedReviewIds = new Set<number>();
+        
         if (reviewIds.length > 0) {
             const placeholdersComments = reviewIds.map(() => "?").join(", ");
+            
+            // Fetch comments
             const [commentRows] = await db.execute(
                 `SELECT 
                     id,
@@ -481,6 +486,18 @@ export async function getFriendsReviews(req: BunRequest): Promise<Response> {
                 const list = commentsByReviewId.get(c.reviewId) ?? [];
                 list.push(c);
                 commentsByReviewId.set(c.reviewId, list);
+            }
+            
+            // Check which reviews the current user has liked
+            const [likeRows] = await db.execute(
+                `SELECT review_id
+                 FROM location_review_likes
+                 WHERE review_id IN (${placeholdersComments}) AND user_id = ?`,
+                [...reviewIds, userId]
+            ) as [any[], any];
+            const likes = toCamelCase(likeRows) as any[];
+            for (const like of likes) {
+                userLikedReviewIds.add(like.reviewId);
             }
         }
 
@@ -533,7 +550,9 @@ export async function getFriendsReviews(req: BunRequest): Promise<Response> {
                     review: row.review,
                     likeCount: row.likeCount,
                     createdAt: row.reviewCreatedAt,
-                    comments: commentsByReviewId.get(row.reviewId) ?? []
+                    comments: commentsByReviewId.get(row.reviewId) ?? [],
+                    likeCount: row.likeCount ?? 0,
+                    userHasLiked: userLikedReviewIds.has(row.reviewId)
                 },
                 location,
                 topPosts: topPostsByLocation.get(row.mapPointId) ?? []
