@@ -280,3 +280,86 @@ export async function updateProfilePicture(req: BunRequest): Promise<Response> {
     return new Response(JSON.stringify({ pfpUrl }), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
+/**
+ * GET endpoint to retrieve unseen notifications for the authenticated user.
+ * 
+ * @param req - The incoming Bun request.
+ * @returns A response with unseen notifications or an error status.
+ */
+export async function getNotifications(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    // Get all unseen notifications for this user using LEFT JOIN
+    const [results] = await db.execute(`
+        SELECT n.*
+        FROM notifications n
+        LEFT JOIN notifications_seen s 
+            ON s.notification_id = n.id 
+            AND s.user_id = ?
+        WHERE s.notification_id IS NULL
+        ORDER BY n.created_at DESC
+    `, [userId]) as [any[], any];
+
+    return new Response(JSON.stringify(results), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+    });
+}
+
+/**
+ * POST endpoint to mark notifications as seen for the authenticated user.
+ * 
+ * @param req - The incoming Bun request with notification IDs in the body.
+ * @returns A response indicating success or failure.
+ */
+export async function markNotificationsSeen(req: BunRequest): Promise<Response> {
+    const sessionToken = req.headers.get("Authorization")?.split(" ")[1];
+    if (!sessionToken) {
+        return new Response("Missing session token", { status: 401 });
+    }
+
+    const userId = await verifySessionToken(sessionToken);
+    if (userId === null) {
+        return new Response("Invalid or expired session token", { status: 401 });
+    }
+
+    const body = await req.json() as { notificationIds?: unknown };
+    const notificationIds = body.notificationIds;
+
+    if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+        return new Response("Invalid request: notificationIds must be a non-empty array", { 
+            status: 400 
+        });
+    }
+
+    // Validate all IDs are numbers
+    if (!notificationIds.every(id => typeof id === "number")) {
+        return new Response("Invalid request: all notificationIds must be numbers", { 
+            status: 400 
+        });
+    }
+
+    // Build multi-value INSERT query
+    const values = notificationIds.map(notificationId => [userId, notificationId]);
+    const placeholders = values.map(() => "(?, ?)").join(", ");
+    const flatValues = values.flat();
+
+    await db.execute(`
+        INSERT IGNORE INTO notifications_seen (user_id, notification_id)
+        VALUES ${placeholders}
+    `, flatValues);
+
+    return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+    });
+}
+

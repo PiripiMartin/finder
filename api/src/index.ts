@@ -1,6 +1,6 @@
 import { createPost, deletePost } from "./posts/routes";
 import { getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations, deleteLocationForUser, getSavedLocationsOld, addLocation, createLocationReview } from "./map/routes";
-import { login, validateSessionToken, signup, getProfileData, deleteUserAccount, editUserLocation, updateProfilePicture } from "./user/routes";
+import { login, validateSessionToken, signup, getProfileData, deleteUserAccount, editUserLocation, updateProfilePicture, getNotifications, markNotificationsSeen } from "./user/routes";
 import { addFriend, createLocationInvitation, getFriends, getLocationInvitations, deleteLocationInvitation, getFriendsReviews, commentOnFriendReview, likeFriendReview, unlikeFriendReview, removeFriend } from "./friends/routes";
 import { 
     addLocationToFolderEndpoint, 
@@ -36,6 +36,10 @@ Bun.serve({
         "/api/profile": { GET: getProfileData },
         "/api/profile/pfp": { POST: updateProfilePicture },
         "/api/delete-account": { DELETE: deleteUserAccount },
+
+        // Notifications
+        "/api/notifications": { GET: getNotifications },
+        "/api/notifications/seen": { POST: markNotificationsSeen },
         
         // Friends
         "/api/friends": { POST: addFriend, GET: getFriends },
