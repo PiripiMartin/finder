@@ -29,6 +29,32 @@ CREATE TABLE IF NOT EXISTS user_sessions(
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+
+----------------------------- NOTIFICATIONS -----------------------------
+
+/*
+  Notifications table
+*/
+CREATE TABLE IF NOT EXISTS notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+/*
+  Notifications seen table (tracks which users have seen which notifications)
+*/
+CREATE TABLE IF NOT EXISTS notifications_seen (
+    user_id INT NOT NULL,
+    notification_id INT NOT NULL,
+    seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, notification_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE
+);
+
 ------------------------------- MAP POINTS / LOCATIONS-------------------------------
 
 /*
