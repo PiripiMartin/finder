@@ -20,7 +20,7 @@ async function resolveShortLink(url: string): Promise<string | null> {
         const finalUrl = response.url;
         return finalUrl;
     } catch (error) {
-        console.error("Error resolving short link:", error);
+        //console.error("Error resolving short link:", error);
         return null;
     }
 }
@@ -42,7 +42,7 @@ async function resolveShortLink(url: string): Promise<string | null> {
 export async function extractTikTokVideoId(url: string, depth: number = 0): Promise<string | null> {
     // Prevent infinite recursion
     if (depth > 5) {
-        console.error("Max redirect depth reached while extracting video ID");
+        //console.error("Max redirect depth reached while extracting video ID");
         return null;
     }
 
@@ -88,7 +88,7 @@ export async function getTikTokInfoFromMobilePage(postUrl: string): Promise<TikT
         // Extract video ID from URL (now async to handle short links)
         const videoId = await extractTikTokVideoId(postUrl);
         if (!videoId) {
-            console.error("Could not extract video ID from URL:", postUrl);
+            //console.error("Could not extract video ID from URL:", postUrl);
             return null;
         }
 
@@ -101,7 +101,7 @@ export async function getTikTokInfoFromMobilePage(postUrl: string): Promise<TikT
         });
 
         if (!response.ok) {
-            console.error("Failed to fetch mobile TikTok page:", response.status, response.statusText);
+            //console.error("Failed to fetch mobile TikTok page:", response.status, response.statusText);
             return null;
         }
 
@@ -114,16 +114,16 @@ export async function getTikTokInfoFromMobilePage(postUrl: string): Promise<TikT
             const filename = `${debugDir}/tiktok-${videoId}-${timestamp}.html`;
             // Bun.write will create the directory if it doesn't exist
             await Bun.write(filename, html);
-            console.log(`Saved HTML to ${filename}`);
+            //console.log(`Saved HTML to ${filename}`);
         } catch (fileError) {
             // Don't fail the whole operation if file saving fails
-            console.warn("Failed to save HTML to file:", fileError);
+            //console.warn("Failed to save HTML to file:", fileError);
         }
 
         // Extract the JSON data from the script tag
         const scriptMatch = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">(.*?)<\/script>/s);
         if (!scriptMatch || !scriptMatch[1]) {
-            console.error("Could not find __UNIVERSAL_DATA_FOR_REHYDRATION__ script tag");
+            //console.error("Could not find __UNIVERSAL_DATA_FOR_REHYDRATION__ script tag");
             return null;
         }
 
@@ -137,8 +137,8 @@ export async function getTikTokInfoFromMobilePage(postUrl: string): Promise<TikT
             itemStruct = jsonData?.__DEFAULT_SCOPE__?.["webapp.video-detail"]?.itemInfo?.itemStruct;
         }
         if (!itemStruct) {
-            console.error("Could not find itemStruct in parsed data");
-            console.error("Available keys in __DEFAULT_SCOPE__:", Object.keys(jsonData?.__DEFAULT_SCOPE__ || {}));
+            //console.error("Could not find itemStruct in parsed data");
+            //console.error("Available keys in __DEFAULT_SCOPE__:", Object.keys(jsonData?.__DEFAULT_SCOPE__ || {}));
             return null;
         }
 
@@ -182,17 +182,17 @@ export async function getTikTokInfoFromMobilePage(postUrl: string): Promise<TikT
         const imageArray = imageUrls;
 
         // Log the extracted data for debugging
-        console.log("Extracted TikTok info from mobile page:", {
-            authorName,
-            title,
-            location,
-            imageCount: imageArray.length,
-            videoId,
-        });
+        //console.log("Extracted TikTok info from mobile page:", {
+        //    authorName,
+        //    title,
+        //    location,
+        //    imageCount: imageArray.length,
+        //    videoId,
+        //});
 
         return embedResponse;
     } catch (error) {
-        console.error("Error fetching TikTok info from mobile page:", error);
+        //console.error("Error fetching TikTok info from mobile page:", error);
         return null;
     }
 }
