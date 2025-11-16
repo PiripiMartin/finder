@@ -21,6 +21,9 @@ export interface Post {
     /** The ID of the map point the post is associated with. */
     mapPointId: number;
 
+    /** The type of post: "tiktokvid", "tiktokslideshow", or "instagram" */
+    postType: string | null;
+
     /** The timestamp when the post was created. */
     postedAt: Date;
 }

@@ -8,12 +8,37 @@ import { type CreateLocationRequest, type CreatePostRequest, createLocation, cre
 import { PostPlatform } from "./types";
 import { getPostPlatform } from "./utils";
 import { buildInstagramEmbedUrl, getInstagramPostInformation } from "./instagram";
+import { getTikTokInfoFromMobilePage } from "./tiktok";
 
 
 interface NewPostRequest {
     url: string
 };
 
+/**
+ * Determines the post type based on the URL and platform.
+ * 
+ * @param url - The post URL
+ * @param platform - The post platform (TikTok or Instagram)
+ * @returns The post type: "tiktokvid", "tiktokslideshow", or "instagram"
+ */
+function determinePostType(url: string, platform: PostPlatform): string {
+    if (platform === PostPlatform.INSTAGRAM) {
+        return "instagram";
+    }
+    
+    if (platform === PostPlatform.TIKTOK) {
+        // Check if URL contains "/photo/" which indicates a slideshow
+        if (url.includes("/photo/")) {
+            return "tiktokslideshow";
+        }
+        // Default to video for TikTok
+        return "tiktokvid";
+    }
+    
+    // Fallback (shouldn't happen)
+    return "tiktokvid";
+}
 
 export async function createPost(req: BunRequest): Promise<Response> {
     // Extract basic info ASAP
@@ -49,11 +74,18 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     let postInformation: TikTokEmbedResponse | InstagramPostInformation | null = null;
     let embedUrl: string | null = null;
+    const postType = determinePostType(data.url, postPlatform);
 
     if (postPlatform === PostPlatform.TIKTOK) {
 
         // Get TikTok embed info
         postInformation = await getTikTokEmbedInfo(data.url) as TikTokEmbedResponse | null;
+
+        // Fallback to mobile page scraper if embed API fails
+        if (!postInformation || !postInformation.embedProductId) {
+            console.log("TikTok embed API failed, falling back to mobile page scraper...");
+            postInformation = await getTikTokInfoFromMobilePage(data.url) as TikTokEmbedResponse | null;
+        }
 
         if (!postInformation || !postInformation.embedProductId) {
             return new Response("Couldn't get TikTok video ID from link.", {status: 500});
@@ -87,7 +119,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
-        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id, postType });
         
         // Add to user's saved locations
         await saveLocationForUser(userId, invalidLocation.id);
@@ -112,7 +144,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
-        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id, postType });
         
         // Add to user's saved locations
         await saveLocationForUser(userId, invalidLocation.id);
@@ -135,7 +167,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
-        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id, postType });
         
         // Add to user's saved locations
         await saveLocationForUser(userId, invalidLocation.id);
@@ -167,7 +199,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
         const postData: CreatePostRequest = {
             url: embedUrl!,
             postedBy: userId,
-            mapPointId: existingLocationId
+            mapPointId: existingLocationId,
+            postType
         };
 
         const newPost = await createPostRecord(postData);
@@ -197,7 +230,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
-        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id, postType });
         
         // Add to user's saved locations
         await saveLocationForUser(userId, invalidLocation.id);
@@ -223,7 +256,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
-        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id });
+        const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id, postType });
         
         // Add to user's saved locations
         await saveLocationForUser(userId, invalidLocation.id);
@@ -267,7 +300,8 @@ export async function createPost(req: BunRequest): Promise<Response> {
     const postData: CreatePostRequest = {
         url: embedUrl!,
         postedBy: userId,
-        mapPointId: newLocation.id
+        mapPointId: newLocation.id,
+        postType
     };
 
     const newPost = await createPostRecord(postData);

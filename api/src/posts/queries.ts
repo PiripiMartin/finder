@@ -32,6 +32,7 @@ export interface CreatePostRequest {
     url: string;
     postedBy: number;
     mapPointId: number;
+    postType: string | null;
 }
 
 /**
@@ -115,10 +116,10 @@ export async function createLocation(location: CreateLocationRequest): Promise<M
  */
 export async function createPost(post: CreatePostRequest): Promise<Post | null> {
     const query = `
-        INSERT INTO posts (url, posted_by, map_point_id)
-        VALUES (?, ?, ?)
+        INSERT INTO posts (url, posted_by, map_point_id, post_type)
+        VALUES (?, ?, ?, ?)
     `;
-    await db.execute(query, [post.url, post.postedBy, post.mapPointId]);
+    await db.execute(query, [post.url, post.postedBy, post.mapPointId, post.postType]);
 
     const [idRows] = await db.execute("SELECT LAST_INSERT_ID() as id") as [any[], any];
     const postId = idRows[0].id;
