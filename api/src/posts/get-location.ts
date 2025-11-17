@@ -317,7 +317,7 @@ export async function generateLocationDetails(
         
         1. **Title** should be 2–5 words and accurately represent the video’s content${placeDetails ? " and the real location if provided" : ""}.
         
-           * If the video is *not location-specific*, title should describe the video type or theme instead (e.g., “Funny meme clip” or “Home cooking tutorial”).
+           * If the video is *not location-specific*, title should describe the video type or theme instead (e.g., “Funny meme clip” or “Home cooking tutorial”) and it should be HEAVILY influenced by the author's name.
         2. **Description** should be 2–4 words describing what is featured in the video.
         
            * Must **not** contain punctuation (no commas, periods, apostrophes, hyphens, etc.).
@@ -331,9 +331,8 @@ export async function generateLocationDetails(
         
         * "Homemade pasta recipe, Homemade pasta, 🍝"
         * "Strawberry matcha latte, Japanese inspired cafe, 🍵"
-        * "OOTD video, Fashion inspiration, 👗"
-        * "Cat video, Cute pet moment, 🐱"
-        * "Funny meme clip, Viral trend video, 😂"
+        * "Cat video by \`AUTHOR_NAME\`, Cute pet moment, 🐱"
+        * "\`AUTHOR_NAME\`'s funny meme clip, Viral trend video, 😂"
         
         ### **CRITICAL**
         
