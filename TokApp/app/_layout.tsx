@@ -1,5 +1,5 @@
 import { Stack, useRouter } from "expo-router";
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState, Linking, LogBox } from 'react-native';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -8,6 +8,8 @@ import { ShareProvider } from './context/ShareContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { TutorialProvider } from './context/TutorialContext';
 import { DeepLinkHandler } from './utils/deepLinkHandler';
+import NotificationModal from './components/NotificationModal';
+import { API_CONFIG } from './config/api';
 
 // Component to handle app state changes with access to LocationContext and AuthContext
 function AppStateHandler() {
@@ -117,6 +119,84 @@ function DeepLinkListener() {
   return null;
 }
 
+// Component to handle notifications with access to AuthContext
+function NotificationHandler() {
+  const { sessionToken, isAuthenticated } = useAuth();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showModal, setShowModal] = useState(false);
+
+  // Fetch notifications when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && sessionToken) {
+      fetchNotifications();
+    }
+  }, [isAuthenticated, sessionToken]);
+
+  const fetchNotifications = async () => {
+    try {
+      console.log('🔔 [NotificationHandler] Fetching notifications...');
+      
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.NOTIFICATIONS}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.log('🔔 [NotificationHandler] Failed to fetch notifications:', response.status);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('🔔 [NotificationHandler] Fetched notifications:', data.length);
+      
+      if (data && data.length > 0) {
+        setNotifications(data);
+        setShowModal(true);
+      }
+    } catch (error) {
+      console.error('🔔 [NotificationHandler] Error fetching notifications:', error);
+      // Silently fail - don't block app startup
+    }
+  };
+
+  const handleDismiss = async (notificationIds: number[]) => {
+    console.log('🔔 [NotificationHandler] Marking notifications as seen:', notificationIds);
+    
+    // Close modal immediately
+    setShowModal(false);
+    setNotifications([]);
+
+    // Send mark as seen request (fire and forget)
+    try {
+      fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.NOTIFICATIONS_SEEN}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ notificationIds }),
+      }).then(() => {
+        console.log('🔔 [NotificationHandler] Notifications marked as seen');
+      }).catch((error) => {
+        console.error('🔔 [NotificationHandler] Error marking notifications as seen:', error);
+      });
+    } catch (error) {
+      console.error('🔔 [NotificationHandler] Error in mark as seen:', error);
+    }
+  };
+
+  return (
+    <NotificationModal
+      visible={showModal}
+      notifications={notifications}
+      onDismiss={handleDismiss}
+    />
+  );
+}
+
 export default function RootLayout() {
   useEffect(() => {
     // Ignore specific warnings that can cause crashes on iOS
@@ -136,6 +216,7 @@ export default function RootLayout() {
             <LocationProvider>
               <DeepLinkListener />
               <AppStateHandler />
+              <NotificationHandler />
               <ShareProvider>
                 <Stack 
                   screenOptions={{ headerShown: false }}
