@@ -10,6 +10,8 @@ const REFRESH_TOGGLE_UUID = "f2d2a8f0-5c5b-4e9e-9f0b-1234567890ab";
  */
 let shouldReturnUnauthorizedForRefresh = false;
 
+const DASHBOARD_FILE = "./dashboard/index.html";
+
 /**
  * Parses and validates the request body to ensure it contains all required fields.
  *
@@ -82,3 +84,18 @@ export function toggleRefreshStatus(req: BunRequest): Response {
         { status: 200, headers: { "Content-Type": "application/json" } }
     );
 }
+
+
+export async function getDashboard(_req: BunRequest): Promise<Response> {
+
+    return new Response(
+        await Bun.file(DASHBOARD_FILE).text(),
+        {
+            headers: {"Content-Type": "text/html"}
+        }
+    );
+}
+
+
+
+

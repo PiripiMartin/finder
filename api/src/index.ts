@@ -16,7 +16,7 @@ import {
     joinFolderAsOwnerEndpoint,
     leaveFolderAsOwnerEndpoint
 } from "./folders/routes";
-import { refresh, toggleRefreshStatus } from "./utils";
+import { getDashboard, refresh, toggleRefreshStatus } from "./utils";
 import { startSessionCleanupTask } from "./background-tasks";
 import { completePasswordReset } from "./email/routes";
 
@@ -86,6 +86,7 @@ Bun.serve({
         // Miscellaneous
         "/api/refresh": { GET: refresh },
         "/api/toggle-refresh": { POST: toggleRefreshStatus },
+        "/internal-dashboard": {GET: getDashboard}
     }
 });
 
