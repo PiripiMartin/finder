@@ -94,21 +94,63 @@ export async function extractPossibleLocationName(embedInfo: TikTokEmbedResponse
         throw new Error("GEMINI_API_KEY is not set");
     }
 
-    const prompt = `You are a location extraction expert. Analyze the following TikTok video information and extract the business/location name and any relevant details that would help identify the specific place.
+    //const prompt = `You are a location extraction expert. Analyze the following TikTok video information and extract the business/location name and any relevant details that would help identify the specific place.
 
-    Video Title: ${embedInfo.title}
-    Author: ${embedInfo.authorName}
-    Author URL: ${"authorUrl" in embedInfo ? embedInfo.authorUrl : "N/A"}
+    //Video Title: ${embedInfo.title}
+    //Author: ${embedInfo.authorName}
+    //Author URL: ${"authorUrl" in embedInfo ? embedInfo.authorUrl : "N/A"}
 
-    Based on this information, create a search query that would work well with Google Places Text Search API to find this business. The query should be:
-    1. Concise but descriptive
-    2. Include the business type/category if apparent
-    3. Include any location hints (city, neighborhood, etc.) if mentioned
-    4. Be formatted as a simple text string suitable for Google Places API
+    //Based on this information, create a search query that would work well with Google Places Text Search API to find this business. The query should be:
+    //1. Concise but descriptive
+    //2. Include the business type/category if apparent
+    //3. Include any location hints (city, neighborhood, etc.) if mentioned
+    //4. Be formatted as a simple text string suitable for Google Places API
 
-    IMPORTANT: If you cannot find a good search query OR if you are not confident about the name, return an empty string and nothing else.
+    //IMPORTANT: If you cannot find a good search query OR if you are not confident about the name, return an empty string and nothing else.
 
-    Return ONLY the search query text, nothing else.`;
+    //Return ONLY the search query text, nothing else.`;
+
+
+    const prompt = `
+        You are a **location extraction expert**. Your goal is to determine whether the given TikTok/Instagram video information refers to a **specific real-world business or location**. You must be **strict and conservative**:
+        If the information does **not clearly indicate a real place**, you **must return an empty string**.
+        
+        Analyze the following TikTok/Instagram video:
+        
+        Video Title: ${embedInfo.title}
+        Author: ${embedInfo.authorName}
+        Author URL: ${"authorUrl" in embedInfo ? embedInfo.authorUrl : "N/A"}
+        
+        Your task:
+        
+        ### **1. Decide if this video refers to a real-world place.**
+        
+        Return an empty string if ANY of the following are true:
+        
+        * The title or author name lacks **clear, specific location information** (e.g., generic jokes, memes, challenges, trends, aesthetics, unrelated topics).
+        * The text contains **no business name, no location keywords, and no category**.
+        * The content appears to be entertainment, personal content, memes, opinions, quotes, humor, or anything not tied to a place.
+        * The author name resembles a personal username rather than a business/venue.
+        * There is **ambiguity** or more than one possible interpretation.
+        * You are **not at least 80% confident** you can identify the specific business/location.
+        
+        ### **2. If the video clearly references a specific place, generate a search query:**
+        
+        The query should:
+        
+        * Be concise but descriptive
+        * Include the business name if clearly stated
+        * Include the business type/category if known
+        * Include any geographic hints (city/region/neighborhood) if provided
+        * Be plain text suitable for the Google Places Text Search API
+        
+        ### **Output Rules (Critical)**
+        
+        * If uncertain → **return an empty string**
+        * If certain → **return only the search query**, with no extra text
+        * Never guess, generalize, infer from vibes, or fabricate a location
+        * Do NOT expand acronyms or assume locations unless explicitly stated
+    `;
 
     try {
         const response = await fetch(AI_ENDPOINT, {
@@ -226,34 +268,80 @@ export async function generateLocationDetails(
         throw new Error("GEMINI_API_KEY is not set");
     }
 
-    const prompt = `You are a location expert. Based on the following TikTok/Instagram video context${placeDetails ? " and Google Place information" : ""}, generate a brief title, description and a relevant emoji for this location.
+    //const prompt = `You are a location expert. Based on the following TikTok/Instagram video context${placeDetails ? " and Google Place information" : ""}, generate a brief title, description and a relevant emoji for this location.
 
-    Video Context:
-    Title: ${embedInfo.title}
-    Author: ${embedInfo.authorName}
-    ${placeDetails ? `
-    Google Place Information:
-    Name: ${placeDetails.displayName.text}
-    Address: ${placeDetails.formattedAddress}
-    Summary: ${placeDetails.generativeSummary?.overview || "N/A"}
-    ` : ""}
+    //Video Context:
+    //Title: ${embedInfo.title}
+    //Author: ${embedInfo.authorName}
+    //${placeDetails ? `
+    //Google Place Information:
+    //Name: ${placeDetails.displayName.text}
+    //Address: ${placeDetails.formattedAddress}
+    //Summary: ${placeDetails.generativeSummary?.overview || "N/A"}
+    //` : ""}
 
-    Requirements:
-    1. Title should be 2-5 words and accurately represent the contents of the video${placeDetails ? " and the location" : ""}.
-    2. Description should be 2-4 words that capture what makes this place special based on the TikTok video
-    3. Focus on the specific food, drink, or experience featured in the video
-    4. Description must NOT contain any punctuation (no commas, periods, apostrophes, hyphens, etc.)
-    5. Choose ONE emoji that best represents the featured item or experience
-    6. Be concise and accurate to what was shown in the video
+    //Requirements:
+    //1. Title should be 2-5 words and accurately represent the contents of the video${placeDetails ? " and the location" : ""}.
+    //2. Description should be 2-4 words that capture what makes this place special based on the TikTok video
+    //3. Focus on the specific food, drink, or experience featured in the video
+    //4. Description must NOT contain any punctuation (no commas, periods, apostrophes, hyphens, etc.)
+    //5. Choose ONE emoji that best represents the featured item or experience
+    //6. Be concise and accurate to what was shown in the video
 
-    Examples of good responses are:
-    - "Homemade pasta recipe, Homemade pasta, 🍝"
-    - "Strawberry matcha latte, Japanese inspired cafe, 🍵"
-    - "OOTD video, Fashion inspiration, 👗"
+    //Examples of good responses are:
+    //- "Homemade pasta recipe, Homemade pasta, 🍝"
+    //- "Strawberry matcha latte, Japanese inspired cafe, 🍵"
+    //- "OOTD video, Fashion inspiration, 👗"
 
-    CRITICAL: Respond with ONLY the title, description and emoji separated by a comma and space. No other text, no quotes, no punctuation in the description.
+    //CRITICAL: Respond with ONLY the title, description and emoji separated by a comma and space. No other text, no quotes, no punctuation in the description.
 
-    Format: title, description, emoji`;
+    //Format: title, description, emoji`;
+
+    const prompt = `
+        You are a **location expert**. Based on the following TikTok/Instagram video context${placeDetails ? " and Google Place information" : ""}, generate a brief **title**, **description**, and **emoji**.
+        
+        If the video does **not** clearly relate to a real-world place or business, you must **not invent a location**.
+        Instead, produce **generic descriptors** summarizing the *type of video content itself* (e.g., cooking video, meme, aesthetic clip, outfit video, tech review, etc.).
+        
+        Video Context:
+        Title: ${embedInfo.title}
+        Author: ${embedInfo.authorName}
+        ${placeDetails ? `
+        Google Place Information:
+        Name: ${placeDetails.displayName.text}
+        Address: ${placeDetails.formattedAddress}
+        Summary: ${placeDetails.generativeSummary?.overview || "N/A"}
+        ` : ""}
+        
+        ### **Requirements**
+        
+        1. **Title** should be 2–5 words and accurately represent the video’s content${placeDetails ? " and the real location if provided" : ""}.
+        
+           * If the video is *not location-specific*, title should describe the video type or theme instead (e.g., “Funny meme clip” or “Home cooking tutorial”) and it should be HEAVILY influenced by the author's name.
+        2. **Description** should be 2–4 words describing what is featured in the video.
+        
+           * Must **not** contain punctuation (no commas, periods, apostrophes, hyphens, etc.).
+           * If the video has no real location, keep the description generic (e.g., “funny moment”, “makeup tutorial”, “cute dog video”).
+        3. Focus on the **food, drink, product, activity, or experience** shown *if applicable*.
+        4. Pick **one emoji** representing what was shown (or the general theme if unrelated to a place).
+        5. **Do not fabricate locations, menu items, or businesses.**
+           If details are missing, ambiguous, or clearly not related to a place, default to **generic descriptors**.
+        
+        ### **Examples**
+        
+        * "Homemade pasta recipe, Homemade pasta, 🍝"
+        * "Strawberry matcha latte, Japanese inspired cafe, 🍵"
+        * "Cat video by \`AUTHOR_NAME\`, Cute pet moment, 🐱"
+        * "\`AUTHOR_NAME\`'s funny meme clip, Viral trend video, 😂"
+        
+        ### **CRITICAL**
+        
+        Respond with **ONLY** the title, description, and emoji, **separated by a comma and a space**.
+        No other text. No quotes. No punctuation in the description.
+        
+        **Format:**
+        \`title, description, emoji\`
+    `;
 
     try {
         const response = await fetch(AI_ENDPOINT, {
