@@ -13,15 +13,15 @@ export async function sendPasswordResetEmail(
 ): Promise<void> {
     const resendApiKey = process.env.RESEND_API_KEY;
     if (!resendApiKey) {
-        console.warn("RESEND_API_KEY not configured, skipping email send");
-        return;
+        console.error("RESEND_API_KEY not configured, cannot send email");
+        throw new Error("Email service is not configured");
     }
 
     try {
         const resend = new Resend(resendApiKey);
-        const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@example.com";
+        const fromEmail = process.env.RESEND_FROM_EMAIL || "lai.noreply@ptvalert.xyz";
         
-        await resend.emails.send({
+        const result = await resend.emails.send({
             from: fromEmail,
             to: email,
             subject: "Password Reset Code",
@@ -35,8 +35,14 @@ export async function sendPasswordResetEmail(
                 <p>If you didn't request this password reset, please ignore this email.</p>
             `,
         });
+
+        // Resend returns errors in the response object, not as thrown exceptions
+        if (result.error) {
+            console.error("Failed to send password reset email:", result.error);
+            throw new Error(`Failed to send email: ${result.error.message || 'Unknown error'}`);
+        }
     } catch (error) {
-        // Log error but don't expose it to the caller
+        // Log error and re-throw for the caller to handle
         console.error("Failed to send password reset email:", error);
         throw error;
     }

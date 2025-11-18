@@ -7,7 +7,7 @@ import { createUserLocationEdit, updateUserLocationEdit } from "./queries";
 import { getGooglePlaceDetails, searchGooglePlaces } from "../posts/get-location";
 import type { LocationEdit } from "../map/types";
 import { s3, write as bunWrite } from "bun";
-import { createAuthChallenge } from "../email/queries";
+import { createAuthChallenge, deleteAuthChallenge } from "../email/queries";
 import { sendPasswordResetEmail } from "../email/utils";
 
 /**
@@ -380,10 +380,11 @@ export async function markNotificationsSeen(req: BunRequest): Promise<Response> 
 /**
  * Handles password reset initiation.
  * Generates a 6-digit code, stores it in the database, and emails it to the user.
- * For security, always returns success even if the account doesn't exist.
+ * For security, returns success even if the account doesn't exist (to avoid revealing account existence).
+ * However, if the account exists and email sending fails, returns an error to inform the user.
  *
  * @param req - The Bun request, containing the username or email.
- * @returns A response indicating success (always, for security).
+ * @returns A response indicating success or an error if email sending fails.
  */
 export async function initiatePasswordReset(req: BunRequest): Promise<Response> {
     // Note: We don't use checkedExtractBody here because username/email are optional (either one is required)
@@ -423,18 +424,27 @@ export async function initiatePasswordReset(req: BunRequest): Promise<Response> 
         expiresAt.setMinutes(expiresAt.getMinutes() + 15);
 
         // Create the challenge in the database
-        await createAuthChallenge(user.id, challengeCode, expiresAt);
+        const challenge = await createAuthChallenge(user.id, challengeCode, expiresAt);
 
         // Send email via Resend
         try {
             await sendPasswordResetEmail(user.email, challengeCode);
         } catch (error) {
-            // Log error but don't expose it to the user
+            // If email fails to send, delete the challenge and return an error to the user
             // The email sending failure is already logged in sendPasswordResetEmail
+            await deleteAuthChallenge(challenge.id);
+            return new Response(JSON.stringify({ 
+                success: false, 
+                error: "Failed to send password reset email. Please try again later." 
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
         }
     }
 
     // Always return success for security (don't reveal if account exists)
+    // Only return error if user exists and email fails (handled above)
     return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
