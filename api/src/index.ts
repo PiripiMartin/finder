@@ -1,6 +1,6 @@
 import { createPost, deletePost } from "./posts/routes";
 import { getGuestRecommendations, getPostsForLocation, getSavedAndRecommendedLocations, getSavedLocations, deleteLocationForUser, getSavedLocationsOld, addLocation, createLocationReview } from "./map/routes";
-import { login, validateSessionToken, signup, getProfileData, deleteUserAccount, editUserLocation, updateProfilePicture, getNotifications, markNotificationsSeen } from "./user/routes";
+import { login, validateSessionToken, signup, getProfileData, deleteUserAccount, editUserLocation, updateProfilePicture, getNotifications, markNotificationsSeen, initiatePasswordReset } from "./user/routes";
 import { addFriend, createLocationInvitation, getFriends, getLocationInvitations, deleteLocationInvitation, getFriendsReviews, commentOnFriendReview, likeFriendReview, unlikeFriendReview, removeFriend } from "./friends/routes";
 import { 
     addLocationToFolderEndpoint, 
@@ -18,6 +18,7 @@ import {
 } from "./folders/routes";
 import { refresh, toggleRefreshStatus } from "./utils";
 import { startSessionCleanupTask } from "./background-tasks";
+import { completePasswordReset } from "./email/routes";
 
 // Start background tasks
 startSessionCleanupTask();
@@ -36,6 +37,8 @@ Bun.serve({
         "/api/profile": { GET: getProfileData },
         "/api/profile/pfp": { POST: updateProfilePicture },
         "/api/delete-account": { DELETE: deleteUserAccount },
+        "/api/password-reset": { POST: initiatePasswordReset },
+        "/api/password-reset/complete": { POST: completePasswordReset },
 
         // Notifications
         "/api/notifications": { GET: getNotifications },

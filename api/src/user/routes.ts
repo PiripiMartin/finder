@@ -7,6 +7,8 @@ import { createUserLocationEdit, updateUserLocationEdit } from "./queries";
 import { getGooglePlaceDetails, searchGooglePlaces } from "../posts/get-location";
 import type { LocationEdit } from "../map/types";
 import { s3, write as bunWrite } from "bun";
+import { createAuthChallenge, deleteAuthChallenge } from "../email/queries";
+import { sendPasswordResetEmail } from "../email/utils";
 
 /**
  * Represents the request body for a user login.
@@ -23,6 +25,14 @@ interface SignupRequest {
     username: string;
     password: string;
     email: string;
+}
+
+/**
+ * Represents the request body for initiating a password reset.
+ */
+interface InitiatePasswordResetRequest {
+    username?: string;
+    email?: string;
 }
 
 /**
@@ -361,6 +371,80 @@ export async function markNotificationsSeen(req: BunRequest): Promise<Response> 
         VALUES ${placeholders}
     `, flatValues);
 
+    return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+    });
+}
+
+/**
+ * Handles password reset initiation.
+ * Generates a 6-digit code, stores it in the database, and emails it to the user.
+ * For security, returns success even if the account doesn't exist (to avoid revealing account existence).
+ * However, if the account exists and email sending fails, returns an error to inform the user.
+ *
+ * @param req - The Bun request, containing the username or email.
+ * @returns A response indicating success or an error if email sending fails.
+ */
+export async function initiatePasswordReset(req: BunRequest): Promise<Response> {
+    // Note: We don't use checkedExtractBody here because username/email are optional (either one is required)
+    let data: InitiatePasswordResetRequest;
+    try {
+        data = await req.json() as InitiatePasswordResetRequest;
+    } catch {
+        return new Response("Malformed request body", { status: 400 });
+    }
+    
+    // Must provide either username or email
+    if (!data || (!data.username && !data.email)) {
+        return new Response("Must provide either username or email", { status: 400 });
+    }
+
+    // Find the user by username or email
+    let user: User | null = null;
+    if (data.username) {
+        const [rows] = await db.execute("SELECT * FROM users WHERE username = ?", [data.username]) as [any[], any];
+        if (rows.length > 0) {
+            user = toCamelCase(rows[0]) as User;
+        }
+    } else if (data.email) {
+        const [rows] = await db.execute("SELECT * FROM users WHERE email = ?", [data.email]) as [any[], any];
+        if (rows.length > 0) {
+            user = toCamelCase(rows[0]) as User;
+        }
+    }
+
+    // If user exists, generate code and send email
+    if (user) {
+        // Generate a 6-digit numeric code
+        const challengeCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Set expiration to 15 minutes from now
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+        // Create the challenge in the database
+        const challenge = await createAuthChallenge(user.id, challengeCode, expiresAt);
+
+        // Send email via Resend
+        try {
+            await sendPasswordResetEmail(user.email, challengeCode);
+        } catch (error) {
+            // If email fails to send, delete the challenge and return an error to the user
+            // The email sending failure is already logged in sendPasswordResetEmail
+            await deleteAuthChallenge(challenge.id);
+            return new Response(JSON.stringify({ 
+                success: false, 
+                error: "Failed to send password reset email. Please try again later." 
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+    }
+
+    // Always return success for security (don't reveal if account exists)
+    // Only return error if user exists and email fails (handled above)
     return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
