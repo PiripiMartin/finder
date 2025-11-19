@@ -227,6 +227,27 @@
                     </table>
                 </div>
             </div>
+
+            <div class="table-container">
+                <div class="table-title">API Errors (Last 12 Hours)</div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Hour</th>
+                                <th>Status</th>
+                                <th>API</th>
+                                <th>Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="errorTableBody">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: #8a8fa3;">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
         
         <script>
@@ -285,6 +306,15 @@
                 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                 return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}`;
             }
+
+            function formatHourLabel(dateStr) {
+                const date = new Date(dateStr);
+                if (Number.isNaN(date.getTime())) {
+                    return dateStr;
+                }
+                const formatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric' });
+                return formatter.format(date);
+            }
             
             async function loadDashboardData(sessionToken) {
                 const headers = {
@@ -315,13 +345,22 @@
                     }
                     const locationsData = await locationsResponse.json();
                     console.log('Locations data:', locationsData);
+
+                    // Load error stats
+                    const errorResponse = await fetch(`${API_BASE}/api/dashboard/error-stats`, { headers });
+                    if (!errorResponse.ok) {
+                        throw new Error(`Error stats API returned ${errorResponse.status}`);
+                    }
+                    const errorData = await errorResponse.json();
+                    console.log('Error stats:', errorData);
                     
                     // Render charts
                     renderSignupsChart(signupsData);
                     renderPostsChart(postsData);
                     renderLocationsTable(locationsData);
+                    renderErrorStats(errorData);
                     
-                    // Setup scroll prevention after table is rendered
+                    // Setup scroll prevention after tables are rendered
                     setupTableScrollPrevention();
                     
                 } catch (error) {
@@ -462,27 +501,70 @@
                     tbody.appendChild(row);
                 });
             }
+
+            function renderErrorStats(data) {
+                const tbody = document.getElementById('errorTableBody');
+                tbody.innerHTML = '';
+
+                if (!data || !Array.isArray(data.buckets)) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #ff6b6b;">Unable to load error data.</td></tr>';
+                    return;
+                }
+
+                const rows = [];
+                let hasErrors = false;
+
+                data.buckets.forEach(bucket => {
+                    const hourLabel = formatHourLabel(bucket.hourStart || bucket.hour);
+                    const errors = bucket.errors || {};
+                    Object.entries(errors).forEach(([statusCode, apiCounts]) => {
+                        Object.entries(apiCounts || {}).forEach(([apiName, count]) => {
+                            hasErrors = true;
+                            rows.push(`
+                                <tr>
+                                    <td>${hourLabel}</td>
+                                    <td>${statusCode}</td>
+                                    <td>${apiName}</td>
+                                    <td class="post-count">${count}</td>
+                                </tr>
+                            `);
+                        });
+                    });
+                });
+
+                if (!hasErrors) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #8a8fa3;">No errors recorded in the last 12 hours.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = rows.join('');
+            }
             
             // Prevent scroll propagation from table to page
             function setupTableScrollPrevention() {
-                const tableWrapper = document.querySelector('.table-wrapper');
-                if (!tableWrapper) return;
-                
-                tableWrapper.addEventListener('wheel', (e) => {
-                    const { scrollTop, scrollHeight, clientHeight } = tableWrapper;
-                    const isAtTop = scrollTop === 0;
-                    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
-                    
-                    // If scrolling up at the top, or scrolling down at the bottom, allow page scroll
-                    // Otherwise, prevent page scroll
-                    if ((isAtTop && e.deltaY < 0) || (isAtBottom && e.deltaY > 0)) {
-                        // Allow the scroll to propagate to the page
+                const tableWrappers = document.querySelectorAll('.table-wrapper');
+                tableWrappers.forEach(wrapper => {
+                    const element = wrapper;
+                    if (element.dataset.scrollLockBound === "true") {
                         return;
                     }
-                    
-                    // Prevent scroll from propagating to the page
-                    e.stopPropagation();
-                }, { passive: false });
+                    element.dataset.scrollLockBound = "true";
+
+                    element.addEventListener('wheel', (e) => {
+                        const { scrollTop, scrollHeight, clientHeight } = element;
+                        const delta = e.deltaY;
+                        const isAtTop = scrollTop <= 0;
+                        const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
+
+                        if ((isAtTop && delta < 0) || (isAtBottom && delta > 0)) {
+                            return;
+                        }
+
+                        e.preventDefault();
+                        e.stopPropagation();
+                        element.scrollTop += delta;
+                    }, { passive: false });
+                });
             }
             
             // Validate session on page load

@@ -2,6 +2,7 @@ import type { BunRequest } from "bun";
 import { db, toCamelCase } from "../database";
 import { verifySessionToken } from "../user/session";
 import { ADMIN_EMAILS } from "../utils";
+import { getErrorMetrics } from "../error-tracker";
 
 /**
  * Verifies that the request is from an admin user.
@@ -184,6 +185,19 @@ export async function getPopularLocations(req: BunRequest): Promise<Response> {
     const data = toCamelCase(results);
 
     return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+    });
+}
+
+export async function getErrorStats(req: BunRequest): Promise<Response> {
+    const userId = await verifyAdmin(req);
+    if (userId === null) {
+        return new Response("Unauthorized", { status: 401 });
+    }
+
+    const metrics = getErrorMetrics();
+    return new Response(JSON.stringify(metrics), {
         status: 200,
         headers: { "Content-Type": "application/json" }
     });
