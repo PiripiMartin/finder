@@ -188,6 +188,55 @@ export default function FriendsScreen() {
     }
   };
 
+  // Delete friend
+  const deleteFriend = async (friendId: number, friendUsername: string) => {
+    Alert.alert(
+      'Remove Friend',
+      `Are you sure you want to remove ${friendUsername} from your friends?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('👥 [Friends] Removing friend with ID:', friendId);
+
+              const response = await fetch(`${API_CONFIG.BASE_URL}/friends/${friendId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${sessionToken}`,
+                },
+              });
+
+              if (!response.ok) {
+                // Handle specific status codes
+                if (response.status === 204) {
+                  Alert.alert('Not Found', 'No friendship found to remove');
+                  return;
+                }
+                throw new Error(`Failed to remove friend: ${response.status}`);
+              }
+
+              console.log('👥 [Friends] Friend removed successfully');
+              Alert.alert('Success', 'Friend removed successfully');
+              
+              // Update the friends list by removing the deleted friend
+              setFriends(prevFriends => prevFriends.filter(friend => friend.id !== friendId));
+            } catch (error) {
+              console.error('👥 [Friends] Error removing friend:', error);
+              Alert.alert('Error', error instanceof Error ? error.message : 'Failed to remove friend');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Share friend code
   const shareFriendCode = async () => {
     if (!currentUsername) {
@@ -260,6 +309,12 @@ export default function FriendsScreen() {
           Friends since {formatDate(item.createdAt)}
         </Text>
       </View>
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => deleteFriend(item.id, item.username)}
+      >
+        <Ionicons name="trash-outline" size={20} color="#ff6b6b" />
+      </TouchableOpacity>
     </View>
   );
 
@@ -589,6 +644,10 @@ const styles = StyleSheet.create({
   },
   friendSince: {
     fontSize: 13,
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   emptyState: {
     flex: 1,
