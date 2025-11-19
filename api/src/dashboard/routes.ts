@@ -170,10 +170,11 @@ export async function getPopularLocations(req: BunRequest): Promise<Response> {
             mp.id,
             mp.title,
             mp.emoji,
+            mp.address,
             COUNT(p.id) as post_count
         FROM map_points mp
         LEFT JOIN posts p ON mp.id = p.map_point_id
-        GROUP BY mp.id, mp.title, mp.emoji
+        GROUP BY mp.id, mp.title, mp.emoji, mp.address
         HAVING post_count > 0
         ORDER BY post_count DESC
         LIMIT 50

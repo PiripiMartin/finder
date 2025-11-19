@@ -87,39 +87,70 @@
                 background: #0f1429;
                 border: 1px solid #2a2f4a;
                 border-radius: 8px;
-                padding: 24px;
+                padding: 20px;
                 margin-top: 30px;
+                max-height: 500px;
+                display: flex;
+                flex-direction: column;
             }
             
             .table-title {
                 color: #e0e0e0;
-                font-size: 18px;
+                font-size: 16px;
                 font-weight: 600;
-                margin-bottom: 20px;
+                margin-bottom: 16px;
+            }
+            
+            .table-wrapper {
+                overflow-y: auto;
+                overflow-x: auto;
+                flex: 1;
+            }
+            
+            .table-wrapper::-webkit-scrollbar {
+                width: 8px;
+            }
+            
+            .table-wrapper::-webkit-scrollbar-track {
+                background: #0f1429;
+            }
+            
+            .table-wrapper::-webkit-scrollbar-thumb {
+                background: #2a2f4a;
+                border-radius: 4px;
+            }
+            
+            .table-wrapper::-webkit-scrollbar-thumb:hover {
+                background: #3a3f5a;
             }
             
             table {
                 width: 100%;
                 border-collapse: collapse;
+                font-size: 13px;
             }
             
             thead {
                 border-bottom: 2px solid #2a2f4a;
+                position: sticky;
+                top: 0;
+                background: #0f1429;
+                z-index: 1;
             }
             
             th {
                 color: #b0b5c8;
                 font-weight: 600;
                 text-align: left;
-                padding: 12px;
-                font-size: 14px;
+                padding: 10px 12px;
+                font-size: 11px;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
             }
             
             td {
                 color: #e0e0e0;
-                padding: 12px;
+                padding: 10px 12px;
                 border-bottom: 1px solid #1a1f3a;
             }
             
@@ -128,13 +159,19 @@
             }
             
             .location-emoji {
-                font-size: 20px;
-                margin-right: 8px;
+                font-size: 16px;
+                margin-right: 6px;
             }
             
             .post-count {
                 color: #7877c6;
                 font-weight: 600;
+            }
+            
+            .location-address {
+                color: #8a8fa3;
+                font-size: 12px;
+                margin-top: 2px;
             }
             
             .error-message {
@@ -173,7 +210,7 @@
             
             <div class="table-container">
                 <div class="table-title">Most Popular Locations</div>
-                <div id="locationsTableContainer">
+                <div class="table-wrapper">
                     <table>
                         <thead>
                             <tr>
@@ -283,6 +320,9 @@
                     renderSignupsChart(signupsData);
                     renderPostsChart(postsData);
                     renderLocationsTable(locationsData);
+                    
+                    // Setup scroll prevention after table is rendered
+                    setupTableScrollPrevention();
                     
                 } catch (error) {
                     console.error('Error loading dashboard data:', error);
@@ -406,13 +446,43 @@
                 
                 data.forEach((location, index) => {
                     const row = document.createElement('tr');
+                    const addressHtml = location.address 
+                        ? `<div class="location-address">${location.address}</div>`
+                        : '';
                     row.innerHTML = `
                         <td>${index + 1}</td>
-                        <td><span class="location-emoji">${location.emoji || '📍'}</span>${location.title}</td>
+                        <td>
+                            <div>
+                                <span class="location-emoji">${location.emoji || '📍'}</span>${location.title}
+                            </div>
+                            ${addressHtml}
+                        </td>
                         <td class="post-count">${location.postCount}</td>
                     `;
                     tbody.appendChild(row);
                 });
+            }
+            
+            // Prevent scroll propagation from table to page
+            function setupTableScrollPrevention() {
+                const tableWrapper = document.querySelector('.table-wrapper');
+                if (!tableWrapper) return;
+                
+                tableWrapper.addEventListener('wheel', (e) => {
+                    const { scrollTop, scrollHeight, clientHeight } = tableWrapper;
+                    const isAtTop = scrollTop === 0;
+                    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
+                    
+                    // If scrolling up at the top, or scrolling down at the bottom, allow page scroll
+                    // Otherwise, prevent page scroll
+                    if ((isAtTop && e.deltaY < 0) || (isAtBottom && e.deltaY > 0)) {
+                        // Allow the scroll to propagate to the page
+                        return;
+                    }
+                    
+                    // Prevent scroll from propagating to the page
+                    e.stopPropagation();
+                }, { passive: false });
             }
             
             // Validate session on page load
