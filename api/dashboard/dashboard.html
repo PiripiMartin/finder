@@ -4,6 +4,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Internal Dashboard</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <style>
             * {
                 margin: 0;
@@ -55,6 +56,95 @@
             .loading p {
                 color: #8a8fa3;
             }
+            
+            .dashboard-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+                gap: 30px;
+                margin-top: 30px;
+            }
+            
+            .chart-container {
+                background: #0f1429;
+                border: 1px solid #2a2f4a;
+                border-radius: 8px;
+                padding: 24px;
+            }
+            
+            .chart-title {
+                color: #e0e0e0;
+                font-size: 18px;
+                font-weight: 600;
+                margin-bottom: 20px;
+            }
+            
+            .chart-wrapper {
+                position: relative;
+                height: 300px;
+            }
+            
+            .table-container {
+                background: #0f1429;
+                border: 1px solid #2a2f4a;
+                border-radius: 8px;
+                padding: 24px;
+                margin-top: 30px;
+            }
+            
+            .table-title {
+                color: #e0e0e0;
+                font-size: 18px;
+                font-weight: 600;
+                margin-bottom: 20px;
+            }
+            
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            
+            thead {
+                border-bottom: 2px solid #2a2f4a;
+            }
+            
+            th {
+                color: #b0b5c8;
+                font-weight: 600;
+                text-align: left;
+                padding: 12px;
+                font-size: 14px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            
+            td {
+                color: #e0e0e0;
+                padding: 12px;
+                border-bottom: 1px solid #1a1f3a;
+            }
+            
+            tr:hover {
+                background: #14192f;
+            }
+            
+            .location-emoji {
+                font-size: 20px;
+                margin-right: 8px;
+            }
+            
+            .post-count {
+                color: #7877c6;
+                font-weight: 600;
+            }
+            
+            .error-message {
+                color: #ff6b6b;
+                padding: 12px;
+                background: #3a1f1f;
+                border: 1px solid #5a2f2f;
+                border-radius: 8px;
+                margin-top: 20px;
+            }
         </style>
     </head>
     <body>
@@ -64,7 +154,42 @@
         
         <div id="dashboardContent" class="dashboard-container" style="display: none;">
             <h1>Internal Dashboard</h1>
-            <p>Welcome to the internal dashboard.</p>
+            
+            <div class="dashboard-grid">
+                <div class="chart-container">
+                    <div class="chart-title">Signups Per Day (Last 7 Days)</div>
+                    <div class="chart-wrapper">
+                        <canvas id="signupsChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <div class="chart-title">Posts Per Day (Last 7 Days)</div>
+                    <div class="chart-wrapper">
+                        <canvas id="postsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <div class="table-title">Most Popular Locations</div>
+                <div id="locationsTableContainer">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Location</th>
+                                <th>Post Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="locationsTableBody">
+                            <tr>
+                                <td colspan="3" style="text-align: center; color: #8a8fa3;">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
         
         <script>
@@ -103,6 +228,9 @@
                     document.getElementById('loadingScreen').style.display = 'none';
                     document.getElementById('dashboardContent').style.display = 'block';
                     
+                    // Load dashboard data
+                    loadDashboardData(sessionToken);
+                    
                 } catch (error) {
                     console.error('Session validation error:', error);
                     localStorage.removeItem('sessionToken');
@@ -112,6 +240,179 @@
             
             function redirectToLogin() {
                 window.location.href = '/internal-dashboard/login';
+            }
+            
+            function formatDate(dateStr) {
+                const date = new Date(dateStr);
+                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}`;
+            }
+            
+            async function loadDashboardData(sessionToken) {
+                const headers = {
+                    'Authorization': `Bearer ${sessionToken}`
+                };
+                
+                try {
+                    // Load signups data
+                    const signupsResponse = await fetch(`${API_BASE}/api/dashboard/signups-per-day`, { headers });
+                    if (!signupsResponse.ok) {
+                        throw new Error(`Signups API returned ${signupsResponse.status}`);
+                    }
+                    const signupsData = await signupsResponse.json();
+                    console.log('Signups data:', signupsData);
+                    
+                    // Load posts data
+                    const postsResponse = await fetch(`${API_BASE}/api/dashboard/posts-per-day`, { headers });
+                    if (!postsResponse.ok) {
+                        throw new Error(`Posts API returned ${postsResponse.status}`);
+                    }
+                    const postsData = await postsResponse.json();
+                    console.log('Posts data:', postsData);
+                    
+                    // Load popular locations
+                    const locationsResponse = await fetch(`${API_BASE}/api/dashboard/popular-locations`, { headers });
+                    if (!locationsResponse.ok) {
+                        throw new Error(`Locations API returned ${locationsResponse.status}`);
+                    }
+                    const locationsData = await locationsResponse.json();
+                    console.log('Locations data:', locationsData);
+                    
+                    // Render charts
+                    renderSignupsChart(signupsData);
+                    renderPostsChart(postsData);
+                    renderLocationsTable(locationsData);
+                    
+                } catch (error) {
+                    console.error('Error loading dashboard data:', error);
+                    const container = document.getElementById('dashboardContent');
+                    container.innerHTML += '<div class="error-message">Failed to load dashboard data. Please refresh the page.</div>';
+                }
+            }
+            
+            function renderSignupsChart(data) {
+                if (!data || !Array.isArray(data) || data.length === 0) {
+                    console.warn('No signups data to render');
+                    return;
+                }
+                
+                const ctx = document.getElementById('signupsChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(item => formatDate(item.date)),
+                        datasets: [{
+                            label: 'Signups',
+                            data: data.map(item => Number(item.count) || 0),
+                            backgroundColor: 'rgba(120, 119, 198, 0.6)',
+                            borderColor: 'rgba(120, 119, 198, 1)',
+                            borderWidth: 2,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: '#8a8fa3',
+                                    stepSize: 1
+                                },
+                                grid: {
+                                    color: '#2a2f4a'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#8a8fa3'
+                                },
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function renderPostsChart(data) {
+                if (!data || !Array.isArray(data) || data.length === 0) {
+                    console.warn('No posts data to render');
+                    return;
+                }
+                
+                const ctx = document.getElementById('postsChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(item => formatDate(item.date)),
+                        datasets: [{
+                            label: 'Posts',
+                            data: data.map(item => Number(item.count) || 0),
+                            backgroundColor: 'rgba(120, 119, 198, 0.6)',
+                            borderColor: 'rgba(120, 119, 198, 1)',
+                            borderWidth: 2,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: '#8a8fa3',
+                                    stepSize: 1
+                                },
+                                grid: {
+                                    color: '#2a2f4a'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#8a8fa3'
+                                },
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function renderLocationsTable(data) {
+                const tbody = document.getElementById('locationsTableBody');
+                tbody.innerHTML = '';
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #8a8fa3;">No locations with posts found.</td></tr>';
+                    return;
+                }
+                
+                data.forEach((location, index) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td><span class="location-emoji">${location.emoji || '📍'}</span>${location.title}</td>
+                        <td class="post-count">${location.postCount}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
             }
             
             // Validate session on page load

@@ -10,7 +10,7 @@ const REFRESH_TOGGLE_UUID = "f2d2a8f0-5c5b-4e9e-9f0b-1234567890ab";
 /**
  * Admin email addresses that are allowed to access the internal dashboard.
  */
-const ADMIN_EMAILS: string[] = [
+export const ADMIN_EMAILS: string[] = [
     "boollewis04@gmail.com",
     "piripi@gmail.com"
 ];

@@ -19,6 +19,7 @@ import {
 import { checkAdminAccess, getDashboard, getLogin, refresh, toggleRefreshStatus } from "./utils";
 import { startSessionCleanupTask } from "./background-tasks";
 import { completePasswordReset } from "./email/routes";
+import { getSignupsPerDay, getPostsPerDay, getPopularLocations } from "./dashboard/routes";
 
 // Start background tasks
 startSessionCleanupTask();
@@ -88,7 +89,12 @@ Bun.serve({
         "/api/toggle-refresh": { POST: toggleRefreshStatus },
         "/api/admin/check": { GET: checkAdminAccess },
         "/internal-dashboard": { GET: getDashboard },
-        "/internal-dashboard/login": { GET: getLogin }
+        "/internal-dashboard/login": { GET: getLogin },
+
+        // Dashboard data
+        "/api/dashboard/signups-per-day": { GET: getSignupsPerDay },
+        "/api/dashboard/posts-per-day": { GET: getPostsPerDay },
+        "/api/dashboard/popular-locations": { GET: getPopularLocations }
     }
 });
 
