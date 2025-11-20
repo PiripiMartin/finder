@@ -174,10 +174,44 @@
                 font-weight: 600;
             }
             
+            .save-count {
+                color: #7877c6;
+                font-weight: 600;
+            }
+            
             .location-address {
                 color: #8a8fa3;
                 font-size: 12px;
                 margin-top: 2px;
+            }
+            
+            .sortable-header {
+                cursor: pointer;
+                user-select: none;
+                position: relative;
+                padding-right: 20px;
+            }
+            
+            .sortable-header:hover {
+                color: #e0e0e0;
+            }
+            
+            .sortable-header::after {
+                content: '↕';
+                position: absolute;
+                right: 4px;
+                opacity: 0.5;
+                font-size: 10px;
+            }
+            
+            .sortable-header.sort-asc::after {
+                content: '↑';
+                opacity: 1;
+            }
+            
+            .sortable-header.sort-desc::after {
+                content: '↓';
+                opacity: 1;
             }
             
             .error-message {
@@ -223,12 +257,13 @@
                                 <tr>
                                     <th>Rank</th>
                                     <th>Location</th>
-                                    <th>Post Count</th>
+                                    <th class="sortable-header" data-sort="posts" id="sortPosts">Post Count</th>
+                                    <th class="sortable-header" data-sort="saves" id="sortSaves">Saves</th>
                                 </tr>
                             </thead>
                             <tbody id="locationsTableBody">
                                 <tr>
-                                    <td colspan="3" style="text-align: center; color: #8a8fa3;">Loading...</td>
+                                    <td colspan="4" style="text-align: center; color: #8a8fa3;">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -309,7 +344,9 @@
             }
             
             function formatDate(dateStr) {
-                const date = new Date(dateStr);
+                // Parse YYYY-MM-DD format and create date in local timezone
+                const [year, month, day] = dateStr.split('-').map(Number);
+                const date = new Date(year, month - 1, day);
                 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                 return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}`;
@@ -368,7 +405,8 @@
                     renderLocationsTable(locationsData);
                     renderErrorStats(errorData);
                     
-                    // Setup scroll prevention after tables are rendered
+                    // Setup sorting and scroll prevention after tables are rendered
+                    setupLocationSorting();
                     setupTableScrollPrevention();
                     
                 } catch (error) {
@@ -482,16 +520,52 @@
                 });
             }
             
+            let locationsData = [];
+            let currentSort = { field: 'saves', direction: 'desc' };
+            
+            function sortLocations(data, sortField, sortDirection) {
+                const sorted = [...data].sort((a, b) => {
+                    let aVal, bVal;
+                    if (sortField === 'posts') {
+                        aVal = Number(a.postCount) || 0;
+                        bVal = Number(b.postCount) || 0;
+                    } else if (sortField === 'saves') {
+                        aVal = Number(a.saveCount) || 0;
+                        bVal = Number(b.saveCount) || 0;
+                    } else {
+                        return 0;
+                    }
+                    
+                    if (sortDirection === 'asc') {
+                        return aVal - bVal;
+                    } else {
+                        return bVal - aVal;
+                    }
+                });
+                return sorted;
+            }
+            
+            function updateSortHeaders() {
+                document.querySelectorAll('.sortable-header').forEach(header => {
+                    header.classList.remove('sort-asc', 'sort-desc');
+                    if (header.dataset.sort === currentSort.field) {
+                        header.classList.add(`sort-${currentSort.direction}`);
+                    }
+                });
+            }
+            
             function renderLocationsTable(data) {
+                locationsData = data;
+                const sortedData = sortLocations(data, currentSort.field, currentSort.direction);
                 const tbody = document.getElementById('locationsTableBody');
                 tbody.innerHTML = '';
                 
-                if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #8a8fa3;">No locations with posts found.</td></tr>';
+                if (sortedData.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #8a8fa3;">No locations with posts found.</td></tr>';
                     return;
                 }
                 
-                data.forEach((location, index) => {
+                sortedData.forEach((location, index) => {
                     const row = document.createElement('tr');
                     const addressHtml = location.address 
                         ? `<div class="location-address">${location.address}</div>`
@@ -504,9 +578,35 @@
                             </div>
                             ${addressHtml}
                         </td>
-                        <td class="post-count">${location.postCount}</td>
+                        <td class="post-count">${location.postCount || 0}</td>
+                        <td class="save-count">${location.saveCount || 0}</td>
                     `;
                     tbody.appendChild(row);
+                });
+                
+                updateSortHeaders();
+            }
+            
+            // Setup sort handlers
+            function setupLocationSorting() {
+                document.getElementById('sortPosts')?.addEventListener('click', () => {
+                    if (currentSort.field === 'posts') {
+                        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.field = 'posts';
+                        currentSort.direction = 'desc';
+                    }
+                    renderLocationsTable(locationsData);
+                });
+                
+                document.getElementById('sortSaves')?.addEventListener('click', () => {
+                    if (currentSort.field === 'saves') {
+                        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.field = 'saves';
+                        currentSort.direction = 'desc';
+                    }
+                    renderLocationsTable(locationsData);
                 });
             }
 

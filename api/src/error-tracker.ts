@@ -83,11 +83,14 @@ export function getErrorMetrics(): ErrorMetricsResponse {
 
 type RouteHandler = (req: BunRequest) => Response | Promise<Response>;
 
+
 export function withErrorTracking(apiName: string, handler: RouteHandler): RouteHandler {
     return async (req: BunRequest): Promise<Response> => {
         try {
             const response = await handler(req);
-            if (response.status >= 400) {
+
+            // Currently we just want to track internal server errors because those are the worrying ones
+            if (response.status >= 500) {
                 recordApiError(apiName, response.status);
             }
             return response;

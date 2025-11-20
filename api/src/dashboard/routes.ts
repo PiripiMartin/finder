@@ -61,15 +61,23 @@ export async function getSignupsPerDay(req: BunRequest): Promise<Response> {
     const [results] = await db.execute(query) as [any[], any];
     const data = toCamelCase(results);
 
+    // Helper function to format date as YYYY-MM-DD in local timezone
+    function formatLocalDate(date: Date): string {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    
     // Fill in missing days with 0
     const last7Days: { date: string; count: number }[] = [];
     const today = new Date();
     
-    // Normalize dates from database to strings
+    // Normalize dates from database to strings (database dates are already in local timezone)
     const normalizedData = (data as any[]).map((item: any) => {
         let dateStr: string;
         if (item.date instanceof Date) {
-            dateStr = item.date.toISOString().split('T')[0];
+            dateStr = formatLocalDate(item.date);
         } else {
             const dateValue = String(item.date || '');
             dateStr = dateValue.split('T')[0] || dateValue;
@@ -80,7 +88,7 @@ export async function getSignupsPerDay(req: BunRequest): Promise<Response> {
     for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0] || date.toISOString();
+        const dateStr = formatLocalDate(date);
         
         const existing = normalizedData.find((item: any) => item.date === dateStr);
         last7Days.push({
@@ -120,15 +128,23 @@ export async function getPostsPerDay(req: BunRequest): Promise<Response> {
     const [results] = await db.execute(query) as [any[], any];
     const data = toCamelCase(results);
 
+    // Helper function to format date as YYYY-MM-DD in local timezone
+    function formatLocalDate(date: Date): string {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    
     // Fill in missing days with 0
     const last7Days: { date: string; count: number }[] = [];
     const today = new Date();
     
-    // Normalize dates from database to strings
+    // Normalize dates from database to strings (database dates are already in local timezone)
     const normalizedData = (data as any[]).map((item: any) => {
         let dateStr: string;
         if (item.date instanceof Date) {
-            dateStr = item.date.toISOString().split('T')[0];
+            dateStr = formatLocalDate(item.date);
         } else {
             const dateValue = String(item.date || '');
             dateStr = dateValue.split('T')[0] || dateValue;
@@ -139,7 +155,7 @@ export async function getPostsPerDay(req: BunRequest): Promise<Response> {
     for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0] || date.toISOString();
+        const dateStr = formatLocalDate(date);
         
         const existing = normalizedData.find((item: any) => item.date === dateStr);
         last7Days.push({
@@ -172,9 +188,11 @@ export async function getPopularLocations(req: BunRequest): Promise<Response> {
             mp.title,
             mp.emoji,
             mp.address,
-            COUNT(p.id) as post_count
+            COUNT(DISTINCT p.id) as post_count,
+            COUNT(DISTINCT usl.user_id) as save_count
         FROM map_points mp
         LEFT JOIN posts p ON mp.id = p.map_point_id
+        LEFT JOIN user_saved_locations usl ON mp.id = usl.map_point_id
         GROUP BY mp.id, mp.title, mp.emoji, mp.address
         HAVING post_count > 0
         ORDER BY post_count DESC
