@@ -22,6 +22,10 @@ import { completePasswordReset } from "./email/routes";
 import { getSignupsPerDay, getPostsPerDay, getPopularLocations, getErrorStats } from "./dashboard/routes";
 import { withErrorTracking } from "./error-tracker";
 
+// Temp
+import { getGenericPostInformation } from "./posts/generic-scraper";
+import type { BunRequest } from "bun";
+
 // Start background tasks
 startSessionCleanupTask();
 
@@ -96,7 +100,15 @@ Bun.serve({
         "/api/dashboard/signups-per-day": { GET: withErrorTracking("GET /api/dashboard/signups-per-day", getSignupsPerDay) },
         "/api/dashboard/posts-per-day": { GET: withErrorTracking("GET /api/dashboard/posts-per-day", getPostsPerDay) },
         "/api/dashboard/popular-locations": { GET: withErrorTracking("GET /api/dashboard/popular-locations", getPopularLocations) },
-        "/api/dashboard/error-stats": { GET: withErrorTracking("GET /api/dashboard/error-stats", getErrorStats) }
+        "/api/dashboard/error-stats": { GET: withErrorTracking("GET /api/dashboard/error-stats", getErrorStats) },
+
+
+        // Debug Endpoints
+        "/api/debug/generic-scraper": { POST: withErrorTracking("POST /api/debug/generic-scraper", async (req: BunRequest) => {
+            const data = await req.json();
+            const postInformation = await getGenericPostInformation((data as any).url);
+            return new Response(JSON.stringify(postInformation), {status: 200});
+        }) },
     }
 });
 

@@ -1,5 +1,5 @@
 import type { BunRequest } from "bun";
-import type { TikTokEmbedResponse, InstagramPostInformation } from "./types";
+import type { TikTokEmbedResponse, InstagramPostInformation, GenericPostInformation } from "./types";
 import { verifySessionToken } from "../user/session";
 import { checkedExtractBody } from "../utils";
 import { extractPossibleLocationName, generateLocationDetails, getGooglePlaceDetails, getTikTokEmbedInfo, searchGooglePlaces, buildTikTokEmbedUrl } from "./get-location";
@@ -9,6 +9,7 @@ import { PostPlatform } from "./types";
 import { getPostPlatform } from "./utils";
 import { buildInstagramEmbedUrl, getInstagramPostInformation } from "./instagram";
 import { getTikTokInfoFromMobilePage } from "./tiktok";
+import { getGenericPostInformation } from "./generic-scraper";
 
 
 interface NewPostRequest {
@@ -19,10 +20,10 @@ interface NewPostRequest {
  * Determines the post type based on the URL and platform.
  * 
  * @param url - The post URL
- * @param platform - The post platform (TikTok or Instagram)
- * @returns The post type: "tiktokvid", "tiktokslideshow", or "instagram"
+ * @param platform - The post platform (TikTok, Instagram, or null for generic)
+ * @returns The post type: "tiktokvid", "tiktokslideshow", "instagram", or "generic"
  */
-function determinePostType(url: string, platform: PostPlatform): string {
+function determinePostType(url: string, platform: PostPlatform | null): string {
     if (platform === PostPlatform.INSTAGRAM) {
         return "instagram";
     }
@@ -36,8 +37,24 @@ function determinePostType(url: string, platform: PostPlatform): string {
         return "tiktokvid";
     }
     
-    // Fallback (shouldn't happen)
-    return "tiktokvid";
+    // Generic post type for non-TikTok/Instagram URLs
+    return "generic";
+}
+
+/**
+ * Converts GenericPostInformation to InstagramPostInformation for compatibility with existing functions.
+ * 
+ * @param genericInfo - The generic post information
+ * @param authorName - The author/site name (extracted separately)
+ * @returns An InstagramPostInformation object
+ */
+function convertGenericToInstagram(genericInfo: GenericPostInformation, authorName: string): InstagramPostInformation {
+    return {
+        authorName,
+        title: genericInfo.title,
+        description: genericInfo.description,
+        location: genericInfo.location || "",
+    };
 }
 
 export async function createPost(req: BunRequest): Promise<Response> {
@@ -68,13 +85,11 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     // Now, we check if the post is for TikTok or Instagram
     const postPlatform = getPostPlatform(data.url);
-    if (!postPlatform) {
-        return new Response("Invalid post platform", {status: 400});
-    }
+    const postType = determinePostType(data.url, postPlatform);
 
     let postInformation: TikTokEmbedResponse | InstagramPostInformation | null = null;
     let embedUrl: string | null = null;
-    const postType = determinePostType(data.url, postPlatform);
+    let genericPostInfo: GenericPostInformation | null = null;
 
     if (postPlatform === PostPlatform.TIKTOK) {
 
@@ -105,6 +120,19 @@ export async function createPost(req: BunRequest): Promise<Response> {
         }
 
         embedUrl = buildInstagramEmbedUrl(data.url);
+    } else {
+        // Generic post - use the generic scraper
+        genericPostInfo = await getGenericPostInformation(data.url);
+
+        if (!genericPostInfo) {
+            return new Response("Couldn't get generic post information", {status: 500});
+        }
+
+        // Convert to InstagramPostInformation for compatibility
+        postInformation = convertGenericToInstagram(genericPostInfo, genericPostInfo.authorName);
+
+        // For generic posts, embedUrl is the thumbnailUrl
+        embedUrl = genericPostInfo.thumbnailUrl || data.url;
     }
 
     if (!postInformation) {
@@ -112,7 +140,16 @@ export async function createPost(req: BunRequest): Promise<Response> {
     }
 
     // Extract possible location name using LLM API
-    const possiblePlaceName = postInformation ? await extractPossibleLocationName(postInformation) : null;
+    // For generic posts, we already have the location from the scraper
+    let possiblePlaceName: string | null = null;
+    if (genericPostInfo && genericPostInfo.location) {
+        // Use the location already extracted by the generic scraper
+        possiblePlaceName = genericPostInfo.location;
+    } else {
+        // For TikTok/Instagram, extract location using LLM API
+        possiblePlaceName = postInformation ? await extractPossibleLocationName(postInformation) : null;
+    }
+    
     if (!possiblePlaceName) {
         console.error("Couldn't create a good location name");
         const invalidLocation = await createInvalidLocation(postInformation);

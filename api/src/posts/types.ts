@@ -46,3 +46,11 @@ export interface InstagramPostInformation {
     description: string;
     location: string;
 }
+
+export interface GenericPostInformation {
+    title: string;
+    description: string;
+    location: string | null;
+    thumbnailUrl: string | null;
+    authorName: string;
+}
