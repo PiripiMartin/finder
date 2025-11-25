@@ -1,7 +1,7 @@
 import { db, toCamelCase } from "../database";
 import { generateLocationDetails } from "../posts/get-location";
 import type { MapPoint } from "../map/types";
-import type { TikTokEmbedResponse, InstagramPostInformation, Post } from "./types";
+import type { TikTokEmbedResponse, InstagramPostInformation, GenericPostInformation, Post } from "./types";
 
 /**
  * Represents an attempt to save a post.
@@ -135,16 +135,25 @@ export async function createPost(post: CreatePostRequest): Promise<Post | null> 
 /**
  * Creates a new invalid location in the database.
  *
- * @param embedInfo - The embed information for the TikTok video.
+ * @param embedInfo - The embed information for the post (TikTok, Instagram, or Generic).
+ * @param websiteUrl - Optional website URL to include for generic posts.
  * @returns A promise that resolves to the newly created map point, or null on failure.
  */
-export async function createInvalidLocation(embedInfo: TikTokEmbedResponse | InstagramPostInformation): Promise<MapPoint | null> {
+export async function createInvalidLocation(
+    embedInfo: TikTokEmbedResponse | InstagramPostInformation | GenericPostInformation,
+    websiteUrl?: string | null
+): Promise<MapPoint | null> {
     const locationDetails = await generateLocationDetails(embedInfo);
     if (!locationDetails) {
         return null;
     }
 
     const { title, description, emoji } = locationDetails;
+
+    // For generic posts, use the provided websiteUrl if available
+    // Check if it's GenericPostInformation by checking for thumbnailUrl without embedProductId
+    const isGenericPost = 'thumbnailUrl' in embedInfo && !('embedProductId' in embedInfo);
+    const finalWebsiteUrl = isGenericPost ? (websiteUrl || null) : null;
 
     return await createLocation({
         googlePlaceId: null,
@@ -155,7 +164,7 @@ export async function createInvalidLocation(embedInfo: TikTokEmbedResponse | Ins
         longitude: 0,
         isValidLocation: false,
         recommendable: false,
-        websiteUrl: null,
+        websiteUrl: finalWebsiteUrl,
         phoneNumber: null,
         address: null,
     });

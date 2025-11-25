@@ -152,7 +152,10 @@ export async function createPost(req: BunRequest): Promise<Response> {
     
     if (!possiblePlaceName) {
         console.error("Couldn't create a good location name");
-        const invalidLocation = await createInvalidLocation(postInformation);
+        const invalidLocation = await createInvalidLocation(
+            genericPostInfo || postInformation!,
+            genericPostInfo ? data.url : null
+        );
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -177,7 +180,10 @@ export async function createPost(req: BunRequest): Promise<Response> {
     const placesResult = await searchGooglePlaces(possiblePlaceName);
     if (!placesResult) {
         console.error("Couldn't resolve actual location.");
-        const invalidLocation = await createInvalidLocation(postInformation);
+        const invalidLocation = await createInvalidLocation(
+            genericPostInfo || postInformation!,
+            genericPostInfo ? data.url : null
+        );
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -200,10 +206,14 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     if (!placesResult.places || placesResult.places.length === 0) {
         console.error("Couldn't resolve actual location.");
-        const invalidLocation = await createInvalidLocation(postInformation);
+        const invalidLocation = await createInvalidLocation(
+            genericPostInfo || postInformation!,
+            genericPostInfo ? data.url : null
+        );
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
+
         const post = await createPostRecord({ url: embedUrl!, postedBy: userId, mapPointId: invalidLocation.id, postType });
         
         // Add to user's saved locations
@@ -263,7 +273,10 @@ export async function createPost(req: BunRequest): Promise<Response> {
     const placeDetails = await getGooglePlaceDetails(placeId);
     if (!placeDetails) {
         console.error("Failed to resolve place details");
-        const invalidLocation = await createInvalidLocation(postInformation);
+        const invalidLocation = await createInvalidLocation(
+            genericPostInfo || postInformation!,
+            genericPostInfo ? data.url : null
+        );
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -286,10 +299,16 @@ export async function createPost(req: BunRequest): Promise<Response> {
     //console.log("Place details:");
     //console.log(placeDetails);
 
-    const locationDetails = await generateLocationDetails(postInformation, placeDetails);
+    const locationDetails = await generateLocationDetails(
+        genericPostInfo || postInformation!,
+        placeDetails
+    );
     if (!locationDetails) {
         console.error("Failed to generate tagline and emoji");
-        const invalidLocation = await createInvalidLocation(postInformation);
+        const invalidLocation = await createInvalidLocation(
+            genericPostInfo || postInformation!,
+            genericPostInfo ? data.url : null
+        );
         if (!invalidLocation) {
             return new Response("Failed to create invalid location.", { status: 500 });
         }
@@ -322,7 +341,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
         longitude: placeDetails.location.longitude,
         isValidLocation: true, 
         recommendable: false, // Always starts as false
-        websiteUrl: placeDetails.websiteUri ?? null,
+        websiteUrl: genericPostInfo ? data.url : placeDetails.websiteUri ?? null,
         phoneNumber: placeDetails.nationalPhoneNumber ?? null,
         address: placeDetails.formattedAddress,
     };

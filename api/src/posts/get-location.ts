@@ -1,5 +1,5 @@
 import { toCamelCase } from "../database";
-import type { TikTokEmbedResponse, InstagramPostInformation, Post } from "./types";
+import type { TikTokEmbedResponse, InstagramPostInformation, GenericPostInformation, Post } from "./types";
 
 /**
  * The endpoint for the Gemini API.
@@ -88,7 +88,7 @@ export async function getTikTokEmbedInfo(vidUrl: string): Promise<TikTokEmbedRes
  * @param embedInfo - The embed information for the post.
  * @returns A promise that resolves to a search query for Google Places or null on failure.
  */
-export async function extractPossibleLocationName(embedInfo: TikTokEmbedResponse | InstagramPostInformation): Promise<string | null> {
+export async function extractPossibleLocationName(embedInfo: TikTokEmbedResponse | InstagramPostInformation | GenericPostInformation): Promise<string | null> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not set");
@@ -255,12 +255,12 @@ export async function getGooglePlaceDetails(placeId: string): Promise<PlacesDeta
 /**
  * Generates a title, description and emoji for a location, based on its details and the context of a TikTok video.
  *
- * @param embedInfo - The embed information for the TikTok video.
+ * @param embedInfo - The embed information for the post (TikTok, Instagram, or Generic).
  * @param placeDetails - Optional: The Google Place details for the location.
  * @returns A promise that resolves to the generated description and emoji, or null on failure.
  */
 export async function generateLocationDetails(
-    embedInfo: TikTokEmbedResponse | InstagramPostInformation,
+    embedInfo: TikTokEmbedResponse | InstagramPostInformation | GenericPostInformation,
     placeDetails?: PlacesDetailsResponse
 ): Promise<{ title: string; description: string; emoji: string } | null> {
     const apiKey = process.env.GEMINI_API_KEY;
