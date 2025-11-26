@@ -66,6 +66,10 @@ export default function LoginScreen() {
     router.push('/auth/create-account');
   };
 
+  const goToForgotPassword = () => {
+    router.push('/auth/forgot-password');
+  };
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -113,6 +117,14 @@ export default function LoginScreen() {
       color: theme.colors.surface,
       fontSize: 18,
       fontWeight: '600',
+    },
+    forgotPasswordButton: {
+      paddingVertical: 12,
+      alignItems: 'center',
+    },
+    forgotPasswordText: {
+      color: theme.colors.primary,
+      fontSize: 16,
     },
     createAccountButton: {
       paddingVertical: 16,
@@ -169,6 +181,15 @@ export default function LoginScreen() {
         >
           <Text style={styles.loginButtonText}>
             {isLoading ? 'Logging in...' : 'Login'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.forgotPasswordButton}
+          onPress={goToForgotPassword}
+        >
+          <Text style={styles.forgotPasswordText}>
+            Forgot Password?
           </Text>
         </TouchableOpacity>
 

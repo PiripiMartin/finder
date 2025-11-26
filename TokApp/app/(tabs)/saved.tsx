@@ -102,10 +102,12 @@ export default function Saved() {
   // Fetch saved locations from API with retry logic (now also fetches folders from saved-new)
   const fetchSavedLocations = useCallback(async () => {
     try {
-      setIsLoading(true);
+      // Only show full loading screen if we have no data yet (initial load)
+      const hasData = folders.length > 0 || uncategorisedLocations.length > 0 || savedLocations.length > 0;
+      setIsLoading(!hasData); // Only true when no data exists
       setError(null);
       
-      console.log('📚 [Saved] Fetching saved locations...');
+      console.log('📚 [Saved] Fetching saved locations...', hasData ? '(background refresh)' : '(initial load)');
       const apiUrl = `${API_CONFIG.BASE_URL}/map/saved-new`;
       console.log('🌐 [Saved] API URL:', apiUrl);
       
@@ -222,7 +224,7 @@ export default function Saved() {
     } finally {
       setIsLoading(false);
     }
-  }, [sessionToken]);
+  }, [sessionToken, folders.length, uncategorisedLocations.length, savedLocations.length]);
 
   // Get unique emojis from saved locations
   const getUniqueEmojis = () => {
