@@ -11,6 +11,8 @@ export const API_CONFIG = {
     PROFILE: '/profile',
     NOTIFICATIONS: '/notifications',
     NOTIFICATIONS_SEEN: '/notifications/seen',
+    PASSWORD_RESET: '/password-reset',
+    PASSWORD_RESET_COMPLETE: '/password-reset/complete',
   },
 };
 
