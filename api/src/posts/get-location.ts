@@ -54,10 +54,12 @@ interface PlacesDetailsResponse {
  * Builds the standard TikTok player embed URL for a given video ID.
  *
  * @param videoId - The ID of the TikTok video.
+ * @param isSlideshow - Whether this is a slideshow (adds muted=1 parameter).
  * @returns The embeddable URL for the TikTok player.
  */
-export function buildTikTokEmbedUrl(videoId: string): string {
-    return `https://www.tiktok.com/player/v1/${videoId}?loop=1&autoplay=1&controls=1&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
+export function buildTikTokEmbedUrl(videoId: string, isSlideshow: boolean = false): string {
+    const baseUrl = `https://www.tiktok.com/player/v1/${videoId}?loop=1&autoplay=1&controls=1&volume_control=1&description=0&rel=0&native_context_menu=0&closed_caption=0&progress_bar=0&timestamp=0`;
+    return isSlideshow ? `${baseUrl}&muted=1` : baseUrl;
 }
 
 /**
@@ -75,7 +77,16 @@ export async function getTikTokEmbedInfo(vidUrl: string): Promise<TikTokEmbedRes
             console.error("TikTok oEmbed API request failed:", await embedResponse.text());
             return null;
         }
-        return toCamelCase(await embedResponse.json() as any) as TikTokEmbedResponse;
+        const raw = await embedResponse.json() as any;
+        const camel = toCamelCase(raw as any) as TikTokEmbedResponse;
+
+        // Best-effort detection: if the shared URL uses the /photo/ path, treat it as a slideshow.
+        // This will be overridden by the mobile page scraper when available.
+        if (vidUrl.includes("/photo/")) {
+            camel.isSlideshow = true;
+        }
+
+        return camel;
     } catch (error) {
         console.error("Error fetching TikTok embed info:", error);
         return null;

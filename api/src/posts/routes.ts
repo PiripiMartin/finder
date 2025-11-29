@@ -17,31 +17,6 @@ interface NewPostRequest {
 };
 
 /**
- * Determines the post type based on the URL and platform.
- * 
- * @param url - The post URL
- * @param platform - The post platform (TikTok, Instagram, or null for generic)
- * @returns The post type: "tiktokvid", "tiktokslideshow", "instagram", or "generic"
- */
-function determinePostType(url: string, platform: PostPlatform | null): string {
-    if (platform === PostPlatform.INSTAGRAM) {
-        return "instagram";
-    }
-    
-    if (platform === PostPlatform.TIKTOK) {
-        // Check if URL contains "/photo/" which indicates a slideshow
-        if (url.includes("/photo/")) {
-            return "tiktokslideshow";
-        }
-        // Default to video for TikTok
-        return "tiktokvid";
-    }
-    
-    // Generic post type for non-TikTok/Instagram URLs
-    return "generic";
-}
-
-/**
  * Converts GenericPostInformation to InstagramPostInformation for compatibility with existing functions.
  * 
  * @param genericInfo - The generic post information
@@ -85,7 +60,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
     // Now, we check if the post is for TikTok or Instagram
     const postPlatform = getPostPlatform(data.url);
-    const postType = determinePostType(data.url, postPlatform);
+    let postType: string;
 
     let postInformation: TikTokEmbedResponse | InstagramPostInformation | null = null;
     let embedUrl: string | null = null;
@@ -96,8 +71,11 @@ export async function createPost(req: BunRequest): Promise<Response> {
         // Get TikTok embed info
         postInformation = await getTikTokEmbedInfo(data.url) as TikTokEmbedResponse | null;
 
+        // Determine post type: if embed API fails, it's a slideshow (deterministic)
+        const embedApiSucceeded = postInformation && postInformation.embedProductId;
+        
         // Fallback to mobile page scraper if embed API fails
-        if (!postInformation || !postInformation.embedProductId) {
+        if (!embedApiSucceeded) {
             //console.log("TikTok embed API failed, falling back to mobile page scraper...");
             postInformation = await getTikTokInfoFromMobilePage(data.url) as TikTokEmbedResponse | null;
         }
@@ -106,10 +84,13 @@ export async function createPost(req: BunRequest): Promise<Response> {
             return new Response("Couldn't get TikTok video ID from link.", {status: 500});
         }
 
-        // Compute embed URL
+        // Determine TikTok post type: embed API failure = slideshow (deterministic)
+        postType = embedApiSucceeded ? "tiktokvid" : "tiktokslideshow";
+
+        // Compute embed URL (add muted=1 for slideshows)
         if (postInformation?.embedProductId) {
-            embedUrl = buildTikTokEmbedUrl(postInformation.embedProductId);
-        } 
+            embedUrl = buildTikTokEmbedUrl(postInformation.embedProductId, !embedApiSucceeded);
+        }
 
 
     } else if (postPlatform === PostPlatform.INSTAGRAM) {
@@ -120,6 +101,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
         }
 
         embedUrl = buildInstagramEmbedUrl(data.url);
+        postType = "instagram";
     } else {
         // Generic post - use the generic scraper
         genericPostInfo = await getGenericPostInformation(data.url);
@@ -133,6 +115,7 @@ export async function createPost(req: BunRequest): Promise<Response> {
 
         // For generic posts, embedUrl is the thumbnailUrl
         embedUrl = genericPostInfo.thumbnailUrl || data.url;
+        postType = "generic";
     }
 
     if (!postInformation) {

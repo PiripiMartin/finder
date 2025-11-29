@@ -38,6 +38,11 @@ export interface TikTokEmbedResponse {
     html: string;
     thumbnailUrl: string;
     embedProductId: string;
+    /**
+     * Indicates whether the TikTok post is a slideshow (photo post) rather than a standard video.
+     * This may be inferred from the URL, oEmbed data, or the scraped mobile page JSON.
+     */
+    isSlideshow?: boolean;
 }
 
 export interface InstagramPostInformation {

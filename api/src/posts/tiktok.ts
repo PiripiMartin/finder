@@ -174,12 +174,15 @@ export async function getTikTokInfoFromMobilePage(postUrl: string): Promise<TikT
             html: "", // Not needed for our use case
             thumbnailUrl: thumbnailUrl,
             embedProductId: videoId,
-            // Store image URLs in a local variable as requested
-            // We'll add this to the type if needed, but for now we'll keep it separate
         };
 
         // Store image URLs in a local variable (as requested)
         const imageArray = imageUrls;
+
+        // If we detected one or more images in imagePost, this is a slideshow/photo post.
+        if (imageArray.length > 0) {
+            embedResponse.isSlideshow = true;
+        }
 
         // Log the extracted data for debugging
         //console.log("Extracted TikTok info from mobile page:", {
